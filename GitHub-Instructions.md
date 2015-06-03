@@ -1,10 +1,10 @@
 # Using GitHub for development
 
 ## Join USGS-WERC repo
-1. Create GitHub account (http://butst.usgs.gov/open-source/)
-2. Join USGS Github group by emailing ???
+1. Create GitHub account following USGS guidelines (http://butst.usgs.gov/open-source/)
+2. Join USGS GitHub group by emailing gs_github_admin@usgs.gov
 3. Join USGS-WERC repo by emailing Max (mczapanskiy@usgs.gov)
-4. Download GitHub software (windows.github.com)
+4. Download GitHub software (http://windows.github.com)
 5. Log in to GitHub software and clone the USGS-WERC repo locally
 
 ## More resources
