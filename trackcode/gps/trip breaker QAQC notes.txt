@@ -1,0 +1,28 @@
+Post process QAQC
+
+Potential Codes
+-trip good for nothing
+-trip duration good, no max distance, distance traveled
+-trip duration good, max distance good, distance traveled bad
+
+individual tags/tracks
+-dep id 434 QBA WTSH019 ok just gps signal/location fix lag
+
+
+Dos
+WTSH
+-check and fix HAW WTSH depl/recov times based on scanned field notes from Jay
+
+Develop post trip breaking classification criteria
+-foraging trip
+-local ultra short trip
+-local loafing/near colony
+
+
+Trip behavior states
+-transit
+-restricted area search
+-on water
+-bobbies roosting away from colony
+-combined behavior and diurnal state
+-short trip within t=t of release, observer effect
