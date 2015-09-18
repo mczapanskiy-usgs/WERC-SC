@@ -1,0 +1,128 @@
+library('dplyr')
+library('foreach')
+library('diveMove')
+
+# Iterate through data folder
+foreach(tdr_file = dir('dive_identification/data2/', full.names = TRUE)) %do% {
+  # Read TDR CSV
+  tdr_data <- read.csv(tdr_file, stringsAsFactors = FALSE) %>% 
+    mutate(UTC = as.POSIXct(UTC, tz = 'UTC'))
+  
+  # Extract species and band suffix from file name
+  species <- regmatches(tdr_file, regexpr('BRBO|RFBO|RTTR', tdr_file))
+  bandno <- sub('.*([0-9]{6}).CSV', '\\1', tdr_file)
+  
+  # Create folder for plots
+  plot_path <- file.path('dive_identification', 'plots2', paste(species, bandno, sep = '_'))
+  dir.create(plot_path)
+  
+  # Iterate through valid fast log events (more than zero points)
+  foreach(event = unique(tdr_data$EventId)) %do% {
+    # Create a png to save to
+    png(filename = file.path(plot_path, paste0(event, '.PNG')), 
+        width = 900,
+        height = 600)
+    
+    # Create the plot
+    with(filter(tdr_data, EventId == event), {
+      plot(UTC, Pressure,
+           ylim = c(4,-1),
+           cex = .5,
+           main = sprintf('%s %s\nFast Log %i', species, bandno, event))
+      lines(UTC, Pressure)
+      abline(h = 1, col = 'red', lty = 2)
+      abline(h = median(Pressure), col = 'green', lty = 2)
+      abline(h = 1 + median(Pressure), col = 'blue', lty = 2)
+    })
+    dev.off()
+  }
+}
+
+foreach(tdr_file = dir('dive_identification/data2/', pattern = 'WTSH', full.names = TRUE)) %do% {
+  WTSH_csv <- read.csv(tdr_file, stringsAsFactors = FALSE) %>% mutate(UTC = as.POSIXct(UTC, tz = 'UTC'))
+  foreach(event = unique(WTSH_csv$EventId), .combine = rbind) %do% {
+    #eventid  records	max_depth	surface_offset	adj_max_depth	1m_dives	1m_adj_dives	.75m_adj_dives	.5m_adj_dives
+    burst <- filter(WTSH_csv, EventId == event)
+    if(nrow(burst) == 4) return(NULL)
+    tdr <- with(burst, 
+                createTDR(UTC, 
+                          Pressure, 
+                          dtime = .1, 
+                          file = tdr_file))
+    surface_offset <- median(burst$Pressure)
+    calib1 <- calibrateDepth(tdr, wet.thr = 0, dive.thr = 1,
+                             zoc.method = 'offset', offset = 0)
+    calib1adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = 1,
+                             zoc.method = 'offset', offset = surface_offset)
+    calib.75adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .75,
+                               zoc.method = 'offset', offset = surface_offset)
+    calib.5adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
+                              zoc.method = 'offset', offset = surface_offset)
+    
+    data.frame(EventId = event,
+               records = nrow(burst), 
+               max_depth = max(burst$Pressure),
+               surface_offset = surface_offset,
+               adj_max_depth = max(burst$Pressure) + surface_offset,
+               dives_1 = length(calib1@dive.models),
+               dives_1adj = length(calib1adj@dive.models),
+               dives_.75adj = length(calib.75adj@dive.models),
+               dives_.5adj = length(calib.5adj@dive.models))
+  } -> WTSH_breakdown
+  
+  plot_path <- file.path('dive_identification', 'plots3')
+  png(file.path(plot_path, tdr_file %>% basename %>% sub('.CSV', '.png', .)),
+      height = 400,
+      width = 600)
+  barplot(colSums(BRBO010_breakdown[6:9]),
+          beside = TRUE,
+          main = tdr_file %>% basename %>% sub('.CSV', '', .))
+  dev.off()
+}
+
+tdr_file <- 'dive_identification/data2/HOO_WTSH_029_28077_A10369_091914.CSV'
+WTSH_csv <- read.csv(tdr_file, stringsAsFactors = FALSE) %>% mutate(UTC = as.POSIXct(UTC, tz = 'UTC'))
+WTSH_breakdown <- WTSH_csv %>%
+  group_by(EventId) %>%
+  summarize(records = n(),
+            max_depth = max(Pressure),
+            suface_offset = median(Pressure)
+foreach(event = unique(WTSH_csv$EventId)[-1], .combine = rbind) %do% {
+  #eventid  records  max_depth	surface_offset	adj_max_depth	1m_dives	1m_adj_dives	.75m_adj_dives	.5m_adj_dives
+  burst <- filter(WTSH_csv, EventId == event)
+  if(nrow(burst) == 4) return(NULL)
+  tdr <- with(burst, 
+              createTDR(UTC, 
+                        Pressure, 
+                        dtime = .1, 
+                        file = tdr_file))
+  surface_offset <- median(burst$Pressure)
+  calib1 <- calibrateDepth(tdr, wet.thr = 0, dive.thr = 1,
+                           zoc.method = 'offset', offset = 0)
+  calib1adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = 1,
+                              zoc.method = 'offset', offset = surface_offset)
+  calib.75adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .75,
+                                zoc.method = 'offset', offset = surface_offset)
+  calib.5adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
+                               zoc.method = 'offset', offset = surface_offset)
+  
+  browser()
+  
+  data.frame(EventId = event,
+             records = nrow(burst), 
+             max_depth = max(burst$Pressure),
+             surface_offset = surface_offset,
+             adj_max_depth = max(burst$Pressure) + surface_offset,
+             dives_1 = length(calib1@dive.models),
+             dives_1adj = length(calib1adj@dive.models),
+             dives_.75adj = length(calib.75adj@dive.models),
+             dives_.5adj = length(calib.5adj@dive.models))
+} -> WTSH_breakdown
+
+dive_of_interest <- 152
+BRBO010_tdr <- with(filter(BRBO010_csv, EventId == dive_of_interest), 
+                    createTDR(UTC, 
+                              Pressure, 
+                              dtime = .1, 
+                              file = 'dive_identification/data2/LEH2014BRBO010_A10343_061614.CSV'))
+BRBO010_calib <- calibrateDepth(BRBO010_tdr, zoc.method = 'offset', offset = median(BRBO010_csv$Pressure))
