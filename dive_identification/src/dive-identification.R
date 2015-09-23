@@ -1,6 +1,7 @@
 library('dplyr')
 library('foreach')
 library('diveMove')
+library('iterators')
 
 # Iterate through data folder
 foreach(tdr_file = dir('dive_identification/data2/', full.names = TRUE)) %do% {
@@ -86,7 +87,103 @@ WTSH_breakdown <- WTSH_csv %>%
   group_by(EventId) %>%
   summarize(records = n(),
             max_depth = max(Pressure),
-            suface_offset = median(Pressure)
+            suface_offset = median(Pressure)) %>%
+  tail(-1)
+
+# WTSH Metadata
+read.csv('dive_identification/metadata_all_GPS_05.28.15_working.csv', stringsAsFactors = FALSE) %>% 
+  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M')) %>% 
+  group_by(Deploy_ID, FieldID, Species) %>% 
+  summarize(deployed = min(UTC), 
+            recovered = max(UTC),
+            period = difftime(max(UTC), min(UTC), units = 'days') %>% as.numeric,
+            ValidTDR = any(TDR_TagRecov == 1), 
+            TDR_File = paste(TDR_File, collapse = '')) %>% 
+  filter(ValidTDR) -> WTSH_metadata
+
+# WTSH Pressure Drift
+foreach(wtsh_file = dir('dive_identification/wtsh_data2/', full.names = TRUE), .combine = rbind) %do% {
+  metadata <- WTSH_metadata %>%
+    filter(TDR_File == wtsh_file %>% basename %>% sub('.csv', '', ., ignore.case = TRUE))
+  tdr_data <- read.csv(wtsh_file, stringsAsFactors = FALSE) %>%
+    mutate(UTC = as.POSIXct(UTC, tz = 'UTC'),
+           tad = difftime(UTC, metadata$deployed, units = 'days')) %>%
+    filter(EventId == 0,
+           UTC > metadata$deployed,
+           UTC < metadata$recovered)
+  drift_model <- lm(Pressure ~ tad, data = tdr_data)
+  data.frame(Deploy_ID = metadata$Deploy_ID,
+             deployed = metadata$deployed, 
+             recovered = metadata$recovered, 
+             duration = difftime(metadata$recovered, metadata$deployed, units = 'days'),
+             min_pressure = min(tdr_data$Pressure),
+             max_pressure = max(tdr_data$Pressure),
+             b = coef(drift_model)[1],
+             m = coef(drift_model)[2])
+} -> WTSH_pressure_drift
+with(WTSH_pressure_drift, {
+  plot(x = 0,
+       y = 0,
+       xlim = c(0, max(duration)),
+       ylim = rev(range(c(min_pressure, max_pressure))),
+       pch = NA_integer_,
+       main = 'Pressure drift in WTSH TDRs',
+       xlab = 'Days after deployment',
+       ylab = 'Pressure')
+  axis(side = 4)
+  grid()
+  })
+foreach(WTSH = iter(WTSH_pressure_drift, by = 'row')) %do% {
+  with(WTSH, {
+    lines(c(0, duration), 
+          m * c(0, duration) + b,
+          lwd = 1)
+  })
+}
+
+# WTSH Depth Distribution Over Time
+foreach(wtsh_file = dir('dive_identification/wtsh_data2/', full.names = TRUE), .combine = rbind) %do% {
+  metadata <- WTSH_metadata %>%
+    filter(TDR_File == wtsh_file %>% basename %>% sub('.csv', '', ., ignore.case = TRUE))
+  read.csv(wtsh_file, stringsAsFactors = FALSE) %>% 
+    mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>%
+    filter(EventId > 0,
+           UTC > metadata$deployed,
+           UTC < metadata$recovered) %>%
+    group_by(EventId) %>%
+    summarize(records = n(),
+              max_depth = max(Pressure),
+              UTC = min(UTC),
+              TDR_File = basename(wtsh_file) %>% sub('.csv', '', ., ignore.case = TRUE)) %>%
+    filter(records > 4,
+           max_depth >= 1) %>%
+    mutate(tad = difftime(UTC, metadata$deployed, units = 'days') %>% as.numeric)
+} -> WTSH_depth_distribution
+depth_dist_model <- lm(max_depth ~ tad, WTSH_depth_distribution)
+plot(max_depth ~ tad, 
+     data = WTSH_depth_distribution,
+     main = 'WTSH Dive Detection Bias',
+     sub = with(summary(depth_dist_model), sprintf('R^2 = %.5f  p-value = %.5f', r.squared, pf(fstatistic[1], fstatistic[2], fstatistic[3], lower.tail = FALSE))),
+     xlab = 'Days after deployment',
+     ylab = 'Max depth (m)')
+abline(depth_dist_model)
+
+# WTSH Dive Distribution Over Time
+dive_list <- lapply(unique(WTSH_depth_distribution$TDR_File), 
+                    function(tdr) filter(WTSH_depth_distribution, TDR_File == tdr))
+dive_list_order <- sapply(dive_list, function(dives) max(dives$tad)) %>% order
+dive_list <- dive_list[dive_list_order]
+boxplot(dive_list,
+        horizontal = TRUE,
+        main = 'Dive distribution per tag',
+        xlab = 'Days after deployment',
+        ylab = 'Tag')
+WTSH_depth_distribution %>%
+  #filter(tad < 6) %>%
+  mutate(bucket = tad %/% .5) %>% 
+  group_by(bucket) %>%
+  summarize(dives_per_tag = n() / n_distinct(TDR_File)) -> WTSH_dive_distribution
+
 foreach(event = unique(WTSH_csv$EventId)[-1], .combine = rbind) %do% {
   #eventid  records  max_depth	surface_offset	adj_max_depth	1m_dives	1m_adj_dives	.75m_adj_dives	.5m_adj_dives
   burst <- filter(WTSH_csv, EventId == event)
