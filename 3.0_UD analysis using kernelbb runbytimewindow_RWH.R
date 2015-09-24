@@ -130,34 +130,31 @@ ptt <- read.table (paste(dir.in,species,"/3_Clipped/tracksinpoly.csv",sep = ""),
 ptt$m<-as.numeric(format(as.POSIXct(strptime (ptt$utc, "%Y-%m-%d %H:%M:%S"), "GMT"), "%m"))
 ptt$y<-as.numeric(format(as.POSIXct(strptime (ptt$utc, "%Y-%m-%d %H:%M:%S"), "GMT"), "%Y"))
 
+# state grouping variable name
+grp.var.name<-"Jun_Oct_Y"
+grp.var.name<-"Jun_Jul.Sep_Oct_Y"
+
 # classify catagories 
-ptt <- data.table(ptt)
-ptt[m == c(6,7), group.var1 := "Jun_Jul"]
-ptt[m == c(9,10), group.var1 := "Sep_Oct"]
-ptt[m == c(6,7,8,9,10), group.var2 := "Jun_Oct"]
-ptt=as.data.frame(ptt)
+ptt1 <- data.table(ptt)
+ptt1[m == c(6,7), grp.var1 := "Jun_Jul"]
+ptt1[m == c(9,10), grp.var1 := "Sep_Oct"]
+ptt1[m == c(6,7,8,9,10), grp.var2 := "Jun_Oct"]
+ptt$grp.var<-ptt1$grp.var1
+ptt$grp.var<-ptt1$grp.var2
+rm(ptt1)
+# trim data
+ptt<-ptt[!is.na(ptt$grp.var),]
 
-ptt$groupvar6.7.9.10<-paste(ptt$group.var1,ptt$y,sep="_")
-ptt$groupvar6.7.8.9.10<-paste(ptt$group.var2,ptt$y,sep="_")
-
-ptt1<-ptt[ptt$m==c(6,7,9,10),]
-ptt2<-ptt[ptt$m==c(6,7,8,9,10),]
-
-
-m_Y.wants<-as.character(rbind("Jun_Jul","Sep_Oct"))
-ptt$m_Y.wants<-(ptt$m_Y %in%m_Y.wants)
-
-
-# for ZACA
-# ptt$m_Y<-format(as.POSIXct(strptime (ptt$utc, "%m/%d/%Y %H:%M"), "GMT"), "%m-%Y")
-
-#label and filter for month_Year wanted
-# m_Y.wants<-as.character(rbind("04-2005","04-2007","05-2007","06-2007"))
-# ptt$m_Y.wants<-(ptt$m_Y %in%m_Y.wants)
-
-
-# subset tracking data bounded by dates
-ptt<-subset(ptt,ptt$m_Y.wants=="TRUE")
+# # for ZACA
+# # ptt$m_Y<-format(as.POSIXct(strptime (ptt$utc, "%m/%d/%Y %H:%M"), "GMT"), "%m-%Y")
+# 
+# #label and filter for month_Year wanted
+# # m_Y.wants<-as.character(rbind("04-2005","04-2007","05-2007","06-2007"))
+# # ptt$m_Y.wants<-(ptt$m_Y %in%m_Y.wants)
+# 
+# 
+# # subset tracking data bounded by dates
+# ptt<-subset(ptt,ptt$m_Y.wants=="TRUE")
 
 ## set user input minimum number of locations to allow to render the BB model
 minNo<-2
@@ -168,7 +165,7 @@ print(clipPolyList) # show a list of the clipper files
 
 #### select clipperfile
 #### ui set rno for clipPolyList
-rno<-18 # row number of file list
+rno<-5 # row number of file list
 clipper<-as.character(clipPolyList$clipFileName[rno])
 clipperName<-as.character(clipPolyList$name[rno])
 
@@ -227,8 +224,8 @@ clipperBuff_proj<-gBuffer(clipper_proj, byid=F, id=NULL, width=buffDist, quadseg
 ext<-extent(clipperBuff_proj[1,1])
 # plot(ext, add=T)
 
-# subset tracking data contained in buffer
-ptt<-subset(ptt,ptt[paste(clipperName,"Buffer",sep="")]==1)
+# check subsetted tracking data is contained in buffer
+ptt<-ptt[ptt[paste(clipperName,"Buffer",sep="")]==1,]
 
 # head(ptt)
 
@@ -258,7 +255,12 @@ tracks.sp_proj<-spTransform(tracks.sp, CRS(paste("+",projWant,sep="")))
 #                                      header=T, sep=",", na.string="", strip.white=T)
 
 # select relevant data for kernel density analysis
-date_time <- as.POSIXct(strptime (tracks.sp_proj@data$utc, "%m/%d/%Y %H:%M"), "GMT")
+# for SOSH etc
+date_time <- as.POSIXct(strptime (tracks.sp_proj@data$utc, "%Y-%m-%d %H:%M:%S"), "GMT")
+
+# for ZACA
+# date_time <- as.POSIXct(strptime (tracks.sp_proj@data$utc, "%m/%d/%Y %H:%M"), "GMT")
+
 loc       <- tracks.sp_proj@coords    # where _projection is aea
 # head(tracks.sp_aea@coords)
 
@@ -266,13 +268,15 @@ if (id_2==0) {
   id<- ptt$ptt_deploy_id
   # head(ptt)
 } else {
-  if (exists("m_Y.wants")) {
-   id<- paste(ptt[,paste(clipperName,'Buffer_id2',sep='')],format(as.POSIXct(strptime (ptt$utc, "%m/%d/%Y %H:%M"), "GMT"), "%m-%Y"),sep="_")
+  if (!is.null(ptt$grp.var)) { # grouping variable for month aggregate and year
+    id<- paste(ptt[,paste(clipperName,'Buffer_id2',sep='')],ptt$grp.var,ptt$y,sep="_")
   } else {
-   id<- ptt[,paste(clipperName,'Buffer_id2',sep='')] }
+   id<- ptt[,paste(clipperName,'Buffer_id2',sep='')] 
+  }
 }
-
+  
 # CREATE TRACKS USING YOUR TIME AND LOCATION DATA FOR KERNELBB ANALYSIS
+# for SOSH etc months year
 track <- as.ltraj(loc, date_time, id, burst = id, typeII = TRUE)
 
 track.all<-summary(track)
@@ -324,19 +328,19 @@ tracksums.out<- merge(track.all, meta, by.x = "deploy_id", by.y = "ptt_deploy_id
     
    # CALCULATE UDBB WITH YOUR SPECIFIED SPEED AND SMOOTHING TERMS 
   bb <- kernelbb(track, speed, cellsize, grid = rast, byburst=T)  ## speed in m/s use same for each species and MATCH what you'be done for SDA, this possibly done b/c BB has prefilter based on speed, we've already done speed distance and angle
-#  bb <- kernelbb(track[1,],speed, cellsize, grid = rast, byburst=F)  ## speed in m/s use same for each species and MATCH what you'be done for SDA, this possibly done b/c BB has prefilter based on speed, we've already done speed distance and angle
+# bb <- kernelbb(track[1,],speed, cellsize, grid = rast, byburst=F)  ## speed in m/s use same for each species and MATCH what you'be done for SDA, this possibly done b/c BB has prefilter based on speed, we've already done speed distance and angle
   bbvol = getvolumeUD (bb)
-    ## Create a list of raster maps containing ud if the pixel is inside the100% home range and 0 otherwise
+  ## Create a list of raster maps containing ud if the pixel is inside the100% home range and 0 otherwise
   ## NOTE: ud estimates have been scaled by multiplying each value by 9000^2 to make prob vol that sums to 1.00 accross pixel space
   
-    # create UD clipping function to extract the UD within the 100% contour (which can be varied)
+  # create UD clipping function to extract the UD within the 100% contour (which can be varied)
 
 # create output directory, will not replace if already exists
 dir.create(file.path(paste(dir.out,species,"/",sep=""),"4_BB_out"),showWarnings=TRUE)
 #dir.create(file.path(paste(dir.out,species,"/4_BB_out/",sep="")),showWarnings=TRUE)
 
 # export track summary data
-write.table(as.data.frame(tracksums.out), paste(dir.out,species,"/4_BB_out/","tracksums_",species,"_BB_out_",clipperName,"by_m-Y.csv", sep = ""), sep=",", quote=FALSE,col.names=TRUE, row.names=FALSE,na="")
+write.table(as.data.frame(tracksums.out), paste(dir.out,species,"/4_BB_out/","tracksums_",species,"_BB_out_",clipperName,"_",grp.var.name,".csv", sep = ""), sep=",", quote=FALSE,col.names=TRUE, row.names=FALSE,na="")
             
     ## set mapcont to mapcontour
     mapcont <- function (x,y) {x[y<contour]<- x[y<=contour] * cellsize^2; x[y>contour]<-0; return(x)}   # set cellsize        

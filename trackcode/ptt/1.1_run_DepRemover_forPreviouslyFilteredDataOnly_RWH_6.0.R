@@ -5,7 +5,7 @@
 ## created
 ## April  26, 2015
 ##
-## flags duplicate locations from filtered data not run through USGS coding
+## flags duplicate locations from filtered data not run through USGS coding (i.e. ZACA data from Torez )
 ##
 ##
 ################################################################
@@ -66,6 +66,8 @@ ptt <- read.table (paste(dir.in,species,"/2_SDA_Freitas_out/","All_tracks_and_da
 #### create vector for points kept
 ptt$keeps[which(ptt$filtered=='dup')] = 0
 
+#### remove dep_utc field
+ptt<-ptt[, !(colnames(ptt) %in% c("dep_utc"))]
 
 #### output all tracks concatenated
 write.table (ptt, paste(dir.out,species,"/2_SDA_Freitas_out/","All_tracks_and_data_",species,".csv", sep =""), sep=",", quote=FALSE,col.names=TRUE, row.names=F,na="")

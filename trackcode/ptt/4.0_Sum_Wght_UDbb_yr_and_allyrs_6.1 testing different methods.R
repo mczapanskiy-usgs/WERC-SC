@@ -36,7 +36,7 @@ library(adehabitat)
 library(SDMTools)
 
 #### select species
-species="COMU"
+species="SOSH"
 
 #### select resolution and contour (normal export at "99.999" to include all bb data)
 resolution="3km" # cell size in km
@@ -55,7 +55,7 @@ dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 #### load clipperPolyLIst and select clipper file of interest
 clipPolyList<-read.csv (paste(dir.in.poly,"/clipPolyList.csv", sep=""), header=T, sep=",", strip.white=T)
 print(clipPolyList) # show a list of the clipper files
-rno<-19 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
+rno<-5 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
 clipperName<-as.character(clipPolyList$name[rno])
 
 #### read in metadata,select metadata based on species
@@ -91,7 +91,7 @@ noindiv.grp.ids <- vector ("list", length(grp.ids))
 summary.grp.ids <- vector ("list", length(grp.ids))
 
 #### loop through groups
-# grp.id <-2
+# grp.id <-5
 for (grp.id in 1:length(grp.ids)) {
   
   tracksums.want<-tracksums[which(tracksums$grp==grp.ids[grp.id]),]
@@ -108,7 +108,7 @@ for (grp.id in 1:length(grp.ids)) {
 
   # sum up segments for each track
   # run through track.freq table summing segments >1
-  # j=4
+  # j=1
   for (j in 1:length(track.freq$Var1)) {
     if (track.freq$Freq[j]==1) {
       # operation for only one segment in polygon (track.freq$Freq[j]==1) == TRUE
@@ -140,7 +140,7 @@ for (grp.id in 1:length(grp.ids)) {
         track.days[[j]]<-sum(days.segs)
       }
     }
-
+  
 ## sum by grouping variable weight by:
   # a) number of days tracked 
 print(paste("grouping variable = ", grping.var,sep=""))
@@ -159,6 +159,20 @@ print(paste("grouping variable = ", grping.var,sep=""))
     indiv[ud.track[[l]]>0] <-1
     noindiv.grp.id<-noindiv.grp.id+indiv  
   }
+
+  ud.track.nowght<-ud.track*0
+  for (l in 1:length(ud.track)) {
+    # calculate ud weighted by track.days, weigh each track it's proportion of total hours tracked within the clipperName (Freiberg 20XX paper)
+
+    ud.track.nowght[[l]]<-ud.track[[l]]*noindiv.grp.id
+  }
+  
+ud.track.stack<-stack(ud.track[[1]],ud.track[[2]])
+  ud.track.all
+  
+  ud.track.all<-Reduce("+",ud.track)  
+  
+  noindiv.grp.id
   
   ud.grp.ids[[grp.id]]<-ud.grp.id
 #   max(udall)

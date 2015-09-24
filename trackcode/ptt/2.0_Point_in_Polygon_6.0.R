@@ -45,11 +45,14 @@ dir.in.poly <- "D:/Share_Data/Clip Polygons"
 #### dir.out for outputs
 dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 
+#### dir.in of metadata
+dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
+
 #### set species AUO Code
-species<-"SOSH"
+species<-"COMU"
 
 #### read in metadata
-meta<-read.table (paste(dir.in,"PTT_metadata_1.0_5.08.2015_working.csv",sep = ""),header=T, sep=",", strip.white=T)
+meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
 
 #### select metadata want
 meta<-meta[meta$species==species & meta$loc_data==1,]
@@ -74,7 +77,7 @@ clipPolyList<-read.csv (paste(dir.in.poly,"/clipPolyList.csv", sep=""), header=T
 print(clipPolyList) # show a list of the clipper files
 
 #### select clipperfile
-rno<-5 # row number of file list
+rno<-19 # row number of file list
 clipper<-as.character(clipPolyList$clipFileName[rno])
 clipperName<-as.character(clipPolyList$name[rno])
 

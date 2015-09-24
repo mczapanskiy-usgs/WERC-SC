@@ -27,13 +27,17 @@ library(argosfilter)
 library(plyr)
 
 # set species AUO Code
-species<-"SOSH"
+species<-"COMU"
+
+# set year (optional)
+year=NA
 
 # set plot option to review plots TRUE or FALSE
 plot<-FALSE
 
 dir.in <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
+dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 
 #### initialize the parameters from parameters table for speed, distance, and angle filtering
 #### NOTE: if parameters vary by species be sure to annotate the output tablenames to reflect this!!!
@@ -61,10 +65,15 @@ if(lcerrref=="costa"){
 	}}
 
 #### read in metadata
-meta<-read.table (paste(dir.in,"PTT_metadata_1.0_5.08.2015_working.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
+meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
 
 #### select metadata want
-meta<-meta[meta$species==species & meta$loc_data==1,]
+if !is.na(year) {
+meta<-meta[meta$species==species & meta$year==year & meta$loc_data==1,]
+} else{
+  meta<-meta[meta$species==species & meta$loc_data==1,]
+}
+
 meta<-transform(meta, 
   datetime_deploy_UTC = as.POSIXct(datetime_deploy_UTC, tz = "GMT", format = "%m/%d/%Y %H:%M"),
   datetime_recover_UTC = as.POSIXct(datetime_recover_UTC, tz = "GMT", format = "%m/%d/%Y %H:%M"),
@@ -121,6 +130,8 @@ if ((!is.na(meta$incl_deploy_loc[i])) & (meta$incl_deploy_loc[i]!=0)) {
   t1=track[1,]
   t1[1,]<-NA
   t1$lc<-4
+  t1$program<-track$program[1]
+  t1$tag_id<-track$tag_id[1]
   t1$year<-track$year[1]
   t1$ptt<-track$ptt[1]
   t1$uid<-track$uid[1]-.1

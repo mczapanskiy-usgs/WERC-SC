@@ -9,7 +9,7 @@
 # input .csv files
 # 1. with Colony Locations: Species (or other grouping ID),  Island (Location),	Site (Sublocation),	SubCol_Code (Sublocation code),	Year (YYYY),	lon (dd.ddd),	lat (dd.ddd),	colBuffer (m)
 # 2. distance of ring around colony that when a location is outside of dilineates that begining of a trip (m)
-# 3. Track_File_in contains at min: UTC,  Latitud (dd.ddd),	Longitude (dd.ddd),	SPDfilter (where locations kept !="removed"))
+# 3. Track_File_in contains at min: UTC,  Latitud (dd.ddd),	longitude (dd.ddd),	SPDfilter (where locations kept !="removed"))
 # 4. metadata file containing: Deploy_ID (unique tag identifier), UTC (YYYY/MM/DD HH:MM:SS of either deploy "D" or recover "R" as desingated in next field), Tagging_Event ("D" or "R") GPS_TagRecov(1=good file,3=problems with tag but ok), SubCol_Code (matches that in Colony Location), GPS_Track_File (file name of track)
 # 
 # outputs
@@ -39,27 +39,26 @@ library(plyr)
 dir.in <- "D:/Share_Data/Tracking_Data/"
 
 #### dir.out for .csv files
-dir.out <- "D:/Share_Data/Tracking_Data/GPS/"
+dir.out <- "D:/Share_Data/Tracking_Data/EOBS/"
 
 # open metadata file
-metadata<-read.table(paste("D:/Share_Data/GitHub/WERC-SC/trackcode/gps/","metadata_all_GPS.csv",sep=""),header=T, sep=",", strip.white=T)
+metadata<-read.table(paste(dir.in,"EOBS/metadata_EOBS.csv",sep=""),header=T, sep=",", strip.white=T)
 
 #### enter species to process
-species<-"WTSH"
+species<-"LAAL"
+
+#### get metadata for Species omitting any metadata records without deployment or recovery
+metaWants<-(subset(metadata, Species==species & Tagging_Event=='D' & loc.data==1))
 
 #### Plot or not?
 plot<-"Y"
 
-# subset those track that have been processed up to this point and have good data
-metaWants<-subset(metadata, Species==species & (GPS_TagRecov==1 | GPS_TagRecov==3))
-#head(metaWants)
-
 ##########
 #### read in parameters
 # parameters <- read.csv ("D:/Share_Data/Tracking_Data/GPS/Support_Files/parameters.csv", header=T, sep=",", strip.white=T)
-p <- read.csv (paste(dir.in,"Support_Files/parameters.csv",sep=""), header=T, sep=",", strip.white=T)
+p <- read.csv(paste(dir.in,"Support_Files/parameters.csv",sep=""), header=T, sep=",", strip.white=T)
 
-p <- p[p$spp==species & p$tag=="gps",]
+p <- p[p$spp==species & p$tag=="eobs",]
 
 ## enter radius from colony in km you want consider a trip in km
 radCol<-p$radCol.km # in km
@@ -83,7 +82,7 @@ Trip_Characterization_Specs<-data.frame(species,minDepAdj,minRecAdj,noLocsSpeed,
 # ColLocs<-subset(ColLocs,Species==species)
 
 # open all tracks
-tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTracks.csv",sep = ""),header=T, sep=",", strip.white=T, stringsAsFactors=FALSE)
+tracks_all<-read.table (paste(dir.in,"EOBS/All_tracks/","All_Species_EOBS_allTracks.csv",sep = ""),header=T, sep=",", strip.white=T, stringsAsFactors=FALSE)
 
 # loop through colonies (based on unique SubCol_Code)
 # i<-1
@@ -98,19 +97,19 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
   # head(metaWants)
   
   # loop through tracks
-  # j<-45
-  for (j in 1:length(metaWants$GPS_Track_File)) {
-    
-    file.idWant<-metaWants$GPS_Track_File[j]
+  # j<-12145
+  for (j in 1:length(metaWants$GPS_ID)) {
+
+    file.idWant<-metaWants$GPS_ID[j]
     Deploy_ID<-metaWants$Deploy_ID[j]
     metaTrack<-metaWants[j,]
-    track<-(subset(tracks_all,file.id == file.idWant & SPDfilter != "removed"))
+    track<-(subset(tracks_all,tag.serial.number == file.idWant & SPDfilter != "removed"))
     print(c("Deploy_iD", Deploy_ID))
     # head(tracks_all)
     # head(track)
     # track[1:100,]    
      
-    # label col rad from breaking
+    # label col rad for breaking
     track$radCol4break_km<-rep(radCol,length(track[,1]))
     
     # get what is deemed "start location" or "central place location)
@@ -121,17 +120,40 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
       start.lon<-metaTrack$Col_Long_DD
       start.lat<-metaTrack$Col_Lat_DD
     }
+
+    # add time to track start time to make think bird came back to colony albeit much later
+    track.start1<-track[1,]
+    track.start1[1,c(2:13)]<-NA
+    track.start1[1,c(2,3,4)]<-c(format(strptime(as.character(metaTrack$UTC), "%m/%d/%Y %H:%M"), "%Y-%m-%d %H:%M:%S"),start.lat,start.lon)
+    
+    # add time to track end time to make think bird came back to colony albeit much later
+    track.end.time<-(as.POSIXct(as.character(track[length(track[,1]),2]),tz = "GMT")+(10*60*60*24))
+    track.end.time<-as.character(track.end.time)
+    
+    track.end1<-track[length(track[,1]),]
+    track.end1[1,c(2:13)]<-NA
+    track.end1[1,c(2,3,4)]<-c(track.end.time,start.lat,start.lon)
+    
+    track<-rbind(track.start1,track,track.end1)
+
+    rm(track.start1,track.end1)
+    
+    track$longitude<-as.numeric(track$longitude)
+    track$latitude<-as.numeric(track$latitude)
+  
+    track$longitude360<-track$longitude
+    track$longitude360[track$longitude360<0]=((track$longitude360[track$longitude360<0]+180)+180)
     
     # distance to colony in km
-    dist2Col<-(t(rdist.earth((matrix(c(start.lon,start.lat), ncol=2)),(matrix(c(track$Longitude,track$Latitude),ncol=2)),miles=FALSE)))
-    track$dist2Nest<-(t(rdist.earth((matrix(c(metaTrack$Nest_Long_DD,metaTrack$Nest_Lat_DD), ncol=2)),(matrix(c(track$Longitude,track$Latitude),ncol=2)),miles=FALSE)))
+    dist2Col<-(t(rdist.earth((matrix(c(start.lon,start.lat), ncol=2)),(matrix(c(track$longitude,track$latitude),ncol=2)),miles=FALSE)))
+    track$dist2Nest<-(t(rdist.earth((matrix(c(metaTrack$Col_Long_DD,metaTrack$Col_Lat_DD), ncol=2)),(matrix(c(track$longitude,track$latitude),ncol=2)),miles=FALSE)))
     onCol<-ifelse(dist2Col>=radCol, 1, 0)
     
     #### convert to using logicals not if statements then decide on minimum time or dist from colony to dilineate true trip
     lOnCol<-as.logical(rbind(0,onCol)!=rbind(onCol,0))
      # convert UTC to proper format before reincorporating
     deployUTC<-format(strptime(as.character(metadata$UTC[(which(metadata$Deploy_ID==Deploy_ID & metadata$Tagging_Event=="D"))]), "%m/%d/%Y %H:%M"), "%Y-%m-%d %H:%M:%S")
-    recoverUTC<-format(strptime(as.character(metadata$UTC[(which(metadata$Deploy_ID==Deploy_ID & metadata$Tagging_Event=="R"))]), "%m/%d/%Y %H:%M"), "%Y-%m-%d %H:%M:%S")
+    recoverUTC<-format(strptime(track.end.time, "%Y-%m-%d %H:%M:%S"), "%Y-%m-%d %H:%M:%S")
     departsArrives<-t(track$UTC[lOnCol[1:nrow(onCol)]])
     
     # create data frame for times and label it
@@ -192,7 +214,7 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         # f1.1.2 SET make colony loc the first position and recalculate departure time using mean speed of first 10 locations and label trip start as complete
         tripSt<-format(strptime(as.character(as.POSIXlt(track$UTC[1], tz="GMT")-(dist2Col[1]*1000/
           # trackDistance units in km
-          mean(((trackDistance(cbind(track$Longitude[1:(1+noLocsSpeed)],track$Latitude[1:(1+noLocsSpeed)]), longlat = TRUE, prev = FALSE)*1000)/
+          mean(((trackDistance(cbind(track$longitude[1:(1+noLocsSpeed)],track$latitude[1:(1+noLocsSpeed)]), longlat = TRUE, prev = FALSE)*1000)/
                  (as.numeric(as.POSIXlt(track$UTC[2:(1+noLocsSpeed)],"GMT")-as.POSIXlt(track$UTC[1:(noLocsSpeed)],"GMT"))*60)), na.rm=TRUE))), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
         
         if (as.POSIXlt(tripSt,"GMT")<=as.POSIXlt(deployUTC,"GMT")) { # check that corrected time is not before deployment time, if so set to release time
@@ -231,8 +253,8 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         tripSt<-format(strptime(as.character(as.POSIXlt(track$UTC[which(track$UTC==departsArrives[k])], tz="GMT")
         -(dist2Col[which(track$UTC==departsArrives[k])]*1000/
         # trackDistance units in km
-        mean(((trackDistance(cbind(track$Longitude[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed)],
-        track$Latitude[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed)]),longlat = TRUE, prev = FALSE)*1000)/
+        mean(((trackDistance(cbind(track$longitude[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed)],
+        track$latitude[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed)]),longlat = TRUE, prev = FALSE)*1000)/
         (as.numeric(as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])+1):(which(track$UTC==departsArrives[k])+noLocsSpeed)],"GMT")
         -as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed-1)],"GMT"))*60)),
         na.rm=TRUE))), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")        
@@ -287,7 +309,7 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         # f2.1.2 SET colony loc the last position and recalculate arrival time using mean speed of last noLocsSpeed locations and label trip end as complete
         tripEnd<-format(strptime(as.character(as.POSIXlt(track$UTC[length(track$UTC)], tz="GMT")+(dist2Col[length(dist2Col)]*1000/
           # trackDistance units in km
-          mean(((trackDistance(cbind(track$Longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$Latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
+          mean(((trackDistance(cbind(track$longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
           longlat = TRUE, prev = FALSE)*1000)/
           (as.numeric(as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed+1):length(track$UTC)])-as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed):(length(track$UTC)-1)]))*60)), 
           na.rm=TRUE))),
@@ -299,7 +321,7 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         
         tripEndComp<-3
         #### To plot a track distance
-#         doy=((trackDistance(cbind(track$Longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$Latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
+#         doy=((trackDistance(cbind(track$longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
 #                             longlat = TRUE, prev = FALSE)*1000)/
 #                (as.numeric(as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed+1):length(track$UTC)])-as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed):(length(track$UTC)-1)]))*60))
 #         doy1=doy[doy>.01]
@@ -338,7 +360,7 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         # f2.2.2 SET colony loc the last position and recalculate arrival time using mean speed of last noLocsSpeed locations and label trip end as complete
         tripEnd<-format(strptime(as.character(as.POSIXlt(track$UTC[length(track$UTC)], tz="GMT")+(dist2Col[length(dist2Col)]*1000/
         # trackDistance units in km
-        mean(((trackDistance(cbind(track$Longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$Latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
+        mean(((trackDistance(cbind(track$longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
         longlat = TRUE, prev = FALSE)*1000)/
         (as.numeric(as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed+1):length(track$UTC)])-as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed):(length(track$UTC)-1)]))*60)), 
         na.rm=TRUE))),
@@ -378,8 +400,8 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         # f2.3.2 SET colony loc the last position and recalculate arrival time using mean speed of last 10 locations and label trip end as complete
         tripEnd<-format(strptime(as.character(as.POSIXlt(track$UTC[which(track$UTC==departsArrives[k])-1], tz="GMT")+(dist2Col[which(track$UTC==departsArrives[k])-1]*1000/
         # trackDistance units in km        
-        mean(((trackDistance(cbind(track$Longitude[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-1)],
-        track$Latitude[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-1)]), 
+        mean(((trackDistance(cbind(track$longitude[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-1)],
+        track$latitude[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-1)]), 
         longlat = TRUE, prev = FALSE)*1000)/
         (as.numeric(as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])-noLocsSpeed):(which(track$UTC==departsArrives[k])-1)])-as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-2)]))*60)),
         na.rm=TRUE))), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
@@ -478,8 +500,12 @@ for (i in 1:length(Deploy_IDs)) {
   
 ############
 
+# create output directory, will not replace if already exists
+dir.create(paste(dir.out,species,"/3_Trips/",sep=""),showWarnings=TRUE)
+
+# write trip info out
 tripInfoSort_checked$duration.hrs<-(tripInfoSort_checked$tripEnd-tripInfoSort_checked$tripSt)/60
-write.table(tripInfoSort_checked, paste(dir.out,"3_trips/",species,"_",radCol,"_tripInfo.csv",sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
+write.table(tripInfoSort_checked, paste(dir.out,species,"/3_trips/",species,"_",radCol,"_tripInfo.csv",sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
 
 # Plot trips for QAQC
 
@@ -501,8 +527,8 @@ if (plot=="Y") {
       # windows()
       Deploy_ID_Want<-Deploy_IDs[l]
       metaWant<-metaWants[metaWants$Deploy_ID==Deploy_ID_Want,]
-      file.idWant<-metaWant$GPS_Track_File
-      track<-(subset(tracks_all,file.id == file.idWant & SPDfilter != "removed"))
+      file.idWant<-metaWant$GPS_ID
+      track<-(subset(tracks_all,tag.serial.number == file.idWant & SPDfilter != "removed"))
       tripInfoWant<-subset(tripInfoSort_checked,Deploy_ID == Deploy_ID_Want)
       ColWant<-metaWant$SubCol_Code
       # get what is deemed "start location" or "central place location)
@@ -513,7 +539,7 @@ if (plot=="Y") {
         start.lon<-metaWant$Col_Long_DD
         start.lat<-metaWant$Col_Lat_DD
       }
-      track$dist2Col<-t(rdist.earth((matrix(c(start.lon,start.lat), ncol=2)),(matrix(c(track$Longitude,track$Latitude),ncol=2)),miles=FALSE))
+      track$dist2Col<-t(rdist.earth((matrix(c(start.lon,start.lat), ncol=2)),(matrix(c(track$longitude,track$latitude),ncol=2)),miles=FALSE))
       
       # n<-paste("D:/Share_Data/Tracking_Data/GPS/3_Trips/",Deploy_ID_Want,"_",species,"_trips.pdf",sep = "")
       p <- ggplot(track, aes(x=as.POSIXct(as.character(UTC), tz = "GMT"), y=dist2Col))
@@ -521,8 +547,74 @@ if (plot=="Y") {
       p2 <- p1 + geom_point(colour='sienna',size=.5) + ggtitle(Deploy_ID_Want)
       p3 <- p2 + geom_point(data=tripInfoWant,aes((tripEnd),tripEndComp*6), colour= "red", shape="e", size = 4)
       p4 <- p3 +  geom_point(data=tripInfoWant,aes(x=(tripSt),y=tripStComp*4),  colour="blue", shape="s", size = 4) + labs(title=paste(species,file.idWant,"Deploy_ID",Deploy_ID_Want,sep=" "))
-      pdf(paste(dir.out,"3_Trips/",Deploy_ID_Want,"_",file.idWant,"_",species,"_",radCol,"_trips.pdf",sep = ""), onefile = TRUE)
+      pdf(paste(dir.out,species,"/3_Trips/",Deploy_ID_Want,"_",file.idWant,"_",species,"_",radCol,"_trips.pdf",sep = ""), onefile = TRUE)
       print(p4)
       dev.off()      
     }
+  
+  for (l in 1:length(Deploy_IDs)) { 
+    # windows()
+    Deploy_ID_Want<-Deploy_IDs[l]
+    metaWant<-metaWants[metaWants$Deploy_ID==Deploy_ID_Want,]
+    file.idWant<-metaWant$GPS_ID
+    track<-(subset(tracks_all,tag.serial.number == file.idWant & SPDfilter != "removed"))
+    tripInfoWant<-subset(tripInfoSort_checked,Deploy_ID == Deploy_ID_Want)
+    ColWant<-metaWant$SubCol_Code
+    # get what is deemed "start location" or "central place location)
+    if (metaWant$Nest_loc_use==1) {
+      start.lon<-metaWant$Nest_Long_DD
+      start.lat<-metaWant$Nest_Lat_DD
+    } else if (metaWant$Nest_loc_use==0) {
+      start.lon<-metaWant$Col_Long_DD
+      start.lat<-metaWant$Col_Lat_DD
+    }
+    track$dist2Col<-t(rdist.earth((matrix(c(start.lon,start.lat), ncol=2)),(matrix(c(track$longitude,track$latitude),ncol=2)),miles=FALSE))
+    track.filt<-track[track$temperature<40 & track$temperature>-10,]
+    
+    # n<-paste("D:/Share_Data/Tracking_Data/GPS/3_Trips/",Deploy_ID_Want,"_",species,"_trips.pdf",sep = "")
+    p <- ggplot(track, aes(x=as.POSIXct(as.character(UTC), tz = "GMT"), y=dist2Col))
+    p1 <- p + geom_point(data=track.filt,aes(x=as.POSIXct(as.character(UTC), tz = "GMT"),y=temperature*10),  colour='darkslategrey', size=.5)
+    p2 <- p1 + stat_smooth(data=track.filt,aes(x=as.POSIXct(as.character(UTC), tz = "GMT"),y=temperature*10), fill='lightblue', colour='darkturquoise', size=.5)
+    p3 <- p2 + geom_line(colour='seashell3',size=1) + ggtitle(Deploy_ID_Want)
+    p4 <- p3 + geom_point(colour='sienna',size=.5) + ggtitle(Deploy_ID_Want)
+    p5 <- p4 + geom_point(data=tripInfoWant,aes((tripEnd),tripEndComp*6), colour= "red", shape="e", size = 4)
+    p6 <- p5 +  geom_point(data=tripInfoWant,aes(x=(tripSt),y=tripStComp*4),  colour="blue", shape="s", size = 4) + labs(title=paste(species,file.idWant,"Deploy_ID",Deploy_ID_Want,sep=" "))
+    pdf(paste(dir.out,species,"/3_Trips/",Deploy_ID_Want,"_",file.idWant,"_",species,"_",radCol,"_trips_temp.pdf",sep = ""), onefile = TRUE)
+    print(p6)
+    dev.off()      
+  }
+  # l=1
+  for (l in 1:length(Deploy_IDs)) { 
+    # windows()
+    Deploy_ID_Want<-Deploy_IDs[l]
+    metaWant<-metaWants[metaWants$Deploy_ID==Deploy_ID_Want,]
+    file.idWant<-metaWant$GPS_ID
+    track<-(subset(tracks_all,tag.serial.number == file.idWant & SPDfilter != "removed"))
+    tripInfoWant<-subset(tripInfoSort_checked,Deploy_ID == Deploy_ID_Want)
+    ColWant<-metaWant$SubCol_Code
+    # get what is deemed "start location" or "central place location)
+    if (metaWant$Nest_loc_use==1) {
+      start.lon<-metaWant$Nest_Long_DD
+      start.lat<-metaWant$Nest_Lat_DD
+    } else if (metaWant$Nest_loc_use==0) {
+      start.lon<-metaWant$Col_Long_DD
+      start.lat<-metaWant$Col_Lat_DD
+    }
+    track$dist2Col<-t(rdist.earth((matrix(c(start.lon,start.lat), ncol=2)),(matrix(c(track$longitude,track$latitude),ncol=2)),miles=FALSE))
+    
+    # n<-paste("D:/Share_Data/Tracking_Data/GPS/3_Trips/",Deploy_ID_Want,"_",species,"_trips.pdf",sep = "")
+    track.filt<-track[track$height.above.ellipsoid<200 & track$height.above.ellipsoid>-20,]
+
+    p <- ggplot(track, aes(x=as.POSIXct(as.character(UTC), tz = "GMT"), ,y=dist2Col))
+    p1 <- p + geom_point(data=track.filt,aes(x=as.POSIXct(as.character(UTC), tz = "GMT"),y=height.above.ellipsoid*10),  colour='darkslategrey', size=.5)
+    p2 <- p1 + stat_smooth(data=track.filt,aes(x=as.POSIXct(as.character(UTC), tz = "GMT"),y=height.above.ellipsoid*10), fill='lightblue', colour='darkturquoise', size=.5)
+    p3 <- p2 +geom_line(colour='seashell3',size=1)+ ggtitle(Deploy_ID_Want)
+    p4 <- p3 + geom_point(colour='sienna',size=.5)
+    p5 <- p4 + geom_point(data=tripInfoWant,aes((tripEnd),tripEndComp*6), colour= "red", shape="e", size = 4)
+    p6 <- p5 +  geom_point(data=tripInfoWant,aes(x=(tripSt),y=tripStComp*4),  colour="blue", shape="s", size = 4) + labs(title=paste(species,file.idWant,"Deploy_ID",Deploy_ID_Want,sep=" "))
+    pdf(paste(dir.out,species,"/3_Trips/",Deploy_ID_Want,"_",file.idWant,"_",species,"_",radCol,"_trips_height.pdf",sep = ""), onefile = TRUE)
+    print(p6)
+    dev.off()      
+  }
+    
 }

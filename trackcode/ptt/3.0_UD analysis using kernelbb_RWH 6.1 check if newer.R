@@ -76,6 +76,9 @@ dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 ####  in polygon .shp file for setting raster grid extent
 dir.in.poly <- "D:/Share_Data/Clip Polygons"
 
+#### dir.in of metadata
+dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
+
 ####  in polygon .shp file for setting raster grid extent
 dir.in.params <- "D:/Share_Data/Tracking_Data/PTT/"
 
@@ -84,7 +87,7 @@ dir.in.params <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.out.rast <- "D:/Share_Data/Tracking_Data/PTT/"
 
 # set species
-species="PFSH"
+species="COMU"
 
 #### Get years from file names in the 3_Freitas_Shapes directory
 #year.site.id<-as.numeric(na.omit(list.files(paste("D:/RWH/CA Atlas/",species,"/3_Freitas_Shapes/",sep = ""), include.dirs = TRUE)))
@@ -94,7 +97,7 @@ species="PFSH"
 ## year.site.id<-c(2007, 2008, 2009)
 
 #### read in metadata
-meta<-read.table (paste(dir.in,"PTT_metadata_1.0_5.08.2015_working.csv",sep = ""),header=T, sep=",", strip.white=T)
+meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
 
 #### select metadata want
 meta<-meta[meta$species==species & meta$loc_data==1,]
@@ -130,7 +133,7 @@ print(clipPolyList) # show a list of the clipper files
 
 #### select clipperfile
 #### ui set rno for clipPolyList
-rno<-5 # row number of file list
+rno<-19 # row number of file list
 clipper<-as.character(clipPolyList$clipFileName[rno])
 clipperName<-as.character(clipPolyList$name[rno])
 
@@ -219,7 +222,7 @@ tracks.sp_proj<-spTransform(tracks.sp, CRS(paste("+",projWant,sep="")))
 #                                      header=T, sep=",", na.string="", strip.white=T)
 
 # select relevant data for kernel density analysis
-date_time <- as.POSIXct(strptime (tracks.sp_proj@data$utc, "%m/%d/%Y %H:%M"), "GMT")
+date_time <- as.POSIXct(strptime (tracks.sp_proj@data$utc, "%Y-%m-%d %H:%M:%S"), "GMT")
 loc       <- tracks.sp_proj@coords    # where _projection is aea
 # head(tracks.sp_aea@coords)
 
@@ -229,6 +232,12 @@ if (id_2==0) {
 } else {
   id<- ptt[,paste(clipperName,'Buffer_id2',sep='')]
 }
+
+# check.n<-as.data.frame(matrix(0,ncol=2,nrow=length(unique(id))))
+# for (n in 1:length(unique(id))) {
+#   check.n[n,1]=length(ptt[id %in% unique(id)[n],"utc"])
+#   check.n[n,2]=length(unique(ptt[id %in% unique(id)[n],"utc"]))
+# }
 
 # CREATE TRACKS USING YOUR TIME AND LOCATION DATA FOR KERNELBB ANALYSIS
 track <- as.ltraj(loc, date_time, id, burst = id, typeII = TRUE)

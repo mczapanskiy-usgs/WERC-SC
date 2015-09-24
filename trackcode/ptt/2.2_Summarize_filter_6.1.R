@@ -33,6 +33,9 @@ dir.in <- "D:/Share_Data/Tracking_Data/PTT/"
 #### dir.out
 dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 
+#### dir.in of metadata
+dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
+
 # directory for files with ptt error by location class
 dir.error<-"D:/Share_Data/Tracking_Data/Support_Files/"
 
@@ -40,10 +43,10 @@ dir.error<-"D:/Share_Data/Tracking_Data/Support_Files/"
 data_filt_ext="FALSE"
 
 #### set species
-species="SOSH"
+species="COMU"
 
 #### read in metadata
-meta<-read.table (paste(dir.in,"PTT_metadata_1.0_5.08.2015_working.csv",sep = ""),header=T, sep=",", strip.white=T)
+meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
 
 #### select metadata want
 meta<-meta[meta$species==species & meta$loc_data==1,]
