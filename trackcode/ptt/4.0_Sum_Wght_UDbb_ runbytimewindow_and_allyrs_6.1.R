@@ -36,7 +36,7 @@ library(adehabitat)
 library(SDMTools)
 
 #### select species
-species="COMU"
+species="ZACA"
 
 #### select resolution and contour (normal export at "99.999" to include all bb data)
 resolution="3km" # cell size in km
@@ -50,33 +50,32 @@ dir.in <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.in.poly <- "D:/Share_Data/Clip Polygons" # Directory of list of clipping polygons
 dir.in.asc <-  (paste(dir.in,species,"/4_BB_out/", sep="")) # dir.in directory containing BB.asc files
-dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 
 #### load clipperPolyLIst and select clipper file of interest
 clipPolyList<-read.csv (paste(dir.in.poly,"/clipPolyList.csv", sep=""), header=T, sep=",", strip.white=T)
 print(clipPolyList) # show a list of the clipper files
-rno<-19 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
+rno<-18 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
 clipperName<-as.character(clipPolyList$name[rno])
 
 #### read in metadata,select metadata based on species
-meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
-
-meta<-meta[meta$species==species & meta$loc_data==1,]
+meta<-read.table (paste(dir.in,"PTT_metadata_1.0_5.01.2015_working.csv",sep = ""),header=T, sep=",", strip.white=T)
+meta<-meta[meta$species==species,]
 
 #### desingated a grouping variable, this can be any variable in your metadata (e.i. year, site~year, site~sex~year)
 ## define grouping unit
-grping.var<-"year"
+grping.var<-"m-Y"
+#grping.var<-"year"
 #grping.var<-"year_site"
-## select metadata vased on grping.var
-grp.meta<-meta$year
+## select metadata based on grping.var
+#grp.meta<-meta$year
 #grp.meta<-paste(meta$year, meta$site_abbrev, sep="_")
 
 #### get reference file for ud files and select grouping column, note on 4.28.15 reference file contains all metadata field
 # read in track summary table of rasters to get a) list of files to read and b) number days birds were tracked 
-tracksums <- read.table (paste(dir.in.asc,"tracksums_",species,"_BB_out_",clipperName,".csv", sep = ""),sep=",",header=T)
+tracksums <- read.table (paste(dir.in.asc,"tracksums_",species,"_BB_out_",clipperName,"by_m-Y.csv", sep = ""),sep=",",header=T)
 
 #### set grouping variable again
-tracksums$grp <-tracksums$year
+tracksums$grp <-tracksums$time_per
 #  tracksums$grp <-paste(tracksums$year, tracksums$site_abbrev, sep="_")
   
 # get unique groups (use tracksums b/c these points are contained in polygon - not a tracks will necessarily be represented in a given polygon)
@@ -91,7 +90,7 @@ noindiv.grp.ids <- vector ("list", length(grp.ids))
 summary.grp.ids <- vector ("list", length(grp.ids))
 
 #### loop through groups
-# grp.id <-2
+# grp.id <-1
 for (grp.id in 1:length(grp.ids)) {
   
   tracksums.want<-tracksums[which(tracksums$grp==grp.ids[grp.id]),]
@@ -108,7 +107,7 @@ for (grp.id in 1:length(grp.ids)) {
 
   # sum up segments for each track
   # run through track.freq table summing segments >1
-  # j=4
+  # j=24
   for (j in 1:length(track.freq$Var1)) {
     if (track.freq$Freq[j]==1) {
       # operation for only one segment in polygon (track.freq$Freq[j]==1) == TRUE
@@ -123,11 +122,11 @@ for (grp.id in 1:length(grp.ids)) {
         # get multiple segments
         tracksums.want$id[tracksums.want$deploy_id==track.freq$Var1[j]]
         
-        segs<-tracksums.want$id[floor(tracksums.want$id)==track.freq$Var1[j]]
+        segs<-tracksums.want$id[tracksums.want$deploy_id==track.freq$Var1[j]]
         days.segs<-tracksums.want$days[tracksums.want$deploy_id==track.freq$Var1[j]]
         # list to house asc for each segment
         ud.segs.new <- vector ("list", length(segs))
-        # k=1
+        # k=3
         for (k in 1:length(segs)) {
           # open .asc
           ud.seg <- import.asc(paste(dir.in.asc,species,"_BB_out_",clipperName,"_",contour,"_",segs[k],".asc", sep = ""), type = "numeric")

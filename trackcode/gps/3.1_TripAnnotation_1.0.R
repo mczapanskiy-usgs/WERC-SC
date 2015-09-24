@@ -10,9 +10,9 @@ library('plyr')
 library('dplyr')
 
 # select a spp
-spp="PFSH"
+spp="RTTR"
 
-filename="PFSH_0.5"
+filename="RTTR_0.5"
 
 ####  dir.in for .csv files
 dir.in <- 'D:/Share_Data/GitHub/WERC-SC/trackcode/gps/'
@@ -41,6 +41,7 @@ start.interpolated <- mutate(filter(trip.info, tripStComp == 3), UTC = tripSt)
 end.interpolated <- mutate(filter(trip.info, tripEndComp == 3), UTC = tripEnd)
 at.nest <- merge(rbind(start.interpolated, end.interpolated), metadata, 'Deploy_ID')
 
+if (length(at.nest[,1])>0) {
 for (i in 1:length(at.nest[,1])) {               
 if (at.nest$Nest_loc_use[i]==0) { 
   at.nest$Latitude[i]<-at.nest$Col_Lat_DD[i]
@@ -50,13 +51,14 @@ if (at.nest$Nest_loc_use[i]==0) {
   at.nest$Longitude[i]<-at.nest$Nest_Long_DD[i]
   }
 }
-
-interpolated.points<-at.nest[,c(1,8,15,16,9,2:7)]
- 
-interpolated.points<-rename(interpolated.points,c("Species"="species"))
+  interpolated.points<-at.nest[,c(1,8,15,16,9,2:7)]
   
-# Append interpolated track points and sort
-annotated.tracks <- arrange(rbind(annotated.tracks, interpolated.points), Deploy_ID, UTC)[,c(1,2,3,4,5,10)]
+  interpolated.points<-rename(interpolated.points,c("Species"="species"))
+  
+  # Append interpolated track points and sort
+  annotated.tracks <- arrange(rbind(annotated.tracks, interpolated.points), Deploy_ID, UTC)[,c(1,2,3,4,5,10)]
+}
+
 
 write.table(annotated.tracks, paste(dir.out,filename,'_trips_annoted.csv',sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
 

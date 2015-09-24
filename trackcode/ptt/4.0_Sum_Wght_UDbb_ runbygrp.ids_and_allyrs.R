@@ -36,7 +36,7 @@ library(adehabitat)
 library(SDMTools)
 
 #### select species
-species="COMU"
+species="PFSH"
 
 #### select resolution and contour (normal export at "99.999" to include all bb data)
 resolution="3km" # cell size in km
@@ -46,40 +46,50 @@ contour <- 99.999
 id.out = c("99999")    # = c("68019a","68022a3")     #to exclude birds or segments "99999" excludes none
 
 ####
+dir.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 dir.in <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.in.poly <- "D:/Share_Data/Clip Polygons" # Directory of list of clipping polygons
 dir.in.asc <-  (paste(dir.in,species,"/4_BB_out/", sep="")) # dir.in directory containing BB.asc files
-dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 
 #### load clipperPolyLIst and select clipper file of interest
 clipPolyList<-read.csv (paste(dir.in.poly,"/clipPolyList.csv", sep=""), header=T, sep=",", strip.white=T)
 print(clipPolyList) # show a list of the clipper files
-rno<-19 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
+rno<-5 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
 clipperName<-as.character(clipPolyList$name[rno])
 
 #### read in metadata,select metadata based on species
-meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
-
-meta<-meta[meta$species==species & meta$loc_data==1,]
+meta<-read.table (paste(dir.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T)
+meta<-meta[meta$species==species,]
 
 #### desingated a grouping variable, this can be any variable in your metadata (e.i. year, site~year, site~sex~year)
 ## define grouping unit
-grping.var<-"year"
+grping.var.name<-"Jun_Jul"
+grping.var.name<-"Sep_Oct"
+grping.var.name<-"Jun_Oct"
+#grping.var<-"year"
 #grping.var<-"year_site"
-## select metadata vased on grping.var
-grp.meta<-meta$year
+## select metadata based on grping.var
+#grp.meta<-meta$year
 #grp.meta<-paste(meta$year, meta$site_abbrev, sep="_")
 
 #### get reference file for ud files and select grouping column, note on 4.28.15 reference file contains all metadata field
 # read in track summary table of rasters to get a) list of files to read and b) number days birds were tracked 
-tracksums <- read.table (paste(dir.in.asc,"tracksums_",species,"_BB_out_",clipperName,".csv", sep = ""),sep=",",header=T)
+tracksums <- read.table (paste(dir.in.asc,"tracksums_",species,"_BB_out_",clipperName,"_",grping.var.name,".csv", sep = ""),sep=",",header=T)
 
 #### set grouping variable again
-tracksums$grp <-tracksums$year
-#  tracksums$grp <-paste(tracksums$year, tracksums$site_abbrev, sep="_")
-  
-# get unique groups (use tracksums b/c these points are contained in polygon - not a tracks will necessarily be represented in a given polygon)
+# tracksums$grp <-tracksums$time_per
+# tracksums$grp <-paste(tracksums$year, tracksums$site_abbrev, sep="_")
+tracksums$grp <-paste(tracksums$year, tracksums$grp.var, sep="_")
+#tracksums$grp <-paste(tracksums$year)
+
+# select your grouping variable here
+grp.var<-"Jun_Jul"
+grp.var<-"Sep_Oct"
+grp.var<-"Jun_Oct"
+tracksums<-tracksums[which(tracksums$grp.var==grp.var),]
+
+# get unique groups (use tracksums b/c these points are contained in polygon - not all tracks will necessarily be represented in a given polygon)
 grp.ids<-unique(tracksums$grp)
 
 #### initialize lists to house data by desired grouping variable (group.uniq)
@@ -91,7 +101,7 @@ noindiv.grp.ids <- vector ("list", length(grp.ids))
 summary.grp.ids <- vector ("list", length(grp.ids))
 
 #### loop through groups
-# grp.id <-2
+# grp.id <-1
 for (grp.id in 1:length(grp.ids)) {
   
   tracksums.want<-tracksums[which(tracksums$grp==grp.ids[grp.id]),]
@@ -103,12 +113,12 @@ for (grp.id in 1:length(grp.ids)) {
   ud.track <- vector ("list", length(track.freq$Var1))
   track.days <- vector ("list", length(track.freq$Var1))
   
-  track.grp<-cbind(rep(grp.ids[grp.id],length(track.freq[,1])))
+  track.grp<-(rep(grp.ids[grp.id],length(track.freq[,1])))
   summary.grp.ids[[grp.id]]<-cbind(track.grp,track.freq)
 
   # sum up segments for each track
   # run through track.freq table summing segments >1
-  # j=4
+  # j=24
   for (j in 1:length(track.freq$Var1)) {
     if (track.freq$Freq[j]==1) {
       # operation for only one segment in polygon (track.freq$Freq[j]==1) == TRUE
@@ -123,11 +133,11 @@ for (grp.id in 1:length(grp.ids)) {
         # get multiple segments
         tracksums.want$id[tracksums.want$deploy_id==track.freq$Var1[j]]
         
-        segs<-tracksums.want$id[floor(tracksums.want$id)==track.freq$Var1[j]]
+        segs<-tracksums.want$id[tracksums.want$deploy_id==track.freq$Var1[j]]
         days.segs<-tracksums.want$days[tracksums.want$deploy_id==track.freq$Var1[j]]
         # list to house asc for each segment
         ud.segs.new <- vector ("list", length(segs))
-        # k=1
+        # k=3
         for (k in 1:length(segs)) {
           # open .asc
           ud.seg <- import.asc(paste(dir.in.asc,species,"_BB_out_",clipperName,"_",contour,"_",segs[k],".asc", sep = ""), type = "numeric")
@@ -143,7 +153,7 @@ for (grp.id in 1:length(grp.ids)) {
 
 ## sum by grouping variable weight by:
   # a) number of days tracked 
-print(paste("grouping variable = ", grping.var,sep=""))
+print(paste("grouping variable = ", grping.var.name,sep=""))
   
 # multiply new ud by (# of decimal days of each track/sum decimal days all tracks for that year)
   # initialize rasters
@@ -211,12 +221,19 @@ print(paste("grouping variable = ", grping.var,sep=""))
 #     write.csv(udyear.dur.norm[[yr]], paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",year.id[yr],"_sum.csv", sep=""))
 #     write.csv(year.indiv[[yr]], paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",year.id[yr],"_ni.csv", sep=""))
 #     write.csv(udyear.dur.norm.ind.wght[[yr]], paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",year.id[yr],"_dw.csv", sep=""))
-  
-  
-  
+
+    
+    
+    
   
   } # END grping.var loop
 
+# for single groups per year
+# # make summary table for all years
+# summary.grp.ids.mat<-do.call(rbind, summary.grp.ids)
+# grp.id.wants<-as.data.frame(table(summary.grp.ids.mat[,1]))
+
+# for multiple seasons/year
 # make summary table for all years
 summary.grp.ids.mat<-do.call(rbind, summary.grp.ids)
 grp.id.wants<-as.data.frame(table(summary.grp.ids.mat[,1]))
@@ -227,8 +244,7 @@ grp.id.wants<-as.data.frame(table(summary.grp.ids.mat[,1]))
 
 # grp.id <-1
 for (grp.id in 1:length(grp.ids)) {
-  
-  
+
 # allyrs.dur.notracks.wght=ud.years[[yr]] * (# individuals tracked for year i/sum # individuals tracked for all years)
   
 if (exists("allgrps.dur.notracks.wght")) {
@@ -245,7 +261,7 @@ if (exists("allgrps.dur.notracks.wght")) {
     # allyrs.ud.dur.norm.ind.wght.tracks.wght<-allyrs.ud.dur.norm.ind.wght.tracks.wght/max(allyrs.ud.dur.norm.ind.wght.tracks.wght)
 # examine distribution of contours
 hist(log(allgrps.dur.notracks.wght),100)
-hist((allgrps.dur.notracks.wght),1000)
+hist((allgrps.dur.notracks.wght),100)
 hist(log(allgrps.indiv),100)
 hist((allgrps.indiv),1000)
 
@@ -259,8 +275,8 @@ hist((allgrps.indiv),1000)
 #     export.asc(allyrs.ud.dur.norm.ind.wght.tracks.wght, paste("D:/RWH/CA Atlas/",species,"/4_BB/",species,"_",clipperName,"_",min(year.id),"_",max(year.id),"_all_Downweighted_UDBB_index", sep=""))
 
 # export as .acs (ASCII = although Arc does not recognize header info), used to import into arc
-write.asc(allgrps.indiv, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",resolution,"_all_ni", sep=""),gz=FALSE)
-write.asc(allgrps.dur.notracks.wght, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",resolution,"_all_bb", sep=""),gz=FALSE)
+write.asc(allgrps.indiv, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",resolution,"_",grp.var,"_all_ni", sep=""),gz=FALSE)
+write.asc(allgrps.dur.notracks.wght, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",resolution,"_",grp.var,"_all_bb", sep=""),gz=FALSE)
 
 # # export as .csv - for Jarod
 # write.table(allyrs.indiv, paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",species,"_alni.csv", sep=""))
