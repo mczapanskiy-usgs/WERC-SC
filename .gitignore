@@ -3,3 +3,5 @@
 .RData
 *.csv
 *.CSV
+*.png
+*.PNG
