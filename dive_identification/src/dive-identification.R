@@ -3,6 +3,93 @@ library('foreach')
 library('diveMove')
 library('iterators')
 
+### RFBO ###
+
+# Read RFBO metadata
+read.csv('dive_identification/metadata_all_GPS_05.28.15_working.csv', stringsAsFactors = FALSE) %>% 
+  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M')) %>% 
+  filter(Species == 'RFBO', Island == 'Kauai') %>%
+  group_by(Deploy_ID, FieldID, Species) %>%
+  summarize(deployed = min(UTC), 
+            recovered = max(UTC),
+            period = difftime(max(UTC), min(UTC), units = 'days') %>% as.numeric,
+            ValidGpsTdr = any(TDR_TagRecov == 1 && GPS_TagRecov == 1), 
+            TDR_File = paste(TDR_File, collapse = '')) %>% 
+  filter(ValidGpsTdr) -> RFBO_metadata
+
+# Iterate through each TDR file and plot dives using both surface detection methods (median vs. linear model)
+foreach(rfbo_tdr = dir('dive_identification/rfbo_data2/', full.names = TRUE)) %do% {
+  deploy_metadata <- filter(RFBO_metadata, TDR_File == rfbo_tdr %>% basename %>% sub('.CSV', '', .))
+  
+  # Set up folder for plots
+  plot_path <- file.path('dive_identification', 'rfbo_dive_plots', paste0(deploy_metadata$Deploy_ID, deploy_metadata$FieldID))
+  dir.create(plot_path, showWarnings = FALSE)
+  
+  # Read TDR CSV
+  tdr_data <- read.csv(rfbo_tdr, stringsAsFactors = FALSE) %>% 
+    mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>%
+    filter(UTC > deploy_metadata$deployed,
+           UTC < deploy_metadata$recovered)
+  
+  # Find linear model for background pressure sampling
+  drift_lm <- lm(Pressure ~ UTC, filter(tdr_data, EventId == 0))
+  
+  # Find dives in each Fast Log
+  foreach(event = unique(tdr_data$EventId), .combine = rbind) %do% {
+    fast_log <- filter(tdr_data, EventId == event)
+    tdr <- with(fast_log, 
+                createTDR(UTC, 
+                          Pressure, 
+                          dtime = .1, 
+                          file = rfbo_tdr))
+    
+    # Calculate surface offsets
+    surface_offset_median <- median(fast_log$Pressure)
+    surface_offset_lm <- predict(drift_lm, data.frame(UTC = mean(fast_log$UTC)))
+    
+    # Use diveMove to find dives
+    calib_median <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
+                             zoc.method = 'offset', offset = surface_offset_median)
+    calib_lm <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
+                                zoc.method = 'offset', offset = surface_offset_lm)
+    
+    pressure_range <- range(c(fast_log$Pressure, calib_median@tdr@depth, calib_lm@tdr@depth))
+    
+    plot_dives <- function(tdr_data, zoc_method, zoc) {
+      with(tdr_data, {
+        plot(UTC,
+             Pressure,
+             col = ifelse(Dive, 'blue', 'red'),
+             sub = sprintf('%s ZOC: %.3f',zoc_method, zoc),
+             ylim = rev(pressure_range))
+      })
+    }
+    png(file.path(plot_path, paste0(event, '.png')), width = 1080, height = 1080)
+    par(mfrow=c(3,1)) 
+    with(fast_log, {
+         plot(UTC,
+              Pressure,
+              main = sprintf('Fast Log %i\nFID: %s DID: %s', event, deploy_metadata$FieldID, deploy_metadata$Deploy_ID),
+              sub = 'No ZOC',
+              ylim = rev(pressure_range))
+    })
+    plot_dives(data.frame(UTC = calib_median@tdr@time, 
+                          Pressure = calib_median@tdr@depth,
+                          Dive = calib_median@dive.activity$dive.id >0), 
+               'Median surface', 
+               surface_offset_median)
+    plot_dives(data.frame(UTC = calib_lm@tdr@time, 
+                          Pressure = calib_lm@tdr@depth,
+                          Dive = calib_lm@dive.activity$dive.id >0), 
+               'Linear regression', 
+               surface_offset_lm)
+    dev.off()
+  }
+}
+
+### End RFBO ###
+
+
 # Iterate through data folder
 foreach(tdr_file = dir('dive_identification/data2/', full.names = TRUE)) %do% {
   # Read TDR CSV
