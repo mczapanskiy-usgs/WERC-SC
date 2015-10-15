@@ -51,16 +51,13 @@ test_tdr %>%
   arrange(desc(records)) %>%
   View
 
-verify.tdr <- function()
-
-x11_scale = 1.5
-x11(width = 11 * x11_scale, height = 7 * x11_scale)
-par(mfrow = c(2,1))
-with(filter(test_tdr, EventId == 322), {
+plot_fastlog <- function(fastlog, xlim = range(fastlog$UTC)) {
+  # Pressure plot
   plot(UTC,
        Pressure,
        col = ifelse(Dive, 'blue', 'red'),
        pch = 16,
+       xlim = xlim,
        ylim = rev(range(Pressure)),
        xaxt="n",
        xlab = "") 
@@ -70,18 +67,55 @@ with(filter(test_tdr, EventId == 322), {
   grid()
   abline(h = 0, col = '#AAAAAA', lty = 2)
   abline(h = 1, col = '#AAAAAA', lty = 2)
-})
-with(filter(test_tdr, EventId == 322), {
-  plot(UTC,
-       Speed,
-       pch = 16,
-       xaxt = "n",
-       xlab = "") 
-  lines(UTC, Speed)
-  axis.POSIXct(1, UTC, format = "%m/%d %H:%M:%OS1")
-  axis(4)
-  grid()
-  abline(h = 0, col = '#AAAAAA', lty = 2)
-  abline(h = 1, col = '#AAAAAA', lty = 2)
+}
+
+x11_scale <- 1.5
+x11(width = 11 * x11_scale, height = 7 * x11_scale)
+fastlog <- filter(test_tdr, EventId == 322)
+with(fastlog, {
+  plot_fastlog(fastlog) 
+  
+  # Zoom 
+  xlim_orig <- par("usr")[1:2]
+  flags <- NULL
+  is_zoomed <- FALSE
+  usrxy <- function(x, y) {
+    origin <- as.POSIXct('1970-01-01 00:00.00', tz = 'UTC')
+  }
+  newxlim <- function(x) {
+    origin <- as.POSIXct('1970-01-01 00:00.00', tz = 'UTC')
+    clickx <- as.POSIXct(xlim_orig[1] + x * diff(xlim_orig), origin = origin, tz = 'UTC')
+    c(clickx - 10, clickx + 10)
+  }
+  setGraphicsEventHandlers(prompt = "Click to zoom, right click to flag, q to quit",
+                           onMouseUp = function(buttons, x, y) {
+                             if(buttons == 0) {
+                               if(is_zoomed) {
+                                 plot_fastlog(fastlog, newxlim(x))
+                                 is_zoomed <<- TRUE
+                               } else {
+                                 plot_fastlog(fastlog)
+                                 is_zoomed <<- FALSE
+                               }
+                             } else if(buttons == 2) {
+                               
+                               
+                                        xlim_new[1] <<- newx(x, xlim_orig)
+                                        click_mode <<- 2
+                                      },
+                                      {
+                                        xlim_new[2] <<- newx(x, xlim_orig)
+                                        click_mode <<- 1
+                                        plot_fastlog(fastlog, xlim_new)
+                                        xlim_orig <<- xlim_new
+                                      })
+                             else {
+                               
+                             }
+                           },
+                           onKeybd = function(key) {
+                             
+                           }
+  locator(n = 2)
 })
 dev.off()
