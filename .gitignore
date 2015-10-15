@@ -1,7 +1,7 @@
 .Rproj.user
 .Rhistory
 .RData
-*.csv
-*.CSV
-*.png
-*.PNG
+dive_identification/CEFAS_output/
+dive_identification/dive_data/
+dive_identification/tdr_data/
+*trips_annoted.csv
