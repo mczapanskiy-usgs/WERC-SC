@@ -29,7 +29,7 @@ initialize.tdr <- function(deploy_id) {
 # TDR Calibration
 # ZOC pressure using median pressure as surface (per fast log)
 # Assign phases based on dive threshold (defaults to 1m)
-calibrate.tdr <- function(tdr) {
+calibrate.tdr <- function(tdr, depth_thr = 1) {
   tdr.calib <- tdr %>%
     rename(PressureInit = Pressure) %>%
     filter(EventId > 0) %>%
@@ -38,9 +38,20 @@ calibrate.tdr <- function(tdr) {
             mutate(fastlog, 
                    Surface = median(PressureInit),
                    Pressure = pmax(PressureInit - Surface, 0),
-                   Dive = Pressure >= 1,
+                   Submerged = Pressure >= depth_thr,
                    Speed = c(diff(Pressure) / (UTC %>% diff %>% round(1) %>% as.numeric), NA))
           })
+}
+
+# Dive Identification
+# A dive is two or more successive points beneath the dive threshold (1m)
+identify.dives <- function(tdr) {
+  dive_match <- gregexpr("1{2,}", fastlog$Submerged %>% ifelse(1, 2) %>% paste(collapse = ''))
+  tdr$DiveIdx <- 0
+  mapply(function(i, l, d) fastlog$DiveIdx[i:(i+l-1)] <<- d, 
+         dive_match[[1]], 
+         attr(dive_match[[1]], 'match.length'), 
+         seq_along(dive_match[[1]]))
 }
 
 test_deploy_id %>% initialize.tdr() %>% calibrate.tdr() -> test_tdr
@@ -51,13 +62,14 @@ test_tdr %>%
   arrange(desc(records)) %>%
   View
 
-plot_fastlog <- function(fastlog, xlim = range(fastlog$UTC)) {
-  # Pressure plot
+fastlog <- filter(test_tdr, EventId == 302)
+
+with(filter(test_tdr, EventId == 302), {
+  # FastLog plot
   plot(UTC,
        Pressure,
-       col = ifelse(Dive, 'blue', 'red'),
+       col = ifelse(Submerged, 'blue', 'red'),
        pch = 16,
-       xlim = xlim,
        ylim = rev(range(Pressure)),
        xaxt="n",
        xlab = "") 
@@ -67,11 +79,11 @@ plot_fastlog <- function(fastlog, xlim = range(fastlog$UTC)) {
   grid()
   abline(h = 0, col = '#AAAAAA', lty = 2)
   abline(h = 1, col = '#AAAAAA', lty = 2)
-}
+})
 
 x11_scale <- 1.5
 x11(width = 11 * x11_scale, height = 7 * x11_scale)
-fastlog <- filter(test_tdr, EventId == 322)
+fastlog <- 
 with(fastlog, {
   plot_fastlog(fastlog) 
   
