@@ -1,7 +1,8 @@
 .Rproj.user
 .Rhistory
 .RData
-dive_identification/CEFAS_output/
-dive_identification/dive_data/
-dive_identification/tdr_data/
+dive_identification/1_CEFAS_output/
+dive_identification/2_tdr_data/
+dive_identification/3_dive_data/
+dive_identification/4_plots/
 *trips_annoted.csv
