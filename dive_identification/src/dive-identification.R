@@ -1,439 +1,165 @@
 library('dplyr')
 library('foreach')
 library('diveMove')
-library('iterators')
 
-### RFBO ###
-
-# Read RFBO metadata
-read.csv('dive_identification/metadata_all_GPS_05.28.15_working.csv', stringsAsFactors = FALSE) %>% 
-  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M')) %>% 
-  filter(Species == 'RFBO', Island == 'Kauai') %>%
-  group_by(Deploy_ID, FieldID, Species) %>%
-  summarize(deployed = min(UTC), 
-            recovered = max(UTC),
-            period = difftime(max(UTC), min(UTC), units = 'days') %>% as.numeric,
-            ValidGpsTdr = any(TDR_TagRecov == 1 && GPS_TagRecov == 1), 
-            TDR_File = paste(TDR_File, collapse = '')) %>% 
-  filter(ValidGpsTdr) -> RFBO_metadata
-
-# Iterate through each TDR file and plot dives using both surface detection methods (median vs. linear model)
-foreach(rfbo_tdr = dir('dive_identification/rfbo_data2/', full.names = TRUE)) %do% {
-  deploy_metadata <- filter(RFBO_metadata, TDR_File == rfbo_tdr %>% basename %>% sub('.CSV', '', .))
-  
-  # Set up folder for plots
-  plot_path <- file.path('dive_identification', 'rfbo_dive_plots', paste0(deploy_metadata$Deploy_ID, deploy_metadata$FieldID))
-  dir.create(plot_path, showWarnings = FALSE)
-  
-  # Read TDR CSV
-  tdr_data <- read.csv(rfbo_tdr, stringsAsFactors = FALSE) %>% 
+initilize.tdr <- function(deployid) {
+  metadata <- filter(metadata, DeployID == deployid)
+  tdr <- read.csv(tdr.path(deployid), stringsAsFactors = FALSE) %>% 
     mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>%
-    filter(UTC > deploy_metadata$deployed,
-           UTC < deploy_metadata$recovered)
-  
-  # Find linear model for background pressure sampling
-  drift_lm <- lm(Pressure ~ UTC, filter(tdr_data, EventId == 0))
-  
-  # Find dives in each Fast Log
-  foreach(event = sort(unique(tdr_data$EventId))[-1], .combine = rbind) %do% {
-    fast_log <- filter(tdr_data, EventId == event)
-    tdr <- with(fast_log, 
-                createTDR(UTC, 
-                          Pressure, 
-                          dtime = .1, 
-                          file = rfbo_tdr))
-    
-    # Calculate surface offsets
-    surface_offset_median <- median(fast_log$Pressure)
-    surface_offset_lm <- predict(drift_lm, data.frame(UTC = mean(fast_log$UTC)))
-    
-    # Use diveMove to find dives
-    calib_median <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
-                                   zoc.method = 'offset', offset = surface_offset_median)
-    calib_lm <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
-                               zoc.method = 'offset', offset = surface_offset_lm)
-    
-    pressure_range <- range(c(fast_log$Pressure, calib_median@tdr@depth, calib_lm@tdr@depth))
-    
-    plot_dives <- function(tdr_data, zoc_method, zoc) {
-      with(tdr_data, {
-        plot(UTC,
-             Pressure,
-             col = ifelse(Dive, 'blue', 'red'),
-             sub = sprintf('%s ZOC: %.3f',zoc_method, zoc),
-             ylim = rev(pressure_range))
-      })
-    }
-    png(file.path(plot_path, paste0(event, '.png')), width = 1080, height = 1080)
-    par(mfrow=c(3,1)) 
-    with(fast_log, {
-      plot(UTC,
-           Pressure,
-           main = sprintf('Fast Log %i\nFID: %s DID: %s', event, deploy_metadata$FieldID, deploy_metadata$Deploy_ID),
-           sub = 'No ZOC',
-           ylim = rev(pressure_range))
-    })
-    plot_dives(data.frame(UTC = calib_median@tdr@time, 
-                          Pressure = calib_median@tdr@depth,
-                          Dive = calib_median@dive.activity$dive.id >0), 
-               'Median surface', 
-               surface_offset_median)
-    plot_dives(data.frame(UTC = calib_lm@tdr@time, 
-                          Pressure = calib_lm@tdr@depth,
-                          Dive = calib_lm@dive.activity$dive.id >0), 
-               'Linear regression', 
-               surface_offset_lm)
-    dev.off()
-    
-    cbind(data.frame(EventId = event),
-          diveStats(calib_median) %>% 
-            summarize(NDives_median = n(), 
-                      MaxDepth_median = max(bottD.max)),
-          diveStats(calib_lm) %>% 
-            summarize(NDives_lm = n(), 
-                      MaxDepth_lm = max(bottD.max)))
-  } %>% View
+    filter(UTC > metadata$Deployed,
+           UTC < metadata$Recovered) %>%
+    rename(PressureInit = Pressure)
+  attr(tdr, 'DeployID') <- deployid
+  tdr
+}
+tdr.path <- function(deployid) {
+  with(metadata %>%
+         filter(DeployID == deployid),
+       file.path('dive_identification',
+                 '2_tdr_data',
+                 sprintf('%s.CSV', TDRFilename)))
 }
 
-### End RFBO ###
-
-### RTTR ###
-
-# Read RFBO metadata
-read.csv('dive_identification/metadata_all_GPS_05.28.15_working.csv', stringsAsFactors = FALSE) %>% 
-  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M')) %>% 
-  filter(Species == 'RTTR', Site == 'Lehua') %>% 
-  group_by(Deploy_ID, FieldID, Species) %>%
-  summarize(deployed = min(UTC), 
-            recovered = max(UTC),
-            period = difftime(max(UTC), min(UTC), units = 'days') %>% as.numeric,
-            ValidGpsTdr = any(TDR_TagRecov == 1 && GPS_TagRecov == 1), 
-            TDR_File = paste(TDR_File, collapse = '')) %>% 
-  filter(ValidGpsTdr) -> RTTR_metadata
-
-# Iterate through each TDR file and plot dives using both surface detection methods (median vs. linear model)
-foreach(rttr_tdr = dir('dive_identification/rttr_data2/', full.names = TRUE), .combine = rbind) %do% {
-  deploy_metadata <- filter(RTTR_metadata, TDR_File == rttr_tdr %>% basename %>% sub('.CSV', '', .))
-  
-  # Set up folder for plots
-  plot_path <- file.path('dive_identification', 'rttr_dive_plots', paste0(deploy_metadata$Deploy_ID, deploy_metadata$FieldID))
-  dir.create(plot_path, showWarnings = FALSE)
-  
-  # Read TDR CSV
-  tdr_data <- read.csv(rttr_tdr, stringsAsFactors = FALSE) %>% 
-    mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>%
-    filter(UTC > deploy_metadata$deployed,
-           UTC < deploy_metadata$recovered)
-  
-  # Find linear model for background pressure sampling
-  drift_lm <- lm(Pressure ~ UTC, filter(tdr_data, EventId == 0))
-  
-  # Find dives in each Fast Log
-  foreach(event = sort(unique(tdr_data$EventId))[-1], .combine = rbind) %do% {
-    fast_log <- filter(tdr_data, EventId == event)
-    tdr <- with(fast_log, 
-                createTDR(UTC, 
-                          Pressure, 
-                          dtime = .1, 
-                          file = rttr_tdr))
-    
-    # Calculate surface offsets
-    surface_offset_median <- median(fast_log$Pressure)
-    surface_offset_lm <- predict(drift_lm, data.frame(UTC = mean(fast_log$UTC)))
-    
-    # Use diveMove to find dives. Note: the lm method can result in some bugs in calibrateDepth if it thinks the whole burst is one dive.
-    calib_median <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
-                                   zoc.method = 'offset', offset = surface_offset_median)
-    valid_lm <- TRUE
-    calib_lm <- tryCatch(calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
-                                        zoc.method = 'offset', offset = surface_offset_lm),
-                         error = function(e) {
-                           valid_lm <<- FALSE
-                           calib_median
-                         })
-    
-    
-    pressure_range <- range(c(fast_log$Pressure, calib_median@tdr@depth, calib_lm@tdr@depth))
-    
-    plot_dives <- function(tdr_data, zoc_method, zoc) {
-      with(tdr_data, {
-        plot(UTC,
-             Pressure,
-             col = ifelse(Dive, 'blue', 'red'),
-             sub = sprintf('%s ZOC: %.3f',zoc_method, zoc),
-             ylim = rev(pressure_range))
-      })
-    }
-    png(file.path(plot_path, paste0(event, '.png')), width = 1080, height = 1080)
-    par(mfrow=c(3,1)) 
-    with(fast_log, {
-      plot(UTC,
-           Pressure,
-           main = sprintf('Fast Log %i\nFID: %s DID: %s', event, deploy_metadata$FieldID, deploy_metadata$Deploy_ID),
-           sub = 'No ZOC',
-           ylim = rev(pressure_range))
-    })
-    plot_dives(data.frame(UTC = calib_median@tdr@time, 
-                          Pressure = calib_median@tdr@depth,
-                          Dive = calib_median@dive.activity$dive.id > 0), 
-               'Median surface', 
-               surface_offset_median)
-    if(valid_lm) {
-      plot_dives(data.frame(UTC = calib_lm@tdr@time, 
-                            Pressure = calib_lm@tdr@depth,
-                            Dive = calib_lm@dive.activity$dive.id > 0), 
-                 'Linear regression', 
-                 surface_offset_lm)
-    } else {
-      plot(0, 0, xlab = 'lm method failed')
-    }
-    
-    dev.off()
-    
-    median_stats <- if(any(calib_median@dive.activity$dive.id > 0)) {
-      diveStats(calib_median) %>% 
-        summarize(NDives_median = n(), 
-                  MaxDepth_median = max(bottD.max, na.rm = TRUE))
-    } else {
-      data.frame(NDives_median = 0,
-                 MaxDepth_median = 0)
-    }
-    
-    lm_stats <- if(valid_lm && any(calib_lm@dive.activity$dive.id > 0)) {
-      diveStats(calib_lm) %>% 
-        summarize(NDives_lm = n(), 
-                  MaxDepth_lm = max(bottD.max, na.rm = TRUE))
-    } else {
-      data.frame(NDives_lm = 0,
-                 MaxDepth_lm = 0)
-    }
-    
-    data.frame(EventId = event,
-               median_stats,
-               lm_stats)
-  }
+calibrate.tdr <- function(tdr, depth_thr = .5) {
+  deployid <- attr(tdr, 'DeployID')
+  metadata <- filter(metadata, DeployID == deployid)
+  # Split by EventId and process FastLogs individually using diveMove
+  tdr %>%
+    filter(EventId > 0) %>%
+    group_by(EventId) %>%
+    (function(fastlog) {
+      surface <- if(metadata$Threshold == 0) median(fastlog$PressureInit) else 0
+      # Create a TDR object
+      createTDR(fastlog$UTC,
+                fastlog$PressureInit,
+                dtime = metadata$FastLogRate,
+                file = tdr.path(deployid)) %>%
+        # Calibrate TDR using median pressure as offset
+        calibrateDepth(wet.thr = 0,
+                       dive.thr = depth_thr,
+                       zoc.method = 'offset',
+                       offset = surface) %>%
+        # Pull calibrated pressures, dive ids, and phases from calibrated TDR object
+        (function(calibrated.tdr) {
+          data.frame(Pressure = calibrated.tdr@tdr@depth, 
+                     Surface = surface,
+                     DiveIdInit = calibrated.tdr@dive.activity$dive.id, 
+                     DivePhase = calibrated.tdr@dive.phases)
+        }) %>%
+        # Rejoin to original data
+        cbind(fastlog, .) %>%
+        #Recalibrate DiveIds
+        (function(tdr) {
+          # Calculate DiveIds across all records
+          diveTable <- tdr %>%
+            filter(EventId > 0,
+                   DiveIdInit > 0) %>%
+            group_by(EventId, DiveIdInit) %>%
+            summarize %>%
+            as.data.frame
+          diveTable$DiveId <- seq_along(diveTable[,1])
+          # Merge tdr with dive table
+          merge(tdr, diveTable, all.x = TRUE) %>%
+            select(-DiveIdInit) %>%
+            mutate(DiveId = ifelse(is.na(DiveId), 0, DiveId))
+        }) %>%
+        arrange(UTC) -> result
+      attr(result, 'DeployID') <- deployid
+      result
+    }) 
 }
 
-### End RTTR ###
-
-
-# Iterate through data folder
-foreach(tdr_file = dir('dive_identification/data2/', full.names = TRUE)) %do% {
-  # Read TDR CSV
-  tdr_data <- read.csv(tdr_file, stringsAsFactors = FALSE) %>% 
-    mutate(UTC = as.POSIXct(UTC, tz = 'UTC'))
-  
-  # Extract species and band suffix from file name
-  species <- regmatches(tdr_file, regexpr('BRBO|RFBO|RTTR', tdr_file))
-  bandno <- sub('.*([0-9]{6}).CSV', '\\1', tdr_file)
-  
-  # Create folder for plots
-  plot_path <- file.path('dive_identification', 'plots2', paste(species, bandno, sep = '_'))
-  dir.create(plot_path)
-  
-  # Iterate through valid fast log events (more than zero points)
-  foreach(event = unique(tdr_data$EventId)) %do% {
-    # Create a png to save to
-    png(filename = file.path(plot_path, paste0(event, '.PNG')), 
-        width = 900,
-        height = 600)
-    
-    # Create the plot
-    with(filter(tdr_data, EventId == event), {
-      plot(UTC, Pressure,
-           ylim = c(4,-1),
-           cex = .5,
-           main = sprintf('%s %s\nFast Log %i', species, bandno, event))
-      lines(UTC, Pressure)
-      abline(h = 1, col = 'red', lty = 2)
-      abline(h = median(Pressure), col = 'green', lty = 2)
-      abline(h = 1 + median(Pressure), col = 'blue', lty = 2)
-    })
-    dev.off()
-  }
+analyze.dives <- function(tdr) {
+  tdr %>%
+    filter(DiveId > 0) %>%
+    group_by(DiveId) %>%
+    summarize(DeployID = attr(tdr, 'DeployID'),
+              EventID = first(EventId),
+              Begin = first(UTC),
+              End = last(UTC),
+              Duration = difftime(last(UTC), first(UTC), units = 'secs') %>% as.numeric %>% round(digits = 1),
+              MaxDepth = max(Pressure),
+              N = n()) %>%
+    select(DeployID:EventID, DiveID = DiveId, Begin:N)
 }
 
-foreach(tdr_file = dir('dive_identification/data2/', pattern = 'WTSH', full.names = TRUE)) %do% {
-  WTSH_csv <- read.csv(tdr_file, stringsAsFactors = FALSE) %>% mutate(UTC = as.POSIXct(UTC, tz = 'UTC'))
-  foreach(event = unique(WTSH_csv$EventId), .combine = rbind) %do% {
-    #eventid  records	max_depth	surface_offset	adj_max_depth	1m_dives	1m_adj_dives	.75m_adj_dives	.5m_adj_dives
-    burst <- filter(WTSH_csv, EventId == event)
-    if(nrow(burst) == 4) return(NULL)
-    tdr <- with(burst, 
-                createTDR(UTC, 
-                          Pressure, 
-                          dtime = .1, 
-                          file = tdr_file))
-    surface_offset <- median(burst$Pressure)
-    calib1 <- calibrateDepth(tdr, wet.thr = 0, dive.thr = 1,
-                             zoc.method = 'offset', offset = 0)
-    calib1adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = 1,
-                                zoc.method = 'offset', offset = surface_offset)
-    calib.75adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .75,
-                                  zoc.method = 'offset', offset = surface_offset)
-    calib.5adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
-                                 zoc.method = 'offset', offset = surface_offset)
-    
-    data.frame(EventId = event,
-               records = nrow(burst), 
-               max_depth = max(burst$Pressure),
-               surface_offset = surface_offset,
-               adj_max_depth = max(burst$Pressure) + surface_offset,
-               dives_1 = length(calib1@dive.models),
-               dives_1adj = length(calib1adj@dive.models),
-               dives_.75adj = length(calib.75adj@dive.models),
-               dives_.5adj = length(calib.5adj@dive.models))
-  } -> WTSH_breakdown
-  
-  plot_path <- file.path('dive_identification', 'plots3')
-  png(file.path(plot_path, tdr_file %>% basename %>% sub('.CSV', '.png', .)),
-      height = 400,
-      width = 600)
-  barplot(colSums(BRBO010_breakdown[6:9]),
-          beside = TRUE,
-          main = tdr_file %>% basename %>% sub('.CSV', '', .))
+plot.dive <- function(tdr, diveid, dive_thr = .5) {
+  expand.range <- function(rng, delta) rng + c(-delta, delta)
+  `%between%` <- function(x, rng) x >= rng[1] & x <= rng[2]
+  pressure.range <- function(pressure) range(pressure) %>% pmin(c(0, Inf)) %>% rev
+  dive_UTC_rng <- range(filter(tdr, DiveId == diveid)$UTC)
+  deployid <- attr(tdr, 'DeployID')
+  metadata <- filter(metadata, DeployID == deployid)
+  eventid <- filter(tdr, DiveId == diveid)$EventId[1]
+  png(filename = file.path('dive_identification',
+                           '4_plots',
+                           sprintf('%i_%i_%i.png', deployid, eventid, diveid)),
+      width = 1600, height = 900)
+  par(ps = 20, cex = 1)
+  layout(matrix(c(1, 1, 1, 2, 2), 1, 5))
+  with(filter(tdr, EventId == eventid, UTC %between% expand.range(dive_UTC_rng, 1)), {
+    plot(UTC, Pressure,
+         ylim = pressure.range(Pressure),
+         pch = 16,
+         cex = 2,
+         col = ifelse(DiveId == diveid, 'blue', 'red'),
+         xaxt = 'n',
+         main = sprintf('Field ID = %s, Deploy ID = %i\nEvent ID = %i, Dive ID = %i', 
+                        metadata$FieldID, deployid, eventid, diveid),
+         sub = sprintf('Threshold = %im', metadata$Threshold),
+         xlab = '',
+         ylab = 'Depth (m)')
+    lines(UTC, Pressure, col = '#888888')
+    abline(h = dive_thr, col = 'blue', lty = 2)
+    axis(4)
+    axis.POSIXct(1, 
+                 at = seq(from = min(UTC), to = max(UTC), length.out = 6), 
+                 format = '%m/%d %H:%M:%OS1')
+    grid()
+  })
+  with(filter(tdr, EventId == eventid), {
+    plot(UTC, PressureInit,
+         ylim = pressure.range(c(Pressure, PressureInit)),
+         pch = 16,
+         col = 'red',
+         cex = 2,
+         xaxt = 'n',
+         xlab = '',
+         ylab = '')
+    lines(UTC, PressureInit, col = 'red')
+    points(UTC, Pressure, pch = 16, cex = 2, col = 'green')
+    lines(UTC, Pressure, col = 'green')
+    abline(h = dive_thr, col = 'blue', lty = 2)
+    axis(4)
+    axis.POSIXct(1, 
+                 at = seq(from = min(UTC), to = max(UTC), length.out = 6), 
+                 format = '%m/%d %H:%M:%OS1')
+    grid()
+    x_range <- dive_UTC_rng %>% as.numeric
+    if(diff(x_range) < .05 * diff(par('usr')[1:2]))
+      x_range <- expand.range(x_range, .025 * diff(par('usr')[1:2]))
+    rect(x_range[1], par('usr')[3], x_range[2], par('usr')[4], col = '#AAAAAA50', border = NA)
+  })
   dev.off()
 }
 
-tdr_file <- 'dive_identification/data2/HOO_WTSH_029_28077_A10369_091914.CSV'
-WTSH_csv <- read.csv(tdr_file, stringsAsFactors = FALSE) %>% mutate(UTC = as.POSIXct(UTC, tz = 'UTC'))
-WTSH_breakdown <- WTSH_csv %>%
-  group_by(EventId) %>%
-  summarize(records = n(),
-            max_depth = max(Pressure),
-            suface_offset = median(Pressure)) %>%
-  tail(-1)
-
-# WTSH Metadata
-read.csv('dive_identification/metadata_all_GPS_05.28.15_working.csv', stringsAsFactors = FALSE) %>% 
-  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M')) %>% 
-  group_by(Deploy_ID, FieldID, Species) %>% 
-  summarize(deployed = min(UTC), 
-            recovered = max(UTC),
-            period = difftime(max(UTC), min(UTC), units = 'days') %>% as.numeric,
-            ValidTDR = any(TDR_TagRecov == 1), 
-            TDR_File = paste(TDR_File, collapse = '')) %>% 
-  filter(ValidTDR) -> WTSH_metadata
-
-# WTSH Pressure Drift
-foreach(wtsh_file = dir('dive_identification/wtsh_data2/', full.names = TRUE), .combine = rbind) %do% {
-  metadata <- WTSH_metadata %>%
-    filter(TDR_File == wtsh_file %>% basename %>% sub('.csv', '', ., ignore.case = TRUE))
-  tdr_data <- read.csv(wtsh_file, stringsAsFactors = FALSE) %>%
-    mutate(UTC = as.POSIXct(UTC, tz = 'UTC'),
-           tad = difftime(UTC, metadata$deployed, units = 'days')) %>%
-    filter(EventId == 0,
-           UTC > metadata$deployed,
-           UTC < metadata$recovered)
-  drift_model <- lm(Pressure ~ tad, data = tdr_data)
-  data.frame(Deploy_ID = metadata$Deploy_ID,
-             deployed = metadata$deployed, 
-             recovered = metadata$recovered, 
-             duration = difftime(metadata$recovered, metadata$deployed, units = 'days'),
-             min_pressure = min(tdr_data$Pressure),
-             max_pressure = max(tdr_data$Pressure),
-             b = coef(drift_model)[1],
-             m = coef(drift_model)[2])
-} -> WTSH_pressure_drift
-with(WTSH_pressure_drift, {
-  plot(x = 0,
-       y = 0,
-       xlim = c(0, max(duration)),
-       ylim = rev(range(c(min_pressure, max_pressure))),
-       pch = NA_integer_,
-       main = 'Pressure drift in WTSH TDRs',
-       xlab = 'Days after deployment',
-       ylab = 'Pressure')
-  axis(side = 4)
-  grid()
-})
-foreach(WTSH = iter(WTSH_pressure_drift, by = 'row')) %do% {
-  with(WTSH, {
-    lines(c(0, duration), 
-          m * c(0, duration) + b,
-          lwd = 1)
-  })
+kitandkaboodle <- function() {
+  foreach(did = metadata$DeployID, .combine = c) %do% {
+    # Initialize and calibrate TDR data
+    calib.tdr <- initialize.tdr(did) %>%
+      calibrate.tdr
+    
+    # Analyze dives and write to file
+    dives <- analyze.dives(calib.tdr)
+    write.csv(dives,
+              file.path('dive_identification',
+                        '3_dive_data',
+                        sprintf('%i.CSV', did)),
+              row.names = FALSE)
+    
+    # Plot dive
+    sapply(dives$DiveID, function(diveid) plot.dive(tdr = calib.tdr, diveid = diveid))
+    
+    did
+  }
 }
-
-# WTSH Depth Distribution Over Time
-foreach(wtsh_file = dir('dive_identification/wtsh_data2/', full.names = TRUE), .combine = rbind) %do% {
-  metadata <- WTSH_metadata %>%
-    filter(TDR_File == wtsh_file %>% basename %>% sub('.csv', '', ., ignore.case = TRUE))
-  read.csv(wtsh_file, stringsAsFactors = FALSE) %>% 
-    mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>%
-    filter(EventId > 0,
-           UTC > metadata$deployed,
-           UTC < metadata$recovered) %>%
-    group_by(EventId) %>%
-    summarize(records = n(),
-              max_depth = max(Pressure),
-              UTC = min(UTC),
-              TDR_File = basename(wtsh_file) %>% sub('.csv', '', ., ignore.case = TRUE)) %>%
-    filter(records > 4,
-           max_depth >= 1) %>%
-    mutate(tad = difftime(UTC, metadata$deployed, units = 'days') %>% as.numeric)
-} -> WTSH_depth_distribution
-depth_dist_model <- lm(max_depth ~ tad, WTSH_depth_distribution)
-plot(max_depth ~ tad, 
-     data = WTSH_depth_distribution,
-     main = 'WTSH Dive Detection Bias',
-     sub = with(summary(depth_dist_model), sprintf('R^2 = %.5f  p-value = %.5f', r.squared, pf(fstatistic[1], fstatistic[2], fstatistic[3], lower.tail = FALSE))),
-     xlab = 'Days after deployment',
-     ylab = 'Max depth (m)')
-abline(depth_dist_model)
-
-# WTSH Dive Distribution Over Time
-dive_list <- lapply(unique(WTSH_depth_distribution$TDR_File), 
-                    function(tdr) filter(WTSH_depth_distribution, TDR_File == tdr))
-dive_list_order <- sapply(dive_list, function(dives) max(dives$tad)) %>% order
-dive_list <- dive_list[dive_list_order]
-boxplot(dive_list,
-        horizontal = TRUE,
-        main = 'Dive distribution per tag',
-        xlab = 'Days after deployment',
-        ylab = 'Tag')
-WTSH_depth_distribution %>%
-  #filter(tad < 6) %>%
-  mutate(bucket = tad %/% .5) %>% 
-  group_by(bucket) %>%
-  summarize(dives_per_tag = n() / n_distinct(TDR_File)) -> WTSH_dive_distribution
-
-foreach(event = unique(WTSH_csv$EventId)[-1], .combine = rbind) %do% {
-  #eventid  records  max_depth	surface_offset	adj_max_depth	1m_dives	1m_adj_dives	.75m_adj_dives	.5m_adj_dives
-  burst <- filter(WTSH_csv, EventId == event)
-  if(nrow(burst) == 4) return(NULL)
-  tdr <- with(burst, 
-              createTDR(UTC, 
-                        Pressure, 
-                        dtime = .1, 
-                        file = tdr_file))
-  surface_offset <- median(burst$Pressure)
-  calib1 <- calibrateDepth(tdr, wet.thr = 0, dive.thr = 1,
-                           zoc.method = 'offset', offset = 0)
-  calib1adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = 1,
-                              zoc.method = 'offset', offset = surface_offset)
-  calib.75adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .75,
-                                zoc.method = 'offset', offset = surface_offset)
-  calib.5adj <- calibrateDepth(tdr, wet.thr = 0, dive.thr = .5,
-                               zoc.method = 'offset', offset = surface_offset)
-  
-  browser()
-  
-  data.frame(EventId = event,
-             records = nrow(burst), 
-             max_depth = max(burst$Pressure),
-             surface_offset = surface_offset,
-             adj_max_depth = max(burst$Pressure) + surface_offset,
-             dives_1 = length(calib1@dive.models),
-             dives_1adj = length(calib1adj@dive.models),
-             dives_.75adj = length(calib.75adj@dive.models),
-             dives_.5adj = length(calib.5adj@dive.models))
-} -> WTSH_breakdown
-
-dive_of_interest <- 152
-BRBO010_tdr <- with(filter(BRBO010_csv, EventId == dive_of_interest), 
-                    createTDR(UTC, 
-                              Pressure, 
-                              dtime = .1, 
-                              file = 'dive_identification/data2/LEH2014BRBO010_A10343_061614.CSV'))
-BRBO010_calib <- calibrateDepth(BRBO010_tdr, zoc.method = 'offset', offset = median(BRBO010_csv$Pressure))
