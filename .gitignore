@@ -5,4 +5,6 @@ dive_identification/1_CEFAS_output/
 dive_identification/2_tdr_data/
 dive_identification/3_dive_data/
 dive_identification/4_plots/
+*allTracks.csv
 *trips_annoted.csv
+*trips.csv
