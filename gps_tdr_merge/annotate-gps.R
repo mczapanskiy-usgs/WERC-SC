@@ -2,86 +2,84 @@ library('data.table')
 library('dplyr')
 library('adehabitatLT')
 
-# Dummy Data Prototype
-gps <- data.table(gpsUTC = as.POSIXct('2015-07-07 12:12:12', tz = 'UTC') + 120*(0:9),
-                  lat = 1:10,
-                  lon = 1:10) %>%
-  mutate(nextUTC = lead(gpsUTC, default = Inf)) %>%
-  setkey(gpsUTC, nextUTC)
+# Load metadata
+metadata <- read.csv(file.path('trackcode', 'gps', 'metadata_all_GPS.csv')) %>%
+  mutate(UTC = as.POSIXct(UTC, format = '%m/%d/%Y %H:%M', tz = 'UTC')) %>%
+  # Aggregate by Deploy_ID to get deployment and recovery times
+  group_by(Deploy_ID,
+           Species) %>%
+  summarize(Deployed = min(UTC),
+            Recovered = max(UTC))
 
-tdr <- data.table(tdrUTC = as.POSIXct('2015-07-07 12:15:12', tz = 'UTC') + 0:179,
-                  depth = sin(1:180) + 1) %>%
-  mutate(dummyUTC = tdrUTC) %>%
-  setkey(tdrUTC, dummyUTC)
+# Annotate location data with wet/dry and dive data
+annotate.gps <- function(deployid, resample = 120) {
+  metadata <- filter(metadata, Deploy_ID == deployid)
+  
+  # Load dive data
+  dives <- file.path('dive_identification',
+                     '3_dive_data',
+                     sprintf('%s.CSV', deployid)) %>%
+    read.csv %>%
+    mutate(diveUTC = as.POSIXct(Begin, tz = 'UTC'),
+           # Dummy variable necessary for overlap join
+           dummyUTC = diveUTC) %>% 
+    data.table %>%
+    setkey(diveUTC, dummyUTC)
+  
+  # Load wetdry data
+  wetdry <- file.path('dive_identification',
+                      '5_wetdry_data',
+                      sprintf('%s.CSV', deployid)) %>%
+    read.csv %>%
+    mutate(wetdryUTC = as.POSIXct(Begin, tz = 'UTC'),
+           # Dummy variable necessary for overlap join
+           dummyUTC = wetdryUTC) %>% 
+    data.table %>%
+    setkey(wetdryUTC, dummyUTC)
 
-foverlaps(x = gps,
-          y = tdr,
-          nomatch = NA) %>%
-  select(gpsUTC, 
-         lat, 
-         lon,
-         tdrUTC, 
-         depth)
-
-
-# Sample Data Prototype
-gps <- read.csv('trackcode/gps/RTTR_trips.csv') %>%
-  filter(Deploy_ID == 290) %>%
-  mutate(gpsUTC = as.POSIXct(UTC, tz ='UTC'),
-         nextUTC = lead(gpsUTC, default = Inf)) %>%
-  data.table %>%
-  setkey(gpsUTC, nextUTC)
-
-tdr <- read.csv('dive_identification/3_dive_data/290.CSV') %>%
-  mutate(diveUTC = as.POSIXct(Begin, tz = 'UTC'),
-         dummyUTC = diveUTC) %>% 
-  data.table %>%
-  setkey(diveUTC, dummyUTC)
-
-foverlaps(x = gps,
-          y = tdr,
-          nomatch = NA) %>%
-  select(gpsUTC,
-         Latitude,
-         Longitude,
-         trip_no,
-         diveUTC,
-         DiveID,
-         DiveDuration = Duration,
-         MaxDepth)
-
-
-# Rediscretize location data
-gpstraj <- with(gps, as.ltraj(xy = cbind(Longitude, Latitude), date = gpsUTC, id = trip_no)) %>%
-  redisltraj(u = 120, samplex0 = TRUE, type = 'time') %>%
-  lapply(function(trip) {
-    select <- dplyr::select
-    trip <- trip %>%
-      select(gpsUTC = date,
-             Latitude = y,
-             Longitude = x) %>%
-      mutate(nextUTC = lead(gpsUTC, default = Inf)) %>%
-      data.table %>%
-      setkey(gpsUTC, nextUTC)
-    
-    tdrtrip <- filter(tdr, diveUTC %between% range(trip$gpsUTC))
-    
-    foverlaps(x = trip,
-              y = tdrtrip,
-              nomatch = NA) %>%
-      select(gpsUTC,
-             Latitude,
-             Longitude,
-             diveUTC,
-             DiveID,
-             DiveDuration = Duration,
-             MaxDepth)
-  })
-
-sapply(1:6,
-       function(trip_no) {
-         gpstraj[[trip_no]] %>%
-           group_by(gpsUTC, Latitude, Longitude) %>%
-           summarize(Dives = sum(!is.na(DiveID))) %>%
-           write.csv(sprintf('gps_tdr_merge/merged_trips/%i_%i.csv', 290, trip_no), row.names = FALSE)
-       })
+  # Load GPS locations
+  file.path('trackcode',
+            'gps',
+            # Tracks are in files grouped by species
+            sprintf('%s_trips.csv', metadata$Species)) %>%
+    read.csv %>%
+    filter(Deploy_ID == deployid,
+           # Only analyze complete trips
+           tripStComp == 1,
+           tripEndComp == 1) %>%
+    mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>%
+    # Split into trips and rediscretize in time
+    (function(gps) as.ltraj(xy = gps[,c('Longitude', 'Latitude')], date = gps$UTC, id = gps$trip_no)) %>%
+    redisltraj(u = resample, samplex0 = TRUE, type = 'time') %>%
+    # Annotate locations with wetdry and dive data
+    lapply(function(trip) {
+      trip %>%
+        transmute(gpsUTC = date,
+                  Latitude = y,
+                  Longitude = x,
+                  trip_no = attr(., 'burst'),
+                  # Calculate window bounds for overlap join
+                  nextUTC = lead(gpsUTC, default = Inf)) %>%
+        data.table %>%
+        setkey(gpsUTC, nextUTC) %>%
+        # Overlap join GPS locations with dive data
+        foverlaps(x = .,
+                  y = dives,
+                  nomatch = NA) %>%
+        # Overlap join GPS locations with wetdry data
+        foverlaps(x = .,
+                  y = wetdry,
+                  nomatch = NA) %>%
+        # Aggregate annotations by GPS location
+        group_by(trip_no,
+                 gpsUTC,
+                 Latitude,
+                 Longitude) %>%
+        summarize(WetDry = all(!is.na(wetdryUTC)),
+                  DiveN = sum(!is.na(DiveID)),
+                  TotalDiveDuration = sum(Duration),
+                  MaxDepth = max(MaxDepth))
+    }) %>%
+    # Rejoin annotated data
+    rbindlist
+}
