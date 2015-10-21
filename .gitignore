@@ -7,5 +7,6 @@ dive_identification/3_dive_data/
 dive_identification/4_plots/
 dive_identification/5_wetdry_data/
 gps_tdr_merge/merged_trips/
+*allTracks.csv
 *trips_annoted.csv
 *trips.csv
