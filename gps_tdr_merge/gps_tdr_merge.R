@@ -1,5 +1,6 @@
 library('data.table')
 library('dplyr')
+library('adehabitatLT')
 
 # Dummy Data Prototype
 gps <- data.table(gpsUTC = as.POSIXct('2015-07-07 12:12:12', tz = 'UTC') + 120*(0:9),
@@ -48,3 +49,39 @@ foverlaps(x = gps,
          DiveID,
          DiveDuration = Duration,
          MaxDepth)
+
+
+# Rediscretize location data
+gpstraj <- with(gps, as.ltraj(xy = cbind(Longitude, Latitude), date = gpsUTC, id = trip_no)) %>%
+  redisltraj(u = 120, samplex0 = TRUE, type = 'time') %>%
+  lapply(function(trip) {
+    select <- dplyr::select
+    trip <- trip %>%
+      select(gpsUTC = date,
+             Latitude = y,
+             Longitude = x) %>%
+      mutate(nextUTC = lead(gpsUTC, default = Inf)) %>%
+      data.table %>%
+      setkey(gpsUTC, nextUTC)
+    
+    tdrtrip <- filter(tdr, diveUTC %between% range(trip$gpsUTC))
+    
+    foverlaps(x = trip,
+              y = tdrtrip,
+              nomatch = NA) %>%
+      select(gpsUTC,
+             Latitude,
+             Longitude,
+             diveUTC,
+             DiveID,
+             DiveDuration = Duration,
+             MaxDepth)
+  })
+
+sapply(1:6,
+       function(trip_no) {
+         gpstraj[[trip_no]] %>%
+           group_by(gpsUTC, Latitude, Longitude) %>%
+           summarize(Dives = sum(!is.na(DiveID))) %>%
+           write.csv(sprintf('gps_tdr_merge/merged_trips/%i_%i.csv', 290, trip_no), row.names = FALSE)
+       })
