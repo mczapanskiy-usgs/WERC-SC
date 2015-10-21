@@ -5,5 +5,7 @@ dive_identification/1_CEFAS_output/
 dive_identification/2_tdr_data/
 dive_identification/3_dive_data/
 dive_identification/4_plots/
+dive_identification/5_wetdry_data/
+gps_tdr_merge/merged_trips/
 *trips_annoted.csv
 *trips.csv
