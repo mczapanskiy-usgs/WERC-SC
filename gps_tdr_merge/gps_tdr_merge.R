@@ -32,23 +32,32 @@ gps <- read.csv('trackcode/gps/RTTR_trips.csv') %>%
   data.table %>%
   setkey(gpsUTC, nextUTC)
 
-tdr <- read.csv('dive_identification/3_dive_data/290.CSV') %>%
+dives <- read.csv('dive_identification/3_dive_data/290.CSV') %>%
   mutate(diveUTC = as.POSIXct(Begin, tz = 'UTC'),
          dummyUTC = diveUTC) %>% 
   data.table %>%
   setkey(diveUTC, dummyUTC)
 
+wetdry <- read.csv('dive_identification/5_wetdry_data/290.CSV') %>%
+  mutate(wetdryUTC = as.POSIXct(Begin, tz = 'UTC'),
+         dummyUTC = wetdryUTC) %>% 
+  data.table %>%
+  setkey(wetdryUTC, dummyUTC)
+
 foverlaps(x = gps,
-          y = tdr,
+          y = dives,
           nomatch = NA) %>%
-  select(gpsUTC,
-         Latitude,
-         Longitude,
-         trip_no,
-         diveUTC,
-         DiveID,
-         DiveDuration = Duration,
-         MaxDepth)
+  foverlaps(y = wetdry,
+            nomatch = NA) %>%
+  transmute(gpsUTC,
+            Latitude,
+            Longitude,
+            trip_no,
+            Wet = !is.na(wetdryUTC),
+            diveUTC,
+            DiveID,
+            DiveDuration = Duration,
+            MaxDepth)
 
 
 # Rediscretize location data
