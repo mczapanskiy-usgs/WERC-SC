@@ -1,11 +1,10 @@
 .Rproj.user
 .Rhistory
 .RData
-dive_identification/1_CEFAS_output/
-dive_identification/2_tdr_data/
-dive_identification/3_dive_data/
-dive_identification/4_plots/
-dive_identification/5_wetdry_data/
+dive_identification/*/*.csv
+dive_identification/*/*.png
+dive_identification/7_calibration_plots/*
+dive_identification/of note/*
 gps_tdr_merge/merged_trips/
 *allTracks.csv
 *trips_annoted.csv
