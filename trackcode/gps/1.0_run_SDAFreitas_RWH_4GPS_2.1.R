@@ -44,6 +44,9 @@ plot<-TRUE
 ####  dir.in for .csv files
 dir.in <- "D:/Share_Data/Tracking_Data/GPS/"
 
+####  meta.in for .csv files
+meta.in <- "D:/Share_Data/GitHub/WERC-SC/trackcode/gps/"
+
 #### dir.out for .csv files
 dir.out <- "D:/Share_Data/Tracking_Data/GPS/"
 
@@ -66,11 +69,11 @@ parameters <- read.table(paste(dir.in.params,"parameters.csv",sep=""),header=T,s
 
 # open metadata file
 # metadata<-read.table ("/Users/henry/Documents/Work/Projects/USGS/Latest/Tracking Data/GPS/metadata_all_GPS_12.19.14_2.0.csv",header=T, sep=",", strip.white=T)
-metadata<-read.table(paste(dir.in,"metadata_all_GPS_06.04.15_working.csv",sep=""),header=T, sep=",", strip.white=T)
+metadata<-read.table(paste(meta.in,"metadata_all_GPS.csv",sep=""),header=T, sep=",", strip.white=T)
 
 # get species from AUO Code in metadata
 species.tagged<-unique(metadata$Species)
-# i=2
+# i=3
 for (i in 1:length(species.tagged)) {
   species<-species.tagged[i]
 
@@ -260,7 +263,7 @@ for (i in 1:length(species.tagged)) {
       max_SPD<-max(trackwant$speed.pckTrip.SPD,na.rm=TRUE)
       max_SDA<-max(trackwant$speed.pckTrip.SDA,na.rm=TRUE)
       
-      trackwant[trackwant=="NaN"]=NA
+  #    trackwant[trackwant=="NaN"]=NA
       head(trackwant)
       rm(trackkeeps.spd)
       rm(trackkeeps.sda)
