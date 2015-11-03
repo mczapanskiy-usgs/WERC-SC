@@ -10,9 +10,9 @@ library('plyr')
 library('dplyr')
 
 # select a spp
-spp="WTSH"
+spp="RTTR"
 
-radius="1"
+radius="1.5"
 
 filename=paste(spp,radius,sep='_')
 
@@ -39,7 +39,9 @@ metadata <- metadata[metadata$Species==spp,]
 
 # Parse dates
 filt.tracks <- transform(filt.tracks, UTC = as.POSIXct(UTC, tz = "GMT", format = "%Y-%m-%d %H:%M:%S"))
-  
+trip.info <- transform(trip.info, tripSt = as.POSIXct(tripSt, tz = "GMT", format = "%Y-%m-%d %H:%M:%S"))
+trip.info <- transform(trip.info, tripEnd = as.POSIXct(tripEnd, tz = "GMT", format = "%Y-%m-%d %H:%M:%S"))
+
 # Merge tracks with trip.info on deploy id and time in trip boundaries (conditional join)
 annotated.tracks<- filter(merge(filt.tracks, trip.info, 'Deploy_ID'), UTC >= tripSt & UTC <= tripEnd)
 
