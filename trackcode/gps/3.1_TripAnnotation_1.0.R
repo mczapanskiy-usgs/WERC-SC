@@ -10,29 +10,36 @@ library('plyr')
 library('dplyr')
 
 # select a spp
-spp="RTTR"
+spp="WTSH"
 
-filename="RTTR_0.5"
+radius="1"
 
-####  dir.in for .csv files
-dir.in <- 'D:/Share_Data/GitHub/WERC-SC/trackcode/gps/'
+filename=paste(spp,radius,sep='_')
+
+####  meta.in for meta.csv file
+meta.in <- 'D:/Share_Data/GitHub/WERC-SC/trackcode/gps/'
+
+####  dir.in for tracks.csv file
+dir.in <- 'D:/Share_Data/Tracking_Data/GPS/All_tracks/'
+
+####  trips.in for trips.csv file
+trips.in<-'D:/Share_Data/Tracking_Data/GPS/3_Trips/'
 
 #### dir.out for .csv files
 dir.out <- 'D:/Share_Data/Tracking_Data/GPS/All_tracks/'
 
 # Read data, select relevant data and columns
-filt.tracks <- data.frame(read.csv('D:/Share_Data/Tracking_Data/GPS/All_tracks/All_Species_GPS_allTracks.csv'))[,c(1,2,3,21,20)]
+filt.tracks <- data.frame(read.csv(paste(dir.in,'All_Species_GPS_allTracks.csv',sep='')))[,c(1,2,3,21,20)]
 filt.tracks <- filt.tracks[filt.tracks$species==spp,]
-trip.info <- data.frame(read.csv(paste('D:/Share_Data/Tracking_Data/GPS/3_Trips/',filename,'_tripInfo.csv',sep='')))
+trip.info <- data.frame(read.csv(paste(trips.in,filename,'_tripInfo.csv',sep='')))
 # Each Deploy_ID has one entry for deployment and retrieval. They're functionally equivalent for
 # this purpose so we only want unique Deploy_ID/lat/lon combos.
-metadata <- unique(data.frame(read.csv(paste(dir.in,'metadata_all_GPS.csv',sep='')))[,c(3,9,48:52)]) 
+metadata <- unique(data.frame(read.csv(paste(meta.in,'metadata_all_GPS.csv',sep='')))[,c(3,9,48:52)]) 
 metadata <- metadata[metadata$Species==spp,]
 
 # Parse dates
 filt.tracks <- transform(filt.tracks, UTC = as.POSIXct(UTC, tz = "GMT", format = "%Y-%m-%d %H:%M:%S"))
-trip.info <- transform(trip.info, tripSt = as.POSIXct(tripSt, tz = "GMT", format = "%Y-%m-%d %H:%M:%S"), tripEnd = as.POSIXct(tripEnd, tz = "GMT", format = "%Y-%m-%d %H:%M:%S"))
-
+  
 # Merge tracks with trip.info on deploy id and time in trip boundaries (conditional join)
 annotated.tracks<- filter(merge(filt.tracks, trip.info, 'Deploy_ID'), UTC >= tripSt & UTC <= tripEnd)
 
@@ -53,7 +60,7 @@ if (at.nest$Nest_loc_use[i]==0) {
 }
   interpolated.points<-at.nest[,c(1,8,15,16,9,2:7)]
   
-  interpolated.points<-rename(interpolated.points,c("Species"="species"))
+  interpolated.points<-rename(interpolated.points,species=Species)
   
   # Append interpolated track points and sort
   annotated.tracks <- arrange(rbind(annotated.tracks, interpolated.points), Deploy_ID, UTC)[,c(1,2,3,4,5,10)]
