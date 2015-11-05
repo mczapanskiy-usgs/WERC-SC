@@ -250,7 +250,7 @@ fastlog.summary2 <- function(did, eid) {
 }
 
 min.vs.median <- function() {
-  min_events <- dir('dive_identification/7_calibration_plots/min or median/min/') %>%
+  min_events <- dir('dive_identification/8_calibration_plots/min or median/min/') %>%
     sub('medium_[xyz]_([0-9]+_[0-9]+).*', '\\1', .) %>%
     strsplit('_') %>%
     unlist %>%
@@ -261,7 +261,7 @@ min.vs.median <- function() {
     ungroup %>%
     mutate(CalibType = 'Min')
   
-  median_events <- dir('dive_identification/7_calibration_plots/min or median/median/') %>%
+  median_events <- dir('dive_identification/8_calibration_plots/min or median/median/') %>%
     sub('medium_[xyz]_([0-9]+_[0-9]+).*', '\\1', .) %>%
     strsplit('_') %>%
     unlist %>%
