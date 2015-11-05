@@ -1,11 +1,3 @@
 .Rproj.user
 .Rhistory
 .RData
-dive_identification/*/*.csv
-dive_identification/*/*.png
-dive_identification/7_calibration_plots/*
-dive_identification/of note/*
-gps_tdr_merge/merged_trips/
-*allTracks.csv
-*trips_annoted.csv
-*trips.csv
