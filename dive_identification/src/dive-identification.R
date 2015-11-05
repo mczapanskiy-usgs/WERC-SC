@@ -2,20 +2,29 @@ library('dplyr')
 library('foreach')
 library('diveMove')
 
-metadata <- read.csv('dive_identification/TDRmetadata.csv') %>%
-  mutate(Deployed = as.POSIXct(Deployed, tz = 'UTC'),
-         Recovered = as.POSIXct(Recovered, tz = 'UTC'))
+metadata <- read.csv('dive_identification/Metadata.csv') %>%
+  mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>%
+  group_by(DeployID = Deploy_ID,
+           FieldID,
+           Species,
+           Site = SubCol_Code) %>%
+  summarize(Deployed = min(UTC, na.rm = TRUE),
+            Recovered = max(UTC, na.rm = TRUE),
+            TDRFile = paste(TDR_File, collapse = ''),
+            ValidTDR = any(TDR_TagRecov == 1)) %>%
+  filter(ValidTDR) %>%
+  select(-ValidTDR)
+
+tdr.path <- function(deployid) {
+  with(metadata %>%
+         filter(DeployID == deployid),
+       file.path('dive_identification',
+                 '2_tdr_data',
+                 sprintf('%s.CSV', TDRFile)))
+}
 
 initialize.tdr <- function(deployid) {
   metadata <- filter(metadata, DeployID == deployid)
-  
-  tdr.path <- function(deployid) {
-    with(metadata %>%
-           filter(DeployID == deployid),
-         file.path('dive_identification',
-                   '2_tdr_data',
-                   sprintf('%s.CSV', TDRFilename)))
-  }
   
   tdr <- read.csv(tdr.path(deployid)) %>% 
     mutate(UTC = as.POSIXct(UTC, tz = 'UTC') + .05) %>%
@@ -66,19 +75,30 @@ calibrate.tdr <- function(tdr, depth_thr = .5) {
   
   # Filter out FastLogs with only 4 points or depth range less than dive threshold
   valid_fastlogs <- tdr %>%
-    filter(EventId > 0) %>%
+    filter(EventId > 0) %>% 
     group_by(EventId) %>%
     summarize(N = n(),
               depthRange = max(Pressure, na.rm = TRUE) - min(Pressure, na.rm = TRUE)) %>%
     filter(N > 4,
            depthRange > depth_thr)
   
+  get.fastlog.rate <- function() {
+    cefas_file <- file.path('dive_identification',
+                            '1_CEFAS_output',
+                            sprintf('%s.CSV', metadata$TDRFile))
+    readLines(cefas_file) %>%
+      grep(pattern = 'Fast rate [0-9\\.]+', x = ., value = TRUE) %>%
+      first %>%
+      sub('Fast rate ([0-9\\.]+)', '\\1', x = .) %>%
+      as.numeric
+  }
+  
   calibrate.fastlog <- function(fastlog) {
     surface <- surface.offset(fastlog)
     # Create a TDR object
     createTDR(fastlog$UTC,
               fastlog$Pressure,
-              dtime = metadata$FastLogRate,
+              dtime = get.fastlog.rate(),
               file = tdr.path(deployid)) %>%
       # Calibrate TDR using min or median pressure as offset
       calibrateDepth(wet.thr = 0,
@@ -103,7 +123,8 @@ calibrate.tdr <- function(tdr, depth_thr = .5) {
     diveTable <- tdr %>%
       filter(DiveIdInit > 0) %>%
       group_by(EventId, DiveIdInit) %>%
-      summarize %>%
+      summarize(N = n()) %>%
+      filter(N > 1) %>%
       as.data.frame
     diveTable$DiveId <- seq_along(diveTable[,1])
     # Merge tdr with dive table
@@ -114,11 +135,13 @@ calibrate.tdr <- function(tdr, depth_thr = .5) {
   }
   
   # Split by EventId and process FastLogs individually using diveMove
-  tdr %>%
-    filter(EventId %in% valid_fastlogs$EventId) %>%
-    group_by(EventId) %>%
-    do(calibrate.fastlog(.)) %>%
-    recalibrate.diveids -> result
+  result <- tryCatch({
+    tdr %>%
+      filter(EventId %in% valid_fastlogs$EventId) %>%
+      group_by(EventId) %>%
+      do(calibrate.fastlog(.)) %>%
+      recalibrate.diveids
+  }, error = function(e) browser())
   attr(result, 'DeployID') <- deployid
   result
 }
@@ -132,7 +155,7 @@ plot.dive <- function(tdr, diveid, dive_thr = .5) {
   metadata <- filter(metadata, DeployID == deployid)
   eventid <- filter(tdr, DiveId == diveid)$EventId[1]
   png(filename = file.path('dive_identification',
-                           '4_dive_plots',
+                           '5_dive_plots',
                            sprintf('%i_%i_%i.png', deployid, eventid, diveid)),
       width = 1600, height = 900)
   par(ps = 20, cex = 1)
@@ -194,23 +217,28 @@ analyze.dives <- function(tdr) {
               Begin = first(UTC),
               End = last(UTC),
               Duration = difftime(last(UTC), first(UTC), units = 'secs') %>% as.numeric %>% round(digits = 1),
-              MaxDepth = max(Pressure),
+              MaxDepth = max(CalibPressure),
               N = n()) %>%
     select(DeployID:EventID, DiveID = DiveId, Begin:N)
 }
 
 kitandkaboodle <- function() {
-  foreach(did = metadata$DeployID[6:64], .combine = c) %do% {
+  foreach(did = metadata$DeployID, .combine = c) %do% {
     # Initialize and calibrate TDR data
     calib.tdr <- initialize.tdr(did) %>%
       calibrate.tdr
+    
+    write.csv(calib.tdr,
+              file.path('dive_identification',
+                        '3_calibrated_data',
+                        sprintf('%i.CSV', did)))
     
     if(nrow(calib.tdr) > 0) {
       # Analyze dives and write to file
       dives <- analyze.dives(calib.tdr)
       write.csv(dives,
                 file.path('dive_identification',
-                          '3_dive_data',
+                          '4_dive_data',
                           sprintf('%i.CSV', did)),
                 row.names = FALSE)
       
@@ -222,4 +250,25 @@ kitandkaboodle <- function() {
       sprintf('ERRORNOROWS:%i', did) 
     }
   }
+}
+
+# analyze.dives was using the wrong pressure field so rerun it
+kitandkaboodle2 <- function() {
+  metadata %>%
+    rowwise %>%
+    do({
+      did <- .$DeployID
+      if(file.exists(sprintf('dive_identification/4_dive_data/%i.CSV', did))) {
+        tdr <- read.csv(sprintf('dive_identification/3_calibrated_data/%i.CSV', did)) %>%
+          mutate(UTC = as.POSIXct(UTC, tz = 'UTC') + .05)
+        attr(tdr, 'DeployID') <- did
+        tdr %>% 
+          analyze.dives %>%
+          write.csv(sprintf('dive_identification/4_dive_data/%i.CSV', did),
+                    row.names = FALSE)
+        data.frame(DeployID = did, divefile = sprintf('dive_identification/4_dive_data/%i.CSV', did))
+      } else {
+        data.frame(DeployID = did, divefile = NA)
+      }
+    })
 }
