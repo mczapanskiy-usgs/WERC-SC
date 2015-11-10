@@ -30,7 +30,7 @@ rm(list=ls())
 ticall<-as.numeric(proc.time()[3])
 
 # set species AUO Code
-species<-"WTSH"
+species<-"PFSH"
 
 ####  dir.in for .csv files
 dir.in <- "D:/Share_Data/Tracking_Data/GPS/"

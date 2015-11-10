@@ -73,7 +73,7 @@ metadata<-read.table(paste(meta.in,"metadata_all_GPS.csv",sep=""),header=T, sep=
 
 # get species from AUO Code in metadata
 species.tagged<-unique(metadata$Species)
-# i=3
+# i=5
 for (i in 1:length(species.tagged)) {
   species<-species.tagged[i]
 
@@ -282,10 +282,7 @@ for (i in 1:length(species.tagged)) {
       
       trackfiltout <-  trackwant[,c("UTC", "Latitude", "Longitude", "Altitude", "SPDfilter", "SDAfilter", "dt", "dist.pckArgos.SPD", "speed.pckArgos.SPD", "dist.pckTrip.SPD", "speed.pckTrip.SPD", "azimuth.SPD", "dist.pckArgos.SDA", "speed.pckArgos.SDA", "dist.pckTrip.SDA", "speed.pckTrip.SDA", "azimuth.SDA")]
       # head(tracksdaout)
- 
-      
-      
-      
+
       rm(trackwant,track)
       
       #### output filtered data for each bird
@@ -371,55 +368,57 @@ for (i in 1:length(species.tagged)) {
   #### summarize deployments and recoveries
   
   #head(recovs)
-  metaWants$DeplEvents<-paste(metaWants$Year,metaWants$SubCol_Code,metaWants$DeplSess, sep="_")
-  deps_summary<-data.frame(unique(metaWants$DeplEvents))
-  deps_summary_out <- data.frame(matrix(ncol = 11, nrow = length(deps_summary[,1])))
-  colnames(deps_summary_out)<-c("DeplEvents", "D", "N", "R", "0", "1", "2", "3", "4", "5", "6")
-  
-  #   GPS Fields Recovery Fields
-  #   0-deployment
-  #   1-good file
-  #   2-tag lost
-  #   3-tag problems but data file ok
-  #   4-tag problems file has some data but not useful
-  #   5-tag problems no file recovered
-  
-  library(plyr)
-  
-  # k=12
-  for (k in 1:length(deps_summary_out[,1])) {
-    deps_summary_out[k,1]<-as.character(deps_summary[k,1])
-    metaWants.sub<-subset(metaWants,DeplEvents==deps_summary[k,])
-    y=t(c(table(metaWants.sub$Tagging_Event), table(metaWants.sub$GPS_TagRecov)))
-    y<-cbind(as.data.frame(deps_summary_out[k,1]),y)
-    colnames(y)[1]<-("DeplEvents") 
-    
-    new<-join(deps_summary_out[k,], y, by = NULL, type = "full", match = "all")
-    
-    deps_summary_out[k,]<-new[2,]
-    }
-  
-  
-  colnames(deps_summary_out)<-c("deploy_events","deployed_GPS_or_TDR","handled_not_tagged", "recovered","deployed_GPS","good_file","tag_lost","tag_problem data ok","tag_problems_data_bad","tag_problems_no_data","tdr_only")
-  
-  deps_summary_out[is.na(deps_summary_out)]<-0
-  deps_summary_out$Percent_GPS_Tag_Recov<-(rowSums(deps_summary_out[,c(6,8,9,10)], na.rm = FALSE, dims = 1)/(deps_summary_out$deployed_GPS_or_TDR-deps_summary_out$tdr_only))*100
-  deps_summary_out$Percent_GPS_Bird_Resighted<-(rowSums(deps_summary_out[,c(6,7,8,9,10)], na.rm = FALSE, dims = 1)/(deps_summary_out$deployed_GPS_or_TDR-deps_summary_out$tdr_only))*100
-  deps_summary_out$Percent_GPS_Bird_not_Resighted<-100-(deps_summary_out$Percent_GPS_Bird_Resighted)
-  deps_summary_out$Percent_GPS_Tag_Data_Issue<-(rowSums(deps_summary_out[,c(9,10)], na.rm = FALSE, dims = 1)/(deps_summary_out$deployed_GPS_or_TDR-deps_summary_out$tdr_only))*100
-  
+#   metaWants$DeplEvents<-paste(metaWants$Year,metaWants$SubCol_Code,metaWants$DeplSess, sep="_")
+#   deps_summary<-data.frame(unique(metaWants$DeplEvents))
+#   deps_summary_out <- data.frame(matrix(ncol = 17, nrow = length(deps_summary[,1])))
+#   colnames(deps_summary_out)<-c("DeplEvents", "D", "N", "R", "GPS_0", "GPS_1", "GPS_2", "GPS_3", "GPS_4", "GPS_5", "GPS_6",...
+#                                 "TDR_0", "TDR_1", "TDR_2", "TDR_3", "TDR_4", "TDR_5", "TDR_6")
+#   
+#   #   GPS Fields Recovery Fields
+#   #   0-deployment
+#   #   1-good file
+#   #   2-tag lost
+#   #   3-tag problems but data file ok
+#   #   4-tag problems file has some data but not useful
+#   #   5-tag problems no file recovered
+#   #   6-no GPS tag deployed (or no other tag deployed)
+#   
+#   library(plyr)
+#   
+#   # k=12
+#   for (k in 1:length(deps_summary_out[,1])) {
+#     deps_summary_out[k,1]<-as.character(deps_summary[k,1])
+#     metaWants.sub<-subset(metaWants,DeplEvents==deps_summary[k,])
+#     y=t(c(table(metaWants.sub$Tagging_Event), table(metaWants.sub$GPS_TagRecov),table(metaWants.sub$TDR_TagRecov)))
+#     y<-cbind(as.data.frame(deps_summary_out[k,1]),y)
+#     colnames(y)[1]<-("DeplEvents") 
+#     
+#     new<-join(deps_summary_out[k,], y, by = NULL, type = "full", match = "all")
+#     
+#     deps_summary_out[k,]<-new[2,]
+#     }
+#   
+#   
+#   colnames(deps_summary_out)<-c("deploy_events","deployed_GPS_or_TDR","handled_not_tagged", "recovered","deployed_GPS","good_file","tag_lost","tag_problem data ok","tag_problems_data_bad","tag_problems_no_data","tdr_only")
+#   
+#   deps_summary_out[is.na(deps_summary_out)]<-0
+#   deps_summary_out$Percent_GPS_Tag_Recov<-(rowSums(deps_summary_out[,c(6,8,9,10)], na.rm = FALSE, dims = 1)/(deps_summary_out$deployed_GPS_or_TDR-deps_summary_out$tdr_only))*100
+#   deps_summary_out$Percent_GPS_Bird_Resighted<-(rowSums(deps_summary_out[,c(6,7,8,9,10)], na.rm = FALSE, dims = 1)/(deps_summary_out$deployed_GPS_or_TDR-deps_summary_out$tdr_only))*100
+#   deps_summary_out$Percent_GPS_Bird_not_Resighted<-100-(deps_summary_out$Percent_GPS_Bird_Resighted)
+#   deps_summary_out$Percent_GPS_Tag_Data_Issue<-(rowSums(deps_summary_out[,c(9,10)], na.rm = FALSE, dims = 1)/(deps_summary_out$deployed_GPS_or_TDR-deps_summary_out$tdr_only))*100
+#   
   if (filter.data=="Y") {
   ####output the number of points filtered for each bird (gps error source from lcerrors input table ex: for GPS from wakefield 2013 scienc (as set in beginning of code)) 
   write.table(filter_sum,paste(dir.out,"2_GPS_Freitas_out/Summary_GPS_Filtered",species,"_SPD_ref.csv",sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
   
   ####output FilterParametersUsed
-  FilterParametersUsed<-as.data.frame(t(c(species,vmax,ang,distlim,lc[1],lcerr)))
+  FilterParametersUsed<-as.data.frame(t(c(as.character(species),vmax,ang,distlim,lc[1],lcerr)))
   colnames(FilterParametersUsed)<-c("species","gps_vmax","ang1","ang2","distlim1","distlim2","lc","lcerror")
   write.table(FilterParametersUsed,paste(dir.out,"2_GPS_Freitas_out/FilterParametersUsed_",species,"_SPD_ref.csv",sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
   }
   
-  ####output summary of deployments for each year session location
-  write.table(deps_summary_out,paste(dir.out,"Stats_out/Deps_Sum_All_",species,"_GPS.csv",sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
+#   ####output summary of deployments for each year session location
+#   write.table(deps_summary_out,paste(dir.out,"Stats_out/Deps_Sum_All_",species,"_GPS.csv",sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
   
   
   rm(filter_sum,FilterParametersUsed,deps_summary_out)

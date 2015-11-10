@@ -503,7 +503,8 @@ if (plot=="Y") {
       metaWant<-metaWants[metaWants$Deploy_ID==Deploy_ID_Want,]
       file.idWant<-metaWant$GPS_Track_File
       track<-(subset(tracks_all,file.id == file.idWant & SPDfilter != "removed"))
-      
+      track$UTC<-(as.POSIXct(track$UTC, tz = "GMT"))
+
       # read original track file
       track.orig <- read.table (paste(dir.in,"GPS/1_RawGPS/",file.idWant,"_RawGPS.csv",sep = ""),header=T, sep=",", strip.white=T)
 
@@ -530,8 +531,20 @@ if (plot=="Y") {
       p4 <- p3 + geom_point(colour='sienna',size=.5) + ggtitle(Deploy_ID_Want)
       p5 <- p4 + geom_point(data=tripInfoWant,aes((tripEnd),tripEndComp*6), colour= "red", shape="e", size = 4)
       p6 <- p5 +  geom_point(data=tripInfoWant,aes(x=(tripSt),y=tripStComp*4),  colour="blue", shape="s", size = 4) + labs(title=paste(species,file.idWant,"Deploy_ID",Deploy_ID_Want,sep=" "))
-      pdf(paste(dir.out,"3_Trips/",Deploy_ID_Want,"_",file.idWant,"_",species,"_",radCol,"_trips.pdf",sep = ""), onefile = TRUE)
+      pdf(paste(dir.out,"3_Trips/","1_",Deploy_ID_Want,"_",file.idWant,"_",species,"_",radCol,"_trips.pdf",sep = ""), onefile = TRUE)
       print(p6)
-      dev.off()      
+      dev.off()
+      
+      # n<-paste("D:/Share_Data/Tracking_Data/GPS/3_Trips/",Deploy_ID_Want,"_",species,"_trips.pdf",sep = "")
+      p <- ggplot(track, aes(x=as.POSIXct(as.character(UTC), tz = "GMT"), y=dist2Col))
+      p1 <- p + geom_line(data = track.orig,colour='seashell1',size=2) + ggtitle(Deploy_ID_Want)
+      p2 <- p1 + geom_point(data = track.orig,colour='blue',size=.5) + ggtitle(Deploy_ID_Want)
+      p3 <- p2 + geom_line(data = track,colour='seashell3',size=1) + ggtitle(Deploy_ID_Want) + coord_cartesian(ylim = c(-10, ceiling(max(track$dist2Col)*1.4))) + coord_cartesian(xlim = c(min(track$UTC)-(60*60*24), max(track$UTC)+(60*60*24)))
+      p4 <- p3 + geom_point(colour='sienna',size=.5) + ggtitle(Deploy_ID_Want)
+      p5 <- p4 + geom_point(data=tripInfoWant,aes((tripEnd),tripEndComp*6), colour= "red", shape="e", size = 4)
+      p6 <- p5 +  geom_point(data=tripInfoWant,aes(x=(tripSt),y=tripStComp*4),  colour="blue", shape="s", size = 4) + labs(title=paste(species,file.idWant,"Deploy_ID",Deploy_ID_Want,sep=" "))
+      pdf(paste(dir.out,"3_Trips/","2_",Deploy_ID_Want,"_",file.idWant,"_",species,"_",radCol,"_trips_xlimdep.pdf",sep = ""), onefile = TRUE)
+      print(p6)
+      dev.off() 
     }
 }

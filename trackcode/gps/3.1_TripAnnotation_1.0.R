@@ -10,9 +10,9 @@ library('plyr')
 library('dplyr')
 
 # select a spp
-spp="RTTR"
+spp="WTSH"
 
-radius="1.5"
+radius="1"
 
 filename=paste(spp,radius,sep='_')
 
