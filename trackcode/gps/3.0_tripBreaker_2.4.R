@@ -45,7 +45,7 @@ dir.out <- "D:/Share_Data/Tracking_Data/GPS/"
 metadata<-read.table(paste("D:/Share_Data/GitHub/WERC-SC/trackcode/gps/","metadata_all_GPS.csv",sep=""),header=T, sep=",", strip.white=T)
 
 #### enter species to process
-species<-"BRBO"
+species<-"PFSH"
 
 #### Plot or not?
 plot<-"Y"
@@ -528,8 +528,8 @@ if (plot=="Y") {
       
       # n<-paste("D:/Share_Data/Tracking_Data/GPS/3_Trips/",Deploy_ID_Want,"_",species,"_trips.pdf",sep = "")
       p <- ggplot(track, aes(x=as.POSIXct(as.character(UTC), tz = "GMT"), y=dist2Col))
-      p1 <- p + geom_line(data = track.orig,colour='seashell2',size=1.5) + ggtitle(Deploy_ID_Want)
-      p2 <- p1 + geom_point(data = track.orig,colour='blue',size=.5) + ggtitle(Deploy_ID_Want)
+      p1 <- p + geom_line(data = track.orig,colour='seashell1',size=2) + ggtitle(Deploy_ID_Want)
+      p2 <- p1 + geom_point(data = track.orig,colour='blue',size=.25) + ggtitle(Deploy_ID_Want)
       p3 <- p2 + geom_line(data = track,colour='seashell3',size=1) + ggtitle(Deploy_ID_Want) + coord_cartesian(ylim = c(-10, ceiling(max(track$dist2Col)*1.4)), xlim = c(deployUTC-(60*60*24), recoverUTC+(60*60*24)))
       p4 <- p3 + geom_point(colour='sienna',size=.5) + ggtitle(Deploy_ID_Want)
       p5 <- p4 + geom_point(data=tripInfoWant,aes((tripEnd),tripEndComp*6), colour= "red", shape="e", size = 4)
@@ -540,9 +540,9 @@ if (plot=="Y") {
       
       # n<-paste("D:/Share_Data/Tracking_Data/GPS/3_Trips/",Deploy_ID_Want,"_",species,"_trips.pdf",sep = "")
       p <- ggplot(track, aes(x=as.POSIXct(as.character(UTC), tz = "GMT"), y=dist2Col))
-      p1 <- p + geom_line(data = track.orig,colour='seashell2',size=1.5) + ggtitle(Deploy_ID_Want)
+      p1 <- p + geom_line(data = track.orig,colour='seashell1',size=2) + ggtitle(Deploy_ID_Want)
       p2 <- p1 + geom_point(data = track.orig,colour='blue',size=.5) + ggtitle(Deploy_ID_Want)
-      p3 <- p2 + geom_line(data = track,colour='seashell3',size=1) + ggtitle(Deploy_ID_Want) + coord_cartesian(ylim = c(-10, ceiling(max(track$dist2Col)*1.4)), xlim = c(min(track$UTC)-(60*60*24), max(track$UTC)+(60*60*24)))
+      p3 <- p2 + geom_line(data = track,colour='seashell3',size=1) + ggtitle(Deploy_ID_Want) + coord_cartesian(ylim = c(-10, ceiling(max(track$dist2Col)*1.4)), xlim = c(min(track.orig$UTC)-(60*60*24), max(track.orig$UTC)+(60*60*24)))
       p4 <- p3 + geom_point(colour='sienna',size=.5) + ggtitle(Deploy_ID_Want)
       p5 <- p4 + geom_point(data=tripInfoWant,aes((tripEnd),tripEndComp*6), colour= "red", shape="e", size = 4)
       p6 <- p5 +  geom_point(data=tripInfoWant,aes(x=(tripSt),y=tripStComp*4),  colour="blue", shape="s", size = 4) + labs(title=paste(species,file.idWant,"Deploy_ID",Deploy_ID_Want,sep=" "))
