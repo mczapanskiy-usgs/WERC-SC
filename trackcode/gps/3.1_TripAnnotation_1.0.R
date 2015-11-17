@@ -10,9 +10,9 @@ library('plyr')
 library('dplyr')
 
 # select a spp
-spp="BRBO"
+spp="WTSH"
 
-radius="1.5"
+radius="1"
 
 filename=paste(spp,radius,sep='_')
 
@@ -69,6 +69,6 @@ if (at.nest$Nest_loc_use[i]==0) {
 }
 
 
-write.table(annotated.tracks, paste(dir.out,filename,'_trips_annotated.csv',sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
+write.table(annotated.tracks, paste(dir.out,filename,'_trips_annoted.csv',sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
 
 # END
