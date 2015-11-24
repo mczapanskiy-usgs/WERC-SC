@@ -91,7 +91,7 @@ noindiv.grp.ids <- vector ("list", length(grp.ids))
 summary.grp.ids <- vector ("list", length(grp.ids))
 
 #### loop through groups
-# grp.id <-5
+# grp.id <-1
 for (grp.id in 1:length(grp.ids)) {
   
   tracksums.want<-tracksums[which(tracksums$grp==grp.ids[grp.id]),]
@@ -160,19 +160,15 @@ print(paste("grouping variable = ", grping.var,sep=""))
     noindiv.grp.id<-noindiv.grp.id+indiv  
   }
 
-  ud.track.nowght<-ud.track*0
-  for (l in 1:length(ud.track)) {
+  ud.track.nowght<-ud.track
+  for (l in 1:length(ud.track.nowght)) {
     # calculate ud weighted by track.days, weigh each track it's proportion of total hours tracked within the clipperName (Freiberg 20XX paper)
-
     ud.track.nowght[[l]]<-ud.track[[l]]*noindiv.grp.id
   }
   
-ud.track.stack<-stack(ud.track[[1]],ud.track[[2]])
-  ud.track.all
+  ud.track.nowght.all<-Reduce("+",ud.track.nowght)  
   
-  ud.track.all<-Reduce("+",ud.track)  
-  
-  noindiv.grp.id
+  plot(ud.track.nowght.all)
   
   ud.grp.ids[[grp.id]]<-ud.grp.id
 #   max(udall)
@@ -239,7 +235,7 @@ grp.id.wants<-as.data.frame(table(summary.grp.ids.mat[,1]))
 # 1. all years weighted by (number of individuals tracked for that year/total number individuals tracks for all years)
 # 2. number of birds per cell for all years
 
-# grp.id <-1
+# grp.id <-5
 for (grp.id in 1:length(grp.ids)) {
   
   
