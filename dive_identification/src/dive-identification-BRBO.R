@@ -2,6 +2,8 @@ library('dplyr')
 library('foreach')
 library('diveMove')
 library('zoo')
+library('ggplot2')
+library('data.table')
 
 metadata <- read.csv('trackcode/gps/metadata_all_GPS.csv') %>%
   filter(Species == 'BRBO') %>%
@@ -92,9 +94,11 @@ calibrate.tdr <- function(tdr, surface_thr = .2, depth_thr = .5, dur_thr = .5) {
     filter(EventId > 0) %>% 
     group_by(EventId) %>%
     summarize(duration = difftime(max(UTC, na.rm = TRUE), min(UTC, na.rm = TRUE), units = 'secs') %>% as.numeric,
-              depthRange = max(Pressure, na.rm = TRUE) - min(Pressure, na.rm = TRUE)) %>%
+              depthRange = max(Pressure, na.rm = TRUE) - min(Pressure, na.rm = TRUE),
+              N = n()) %>%
     filter(duration >= dur_thr,
-           depthRange >= depth_thr)
+           depthRange >= depth_thr,
+           N > 4)
   
   get.fastlog.rate <- function() {
     cefas_file <- file.path('dive_identification',
@@ -138,7 +142,7 @@ calibrate.tdr <- function(tdr, surface_thr = .2, depth_thr = .5, dur_thr = .5) {
       filter(DiveIdInit > 0) %>%
       group_by(EventId, DiveIdInit) %>%
       summarize(duration = difftime(max(UTC, na.rm = TRUE), min(UTC, na.rm = TRUE), units = 'secs') %>% as.numeric,
-                maxdepth = max(Pressure, na.rm = TRUE)) %>%
+                maxdepth = max(CalibPressure, na.rm = TRUE)) %>%
       filter(duration >= dur_thr,
              maxdepth >= depth_thr) %>%
       as.data.frame
@@ -275,27 +279,6 @@ kitandkaboodle <- function() {
   }
 }
 
-# analyze.dives was using the wrong pressure field so rerun it
-kitandkaboodle2 <- function() {
-  metadata %>%
-    rowwise %>%
-    do({
-      did <- .$DeployID
-      if(file.exists(sprintf('dive_identification/4a_brbo_dive_data/%i.CSV', did))) {
-        tdr <- read.csv(sprintf('dive_identification/3a_brbo_calibrated_data/%i.CSV', did)) %>%
-          mutate(UTC = as.POSIXct(UTC, tz = 'UTC') + .05)
-        attr(tdr, 'DeployID') <- did
-        tdr %>% 
-          analyze.dives %>%
-          write.csv(sprintf('dive_identification/4a_brbo_dive_data/%i.CSV', did),
-                    row.names = FALSE)
-        data.frame(DeployID = did, divefile = sprintf('dive_identification/4a_brbo_dive_data/%i.CSV', did))
-      } else {
-        data.frame(DeployID = did, divefile = NA)
-      }
-    })
-}
-
 post.analysis <- function() {
   valid_dives <- dir('dive_identification/5a_brbo_dive_plots/Dives/') %>% 
     sub(pattern = '.png', replacement = '', x = ., fixed = TRUE) %>%
@@ -356,3 +339,22 @@ post.analysis <- function() {
                        limits = c(1, 10)) +
     scale_y_continuous(limits = c(0, 6))
 }
+
+# rfbo_sample <- sample(metadata$DeployID, 5) 
+# duration_thresholds <- seq(.5, .3, by = -.1)
+# depth_thresholds <- seq(.5, .3, by = -.1)
+# foreach(did = )
+# rfbo_calib <- mapply(function(did, dur, dep) initialize.tdr(did) %>% calibrate.tdr(depth_thr = dep, dur_thr = dur),
+#                      rfbo_sample,
+#                      duration_thresholds,
+#                      depth_thresholds)
+# rfbo_calib2 <- foreach(did = 369, .combine = rbind) %:% 
+#   foreach(durthr = duration_thresholds, .combine = rbind) %:% 
+#   foreach(depthr = depth_thresholds, .combine = rbind) %do% {
+#     data.frame(DeployID = did, 
+#                DurationThreshold = durthr, 
+#                DepthThreshold = depthr, 
+#                DivesFound = initialize.tdr(did) %>% calibrate.tdr(depth_thr = depthr, dur_thr = durthr) %>% analyze.dives %>% nrow)
+#   }
+#   
+# ggplot(rfbo_calib)
