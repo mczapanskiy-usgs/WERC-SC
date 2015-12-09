@@ -3,6 +3,7 @@ library('foreach')
 library('diveMove')
 
 metadata <- read.csv('trackcode/gps/metadata_all_GPS.csv') %>%
+  filter(Species == 'RTTR') %>%
   mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>% 
   group_by(DeployID = Deploy_ID,
            FieldID,
@@ -51,26 +52,7 @@ calibrate.tdr <- function(tdr, depth_thr = .5) {
   # Long fastlogs (>10s) always use median
   # Medium fastlogs (>2s, <10s) use a combination of duration and slope to determine method
   surface.offset <- function(fastlog) {
-    fastlog$UTC2 <- seq_along(fastlog$UTC)
-    minoffset <- min(fastlog$Pressure, na.rm = TRUE)
-    medianoffset <- median(fastlog$Pressure, na.rm = TRUE)
-    duration <- difftime(max(fastlog$UTC), min(fastlog$UTC), units = 'secs') %>% as.numeric
-    if(duration < 2) {
-      minoffset
-    } else if(duration > 10) {
-      medianoffset
-    } else {
-      tryCatch({
-        pressurelm <- lm(Pressure ~ UTC2, fastlog)
-        slope <- coefficients(pressurelm)[2]
-        # slope_duration threshold from calibration-analysis.R
-        if(slope > slope_duration_threshold[1] * duration + slope_duration_threshold[2]) {
-          medianoffset
-        } else {
-          minoffset
-        }
-      }, error = function(e) minoffset)
-    }
+   min(fastlog$Pressure, na.rm = TRUE)
   }
   
   # Filter out FastLogs with only 4 points or depth range less than dive threshold
@@ -155,7 +137,7 @@ plot.dive <- function(tdr, diveid, dive_thr = .5) {
   metadata <- filter(metadata, DeployID == deployid)
   eventid <- filter(tdr, DiveId == diveid)$EventId[1]
   png(filename = file.path('dive_identification',
-                           '5_dive_plots',
+                           '9_wtsh_dive_plots',
                            sprintf('%i_%i_%i.png', deployid, eventid, diveid)),
       width = 1600, height = 900)
   par(ps = 20, cex = 1)
@@ -230,7 +212,7 @@ kitandkaboodle <- function() {
     
     write.csv(calib.tdr,
               file.path('dive_identification',
-                        '3_calibrated_data',
+                        '9A_wtsh_calibrated_data',
                         sprintf('%i.CSV', did)))
     
     if(nrow(calib.tdr) > 0) {
@@ -238,7 +220,7 @@ kitandkaboodle <- function() {
       dives <- analyze.dives(calib.tdr)
       write.csv(dives,
                 file.path('dive_identification',
-                          '4_dive_data',
+                          '9B_wtsh_dive_data',
                           sprintf('%i.CSV', did)),
                 row.names = FALSE)
       
@@ -252,67 +234,63 @@ kitandkaboodle <- function() {
   }
 }
 
-# analyze.dives was using the wrong pressure field so rerun it
-kitandkaboodle2 <- function() {
-  metadata %>%
-    rowwise %>%
-    do({
-      did <- .$DeployID
-      if(file.exists(sprintf('dive_identification/4_dive_data/%i.CSV', did))) {
-        tdr <- read.csv(sprintf('dive_identification/3_calibrated_data/%i.CSV', did)) %>%
-          mutate(UTC = as.POSIXct(UTC, tz = 'UTC') + .05)
-        attr(tdr, 'DeployID') <- did
-        tdr %>% 
-          analyze.dives %>%
-          write.csv(sprintf('dive_identification/4_dive_data/%i.CSV', did),
-                    row.names = FALSE)
-        data.frame(DeployID = did, divefile = sprintf('dive_identification/4_dive_data/%i.CSV', did))
-      } else {
-        data.frame(DeployID = did, divefile = NA)
-      }
-    })
-}
 
+foreach(did = metadata$DeployID, .combine = rbind) %do% {
+  read.csv(sprintf('dive_identification/4_dive_data/%d.CSV', did)) %>%
+    mutate(Begin = as.POSIXct(Begin, tz = 'UTC') + .05,
+           End = as.POSIXct(End, tz = 'UTC') + .05)
+} %>%  
+  group_by(DeployID) %>%
+  summarize(Dives = n()) %>% 
+  merge(metadata %>% ungroup %>% transmute(DeployID, Duration = difftime(Recovered, Deployed, units = 'days'))) %>%
+  mutate(DivesPerDay = Dives / as.numeric(Duration)) %>% View
 
-metadata %>% filter(Species = 'WTSH', Year = 2014) %>% 
-  foreach(row = iter(., by = 'row'), .combine = c) %do% {
-    did <- row$DeployID
-    tdr <- initialize.tdr(did)
-    
-    surface.offset <- function(fastlog) {
-      fastlog$UTC2 <- seq_along(fastlog$UTC)
-      duration <- difftime(max(fastlog$UTC), min(fastlog$UTC), units = 'secs') %>% as.numeric
-      if(duration < 2) {
-        'minoffset'
-      } else if(duration > 10) {
-        'medianoffset'
-      } else {
-        tryCatch({
-          pressurelm <- lm(Pressure ~ UTC2, fastlog)
-          slope <- coefficients(pressurelm)[2]
-          # slope_duration threshold from calibration-analysis.R
-          if(slope > slope_duration_threshold[1] * duration + slope_duration_threshold[2]) {
-            'medianoffset'
-          } else {
-            'minoffset'
-          }
-        }, error = function(e) 'minoffset')
-      }
-    }
-    
-    # Filter out FastLogs with only 4 points or depth range less than dive threshold
-    valid_fastlogs <- tdr %>%
-      filter(EventId > 0) %>% 
-      group_by(EventId) %>%
-      summarize(N = n(),
-                depthRange = max(Pressure, na.rm = TRUE) - min(Pressure, na.rm = TRUE)) %>%
-      filter(N > 4,
-             depthRange > depth_thr)
-    
-    tdr %>%
-      filter(EventId %in% valid_fastlogs$EventId) %>%
-      group_by(EventId) %>%
-      do(data.frame(DeployID = did,
-                    EventID = .$EventID[1],
-                    SurfaceOffset = surface.offset(.)))
-  } %>% View
+metadata %>% ungroup %>% transmute(DeployID, Duration = difftime(Recovered, Deployed, units = 'days')) %>% View
+
+# metadata %>% filter(Species == 'WTSH', as.POSIXlt(Deployed)$year + 1900 == 2014) %>% rowwise %>%
+#   do({
+#     did <- .$DeployID
+#     tdr <- initialize.tdr(did)
+#     
+#     surface.offset <- function(fastlog) {
+#       fastlog$UTC2 <- seq_along(fastlog$UTC)
+#       duration <- difftime(max(fastlog$UTC), min(fastlog$UTC), units = 'secs') %>% as.numeric
+#       if(duration < 2) {
+#         'minoffset'
+#       } else if(duration > 10) {
+#         'medianoffset'
+#       } else {
+#         tryCatch({
+#           pressurelm <- lm(Pressure ~ UTC2, fastlog)
+#           slope <- coefficients(pressurelm)[2]
+#           # slope_duration threshold from calibration-analysis.R
+#           if(slope > slope_duration_threshold[1] * duration + slope_duration_threshold[2]) {
+#             'medianoffset'
+#           } else {
+#             'minoffset'
+#           }
+#         }, error = function(e) 'minoffset')
+#       }
+#     }
+#     
+#     # Filter out FastLogs with only 4 points or depth range less than dive threshold
+#     valid_fastlogs <- tdr %>%
+#       filter(EventId > 0) %>% 
+#       group_by(EventId) %>%
+#       summarize(N = n(),
+#                 depthRange = max(Pressure, na.rm = TRUE) - min(Pressure, na.rm = TRUE)) %>%
+#       filter(N > 4,
+#              depthRange > .5)
+#     
+#     if(nrow(valid_fastlogs) > 0) {
+#       tdr %>%
+#         filter(EventId %in% valid_fastlogs$EventId) %>%
+#         group_by(EventId) %>%
+#         do(data.frame(DeployID = did,
+#                       EventID = .$EventId[1],
+#                       SurfaceOffset = surface.offset(.)))
+#     } else {
+#       NULL
+#     }
+#   }) %>% 
+#   filter(SurfaceOffset == '') %>% View

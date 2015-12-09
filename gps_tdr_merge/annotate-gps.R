@@ -54,9 +54,12 @@ annotate.gps <- function(deployid, resample = 120) {
     # Annotate locations with wetdry and dive data
     lapply(function(trip) {
       trip %>%
-        transmute(gpsUTC = date,
+        transmute(DeployID = deployid,
+                  gpsUTC = date,
                   Latitude = y,
                   Longitude = x,
+                  Distance = distHaversine(cbind(x, y), cbind(lead(x), lead(y))),
+                  Speed = Distance / as.numeric(difftime(lead(gpsUTC), gpsUTC, units = 'secs')),
                   trip_no = attr(., 'burst'),
                   # Calculate window bounds for overlap join
                   nextUTC = lead(gpsUTC, default = Inf)) %>%
@@ -71,10 +74,12 @@ annotate.gps <- function(deployid, resample = 120) {
                   y = wetdry,
                   nomatch = NA) %>%
         # Aggregate annotations by GPS location
-        group_by(trip_no,
+        group_by(DeployID,
+                 trip_no,
                  gpsUTC,
                  Latitude,
-                 Longitude) %>%
+                 Longitude,
+                 Speed) %>%
         summarize(WetDry = all(!is.na(wetdryUTC)),
                   DiveN = sum(!is.na(DiveID)),
                   TotalDiveDuration = sum(Duration),
