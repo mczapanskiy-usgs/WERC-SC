@@ -339,22 +339,3 @@ post.analysis <- function() {
                        limits = c(1, 10)) +
     scale_y_continuous(limits = c(0, 6))
 }
-
-# rfbo_sample <- sample(metadata$DeployID, 5) 
-# duration_thresholds <- seq(.5, .3, by = -.1)
-# depth_thresholds <- seq(.5, .3, by = -.1)
-# foreach(did = )
-# rfbo_calib <- mapply(function(did, dur, dep) initialize.tdr(did) %>% calibrate.tdr(depth_thr = dep, dur_thr = dur),
-#                      rfbo_sample,
-#                      duration_thresholds,
-#                      depth_thresholds)
-# rfbo_calib2 <- foreach(did = 369, .combine = rbind) %:% 
-#   foreach(durthr = duration_thresholds, .combine = rbind) %:% 
-#   foreach(depthr = depth_thresholds, .combine = rbind) %do% {
-#     data.frame(DeployID = did, 
-#                DurationThreshold = durthr, 
-#                DepthThreshold = depthr, 
-#                DivesFound = initialize.tdr(did) %>% calibrate.tdr(depth_thr = depthr, dur_thr = durthr) %>% analyze.dives %>% nrow)
-#   }
-#   
-# ggplot(rfbo_calib)
