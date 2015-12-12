@@ -185,3 +185,11 @@ RFBOTrips <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') %
   ungroup
 
 Trip <- rbind(BRBOTrips, RFBOTrips)
+
+# Create SQLite database
+MHIdb <- dbConnect(SQLite(), 'dive_identification/MHI_GPS_TDR.sqlite')
+dbWriteTable(MHIdb, 'DeploymentMetadata', DeploymentMetadata %>% as.data.frame)
+dbWriteTable(MHIdb, 'BirdMetadata', BirdMetadata %>% as.data.frame)
+dbWriteTable(MHIdb, 'Dive', Dive %>% as.data.frame)
+dbWriteTable(MHIdb, 'Track', Track %>% as.data.frame)
+dbWriteTable(MHIdb, 'Trip', Trip %>% as.data.frame)
