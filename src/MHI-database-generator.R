@@ -1,20 +1,23 @@
 library(dplyr)
 library(RSQLite)
 library(foreach)
+library(data.table)
 
 ## Create SQLite Database for MHI data from CSV files
+# Read metadata CSV file
 OriginalMetadata <- read.csv('trackcode/gps/metadata_all_GPS.csv') %>%
   mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M'),
          GPS_programmed_start_datetime_local2 = mapply(FUN = as.POSIXct, GPS_programmed_start_datetime_local, tz = paste0('Etc/GMT', UTC_LocalTime_offset_hours), format = '%m/%d/%Y %H:%M') %>%
            as.POSIXct(origin = '1970-01-01 00:00.00 UTC', tz = 'UTC'))
 
-DeploymentMetadata <- OriginalMetadata %>%
+# Reformat metadata to one row per deployment
+DeploymentMetadataMinusTDRSettings <- OriginalMetadata %>%
   filter(!is.na(Deploy_ID),
          Tagging_Event != 'N') %>%
   group_by(DeployID = Deploy_ID,
            DeploySession = DeplSess,
            GPSID = GPS_ID,
-           GPSStart = GPS_programmed_start_datetime_local,
+           GPSStart = GPS_programmed_start_datetime_local2,
            GPSInterval = GPS_Interval_seconds,
            TDRID = TDR_ID) %>%
   summarize(Recovered = any(Tagging_Event == 'R'),
@@ -36,6 +39,7 @@ DeploymentMetadata <- OriginalMetadata %>%
                      TDRRecovered = TDR_TagRecov,
                      TDRFile = TDR_File))
 
+# Read TDR settings from CEFAS files
 TDRSettings <- foreach(deployid = DeploymentMetadata$DeployID, tdrfile = DeploymentMetadata$TDRFile, .combine = rbind) %do% {
   if(tdrfile == '' || is.na(tdrfile)) return(NULL)
   
@@ -74,4 +78,69 @@ TDRSettings <- foreach(deployid = DeploymentMetadata$DeployID, tdrfile = Deploym
              TDRWetDry = wetdry)
 }
 
+# Join metadata with TDR settings and rearrange columns
+DeploymentMetadata <- left_join(DeploymentMetadataMinusTDRSettings, TDRSettings) %>%
+  select(DeployID, DeploySession, Recovered, UTCDeployed, UTCRecovered, GPSDeployed, GPSRecovered, GPSID, GPSStart, GPSInterval, GPSNotes, GPSFile, TDRDeployed, TDRRecovered, TDRID, TDRStart, TDRInterval, TDRWetDry, TDRThreshold, TDRFile, Notes)
 
+# Extract bird metadata
+BirdMetadata <- OriginalMetadata %>%
+  filter(!is.na(Deploy_ID),
+         Tagging_Event != 'N') %>%
+  group_by(DeployID = Deploy_ID,
+           FieldID = FieldID,
+           BandNumber = BandNo,
+           Country = Country,
+           Island = Island,
+           Site = Site,
+           SubColony = SubCol,
+           SubColonyCode = SubCol_Code,
+           Species = Species,
+           Year = Year, 
+           Phenology = Phenology,
+           NestNumber = NestNo,
+           RLBand = R_L,
+           Sex = Sex,
+           HowSexed = How_Sexed,
+           Age = Age,
+           NestLatitude = Nest_Lat_DD,
+           NestLongitude = Nest_Long_DD,
+           ColonyLatitude = Col_Lat_DD,
+           ColonyLongitude = Col_Long_DD,
+           Processor = Processor,
+           ChickPercentAdultSize = Chick...adult.sz,
+           ChickPrimaries = Chick.Primaries.growing) %>%
+  summarize(BloodCard = any(Blood_FTA == 'Y'),
+            BloodVial = any(Blood_vial == 'Y'),
+            Feathers = any(Feathers == 'Y'),
+            Diet = any(Diet == 'Y'),
+            Notes = paste(Notes, collapse = '')) %>%
+  ungroup
+
+# Gather dive data
+ValidBRBODives <- dir('dive_identification/5a_brbo_dive_plots/Dives') %>%
+  sub('.png', '', ., fixed = TRUE) %>%
+  strsplit('_') %>%
+  unlist %>%
+  as.numeric %>%
+  matrix(ncol = 3, byrow = TRUE, dimnames = list(NULL, c('DeployID', 'EventID', 'DiveID'))) %>%
+  data.table
+
+BRBODive <- lapply(dir('dive_identification/4a_brbo_dive_data/', full.names = TRUE),
+                   read.csv) %>%
+  rbindlist %>%
+  semi_join(ValidBRBODives)
+
+ValidRFBODives <- dir('dive_identification/5b_rfbo_dive_plots/Dives') %>%
+  sub('.png', '', ., fixed = TRUE) %>%
+  strsplit('_') %>%
+  unlist %>%
+  as.numeric %>%
+  matrix(ncol = 3, byrow = TRUE, dimnames = list(NULL, c('DeployID', 'EventID', 'DiveID'))) %>%
+  data.table
+
+RFBODive <- lapply(dir('dive_identification/4b_rfbo_dive_data/', full.names = TRUE),
+                   read.csv) %>%
+  rbindlist %>%
+  semi_join(ValidRFBODives)
+
+Dive <- rbind(BRBODive, RFBODive)
