@@ -144,3 +144,44 @@ RFBODive <- lapply(dir('dive_identification/4b_rfbo_dive_data/', full.names = TR
   semi_join(ValidRFBODives)
 
 Dive <- rbind(BRBODive, RFBODive)
+
+# Gather track and trip data
+BRBOTracks <- read.csv('trackcode/gps/All_tracks/BRBO_1.5_trips_annotated.csv') %>%
+  transmute(DeployID = Deploy_ID,
+            UTC = as.POSIXct(UTC, tz = 'UTC'),
+            Latitude,
+            Longitude,
+            TripID = trip_no)
+
+RFBOTracks <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') %>%
+  transmute(DeployID = Deploy_ID,
+            UTC = as.POSIXct(UTC, tz = 'UTC'),
+            Latitude,
+            Longitude,
+            TripID = trip_no)
+
+Track <- rbind(BRBOTracks, RFBOTracks)
+
+BRBOTrips <- read.csv('trackcode/gps/All_tracks/BRBO_1.5_trips_annotated.csv') %>%
+  group_by(DeployID = Deploy_ID,
+           TripID = trip_no,
+           Begin = tripSt,
+           End = tripEnd,
+           BeginComplete = tripStComp,
+           EndComplete = tripEndComp,
+           Duration = duration.hrs) %>%
+  summarize %>%
+  ungroup
+
+RFBOTrips <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') %>%
+  group_by(DeployID = Deploy_ID,
+           TripID = trip_no,
+           Begin = tripSt,
+           End = tripEnd,
+           BeginComplete = tripStComp,
+           EndComplete = tripEndComp,
+           Duration = duration.hrs) %>%
+  summarize %>%
+  ungroup
+
+Trip <- rbind(BRBOTrips, RFBOTrips)
