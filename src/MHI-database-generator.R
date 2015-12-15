@@ -5,7 +5,7 @@ library(data.table)
 
 ## Create SQLite Database for MHI data from CSV files
 # Read metadata CSV file
-OriginalMetadata <- read.csv('trackcode/gps/metadata_all_GPS.csv') %>%
+OriginalMetadata <- read.csv('trackcode/gps/metadata_all_GPS.csv', stringsAsFactors = FALSE) %>%
   mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M'),
          GPS_programmed_start_datetime_local2 = mapply(FUN = as.POSIXct, GPS_programmed_start_datetime_local, tz = paste0('Etc/GMT', UTC_LocalTime_offset_hours), format = '%m/%d/%Y %H:%M') %>%
            as.POSIXct(origin = '1970-01-01 00:00.00 UTC', tz = 'UTC'))
@@ -15,6 +15,7 @@ DeploymentMetadataMinusTDRSettings <- OriginalMetadata %>%
   filter(!is.na(Deploy_ID),
          Tagging_Event != 'N') %>%
   group_by(DeployID = Deploy_ID,
+           Year = Year, 
            DeploySession = DeplSess,
            GPSID = GPS_ID,
            GPSStart = GPS_programmed_start_datetime_local2,
@@ -24,7 +25,8 @@ DeploymentMetadataMinusTDRSettings <- OriginalMetadata %>%
             GPSDeployed = any(GPS_Y_N == 'Y'),
             GPSNotes = paste(GPS_notes, collapse = ''),
             TDRDeployed = any(TDR_Y_N == 'Y'),
-            Notes = paste(Notes, collapse = '')) %>%
+            Processor = paste(Processor, collapse = '; '),
+            Notes = paste(Notes, collapse = '; ')) %>%
   ungroup %>%
   left_join(OriginalMetadata %>%
               filter(Tagging_Event == 'D') %>%
@@ -95,26 +97,23 @@ BirdMetadata <- OriginalMetadata %>%
            SubColony = SubCol,
            SubColonyCode = SubCol_Code,
            Species = Species,
-           Year = Year, 
-           Phenology = Phenology,
            NestNumber = NestNo,
-           RLBand = R_L,
-           Sex = Sex,
-           HowSexed = How_Sexed,
            Age = Age,
            NestLatitude = Nest_Lat_DD,
            NestLongitude = Nest_Long_DD,
            ColonyLatitude = Col_Lat_DD,
-           ColonyLongitude = Col_Long_DD,
-           Processor = Processor,
-           ChickPercentAdultSize = Chick...adult.sz,
-           ChickPrimaries = Chick.Primaries.growing) %>%
+           ColonyLongitude = Col_Long_DD) %>%
   summarize(BloodCard = any(Blood_FTA == 'Y'),
             BloodVial = any(Blood_vial == 'Y'),
             Feathers = any(Feathers == 'Y'),
             Diet = any(Diet == 'Y'),
-            Notes = paste(Notes, collapse = '')) %>%
-  ungroup
+            Sex = first(Sex[Sex != 'U']),
+            HowSexed = first(How_Sexed[Sex != 'U']),
+            RLBand = paste(R_L, collapse = ''),
+            Notes = paste(Notes, collapse = '; ')) %>%
+  ungroup %>%
+  mutate(Sex = ifelse(is.na(Sex), 'U', Sex),
+         HowSexed = ifelse(is.na(HowSexed), 'N', HowSexed))
 
 # Gather dive data
 ValidBRBODives <- dir('dive_identification/5a_brbo_dive_plots/Dives') %>%
@@ -162,6 +161,20 @@ RFBOTracks <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') 
 
 Track <- rbind(BRBOTracks, RFBOTracks)
 
+## Remove duplicate track points. Temporary fix.
+DropTrackPoints <- Track %>% 
+  group_by(DeployID, UTC) %>% 
+  summarize(N = n()) %>% 
+  ungroup %>% 
+  filter(N == 2) %>% 
+  merge(Track, by = c('DeployID', 'UTC')) %>% 
+  arrange(DeployID, UTC, TripID) %>% 
+  mutate(Drop = row_number() %% 2 == 0) %>% 
+  filter(Drop) %>% 
+  select(-Drop)
+Track <- anti_join(Track,
+                   DropTrackPoints)
+
 BRBOTrips <- read.csv('trackcode/gps/All_tracks/BRBO_1.5_trips_annotated.csv') %>%
   group_by(DeployID = Deploy_ID,
            TripID = trip_no,
@@ -187,9 +200,10 @@ RFBOTrips <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') %
 Trip <- rbind(BRBOTrips, RFBOTrips)
 
 # Create SQLite database
-MHIdb <- dbConnect(SQLite(), 'dive_identification/MHI_GPS_TDR.sqlite')
-dbWriteTable(MHIdb, 'DeploymentMetadata', DeploymentMetadata %>% as.data.frame)
-dbWriteTable(MHIdb, 'BirdMetadata', BirdMetadata %>% as.data.frame)
-dbWriteTable(MHIdb, 'Dive', Dive %>% as.data.frame)
-dbWriteTable(MHIdb, 'Track', Track %>% as.data.frame)
-dbWriteTable(MHIdb, 'Trip', Trip %>% as.data.frame)
+MHIdb <- dbConnect(SQLite(), 'Hawaii_data/MHI_GPS_TDR.sqlite')
+dbWriteTable(MHIdb, 'DeploymentMetadata', DeploymentMetadata %>% as.data.frame, overwrite = TRUE)
+dbWriteTable(MHIdb, 'BirdMetadata', BirdMetadata %>% as.data.frame, overwrite = TRUE)
+dbWriteTable(MHIdb, 'Dive', Dive %>% as.data.frame, overwrite = TRUE)
+dbWriteTable(MHIdb, 'Track', Track %>% as.data.frame, overwrite = TRUE)
+dbWriteTable(MHIdb, 'Trip', Trip %>% as.data.frame, overwrite = TRUE)
+dbDisconnect(MHIdb)
