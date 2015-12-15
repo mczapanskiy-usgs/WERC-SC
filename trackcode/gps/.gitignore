@@ -1,0 +1,3 @@
+*.csv
+@metadata_all_GPS.csv
+All_tracks/*
