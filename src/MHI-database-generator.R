@@ -128,9 +128,12 @@ ValidBRBODives <- dir('dive_identification/5a_brbo_dive_plots/Dives') %>%
   data.table
 
 BRBODive <- lapply(dir('dive_identification/4a_brbo_dive_data/', full.names = TRUE),
-                   read.csv) %>%
+                   read.csv,
+                   stringsAsFactors = FALSE) %>%
   rbindlist %>%
-  semi_join(ValidBRBODives)
+  semi_join(ValidBRBODives) %>%
+  mutate(Begin = as.POSIXct(Begin, tz = 'UTC'),
+         End = as.POSIXct(End, tz = 'UTC'))
 
 ValidRFBODives <- dir('dive_identification/5b_rfbo_dive_plots/Dives') %>%
   sub('.png', '', ., fixed = TRUE) %>%
@@ -141,9 +144,12 @@ ValidRFBODives <- dir('dive_identification/5b_rfbo_dive_plots/Dives') %>%
   data.table
 
 RFBODive <- lapply(dir('dive_identification/4b_rfbo_dive_data/', full.names = TRUE),
-                   read.csv) %>%
+                   read.csv,
+                   stringsAsFactors = FALSE) %>%
   rbindlist %>%
-  semi_join(ValidRFBODives)
+  semi_join(ValidRFBODives) %>%
+  mutate(Begin = as.POSIXct(Begin, tz = 'UTC'),
+         End = as.POSIXct(End, tz = 'UTC'))
 
 Dive <- rbind(BRBODive, RFBODive)
 
@@ -177,30 +183,15 @@ DropTrackPoints <- Track %>%
   select(-Drop)
 Track <- anti_join(Track,
                    DropTrackPoints)
-
-BRBOTrips <- read.csv('trackcode/gps/All_tracks/BRBO_1.5_trips_annotated.csv') %>%
-  group_by(DeployID = Deploy_ID,
-           TripID = trip_no,
-           Begin = tripSt,
-           End = tripEnd,
-           BeginComplete = tripStComp,
-           EndComplete = tripEndComp,
-           Duration = duration.hrs) %>%
-  summarize %>%
-  ungroup
-
-RFBOTrips <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') %>%
-  group_by(DeployID = Deploy_ID,
-           TripID = trip_no,
-           Begin = tripSt,
-           End = tripEnd,
-           BeginComplete = tripStComp,
-           EndComplete = tripEndComp,
-           Duration = duration.hrs) %>%
-  summarize %>%
-  ungroup
-
-Trip <- rbind(BRBOTrips, RFBOTrips)
+Trip <- read.csv('trackcode/gps/All_tracks/AllSpecies_tripInfo_QAQC.csv') %>%
+  select(DeployID = Deploy_ID,
+         TripID = trip_no,
+         Begin = as.POSIXct(tripSt, tz = 'UTC'),
+         End = as.POSIXct(tripEnd, tz = 'UTC'),
+         BeginComplete = tripStComp,
+         EndComplete = tripEndComp,
+         Duration = duration.hrs,
+         Flag:Notes)
 
 # Test primary keys
 pkeys <- list(DeploymentMetadata = 'DeployID',
