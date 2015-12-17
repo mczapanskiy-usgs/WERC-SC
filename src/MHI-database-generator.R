@@ -17,10 +17,8 @@ DeploymentMetadataMinusTDRSettings <- OriginalMetadata %>%
   group_by(DeployID = Deploy_ID,
            Year = Year, 
            DeploySession = DeplSess,
-           GPSID = GPS_ID,
            GPSStart = GPS_programmed_start_datetime_local2,
-           GPSInterval = GPS_Interval_seconds,
-           TDRID = TDR_ID) %>%
+           GPSInterval = GPS_Interval_seconds) %>%
   summarize(Recovered = any(Tagging_Event == 'R'),
             GPSDeployed = any(GPS_Y_N == 'Y'),
             GPSNotes = paste(GPS_notes, collapse = ''),
@@ -31,6 +29,11 @@ DeploymentMetadataMinusTDRSettings <- OriginalMetadata %>%
   left_join(OriginalMetadata %>%
               filter(Tagging_Event == 'D') %>%
               select(DeployID = Deploy_ID, 
+                     # NOTE: some entries have missing and/or different GPS/TDR IDs in deployment and 
+                     # recovery. Since device ID has no impact on analysis, we will default to choosing
+                     # the ID as recorded on deployment
+                     GPSID = GPS_ID,
+                     TDRID = TDR_ID,
                      UTCDeployed = UTC)) %>%
   left_join(OriginalMetadata %>%
               filter(Tagging_Event == 'R') %>%
@@ -42,7 +45,7 @@ DeploymentMetadataMinusTDRSettings <- OriginalMetadata %>%
                      TDRFile = TDR_File))
 
 # Read TDR settings from CEFAS files
-TDRSettings <- foreach(deployid = DeploymentMetadata$DeployID, tdrfile = DeploymentMetadata$TDRFile, .combine = rbind) %do% {
+TDRSettings <- foreach(deployid = DeploymentMetadataMinusTDRSettings$DeployID, tdrfile = DeploymentMetadataMinusTDRSettings$TDRFile, .combine = rbind) %do% {
   if(tdrfile == '' || is.na(tdrfile)) return(NULL)
   
   cefas_file <- file.path('dive_identification',
@@ -161,7 +164,7 @@ RFBOTracks <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') 
 
 Track <- rbind(BRBOTracks, RFBOTracks)
 
-## Remove duplicate track points. Temporary fix.
+## Remove duplicate track points. Temporary workaround until trip breaker interpolation bug is fixed..
 DropTrackPoints <- Track %>% 
   group_by(DeployID, UTC) %>% 
   summarize(N = n()) %>% 
@@ -199,11 +202,31 @@ RFBOTrips <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') %
 
 Trip <- rbind(BRBOTrips, RFBOTrips)
 
+# Test primary keys
+pkeys <- list(DeploymentMetadata = 'DeployID',
+     BirdMetadata = 'DeployID',
+     Dive = c('DeployID', 'DiveID'),
+     Track = c('DeployID', 'UTC'),
+     Trip = c('DeployID', 'TripID'))
+valid.pkeys <- sapply(seq_along(pkeys), function(i) {
+  data <- names(pkeys)[i] %>% get
+  keys <- pkeys[[i]]
+  values.per.key <- data %>%
+    group_by_(.dots = keys) %>%
+    summarize(N = n())
+  all(values.per.key$N == 1)
+})
+
 # Create SQLite database
-MHIdb <- dbConnect(SQLite(), 'Hawaii_data/MHI_GPS_TDR.sqlite')
-dbWriteTable(MHIdb, 'DeploymentMetadata', DeploymentMetadata %>% as.data.frame, overwrite = TRUE)
-dbWriteTable(MHIdb, 'BirdMetadata', BirdMetadata %>% as.data.frame, overwrite = TRUE)
-dbWriteTable(MHIdb, 'Dive', Dive %>% as.data.frame, overwrite = TRUE)
-dbWriteTable(MHIdb, 'Track', Track %>% as.data.frame, overwrite = TRUE)
-dbWriteTable(MHIdb, 'Trip', Trip %>% as.data.frame, overwrite = TRUE)
-dbDisconnect(MHIdb)
+if(all(valid.pkeys)) {
+  MHIdb <- dbConnect(SQLite(), 'Hawaii_data/MHI_GPS_TDR.sqlite')
+  dbWriteTable(MHIdb, 'DeploymentMetadata', DeploymentMetadata %>% as.data.frame, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'BirdMetadata', BirdMetadata %>% as.data.frame, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'Dive', Dive %>% as.data.frame, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'Track', Track %>% as.data.frame, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'Trip', Trip %>% as.data.frame, overwrite = TRUE)
+  dbDisconnect(MHIdb)
+} else {
+  error("Error in primary keys. Check valid.pkeys")
+}
+
