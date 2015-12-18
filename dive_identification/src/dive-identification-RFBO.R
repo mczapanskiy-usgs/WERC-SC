@@ -7,7 +7,7 @@ library('data.table')
 
 metadata <- read.csv('trackcode/gps/metadata_all_GPS.csv') %>%
   filter(Species == 'RFBO') %>%
-  mutate(UTC = as.POSIXct(UTC, tz = 'UTC')) %>% 
+  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M')) %>% 
   group_by(DeployID = Deploy_ID,
            FieldID,
            Species,
@@ -16,6 +16,7 @@ metadata <- read.csv('trackcode/gps/metadata_all_GPS.csv') %>%
             Recovered = max(UTC, na.rm = TRUE),
             TDRFile = paste(TDR_File, collapse = ''),
             ValidTDR = any(TDR_TagRecov %in% c(1, 3))) %>%
+  ungroup %>%
   filter(ValidTDR) %>%
   select(-ValidTDR)
 
@@ -255,7 +256,8 @@ kitandkaboodle <- function() {
     calib.tdr <- initialize.tdr(did) %>%
       calibrate.tdr
     
-    write.csv(calib.tdr,
+    write.csv(calib.tdr %>%
+                mutate(UTC = format(UTC, '%Y-%m-%d %H:%M:%OS1')),
               file.path('dive_identification',
                         '3b_rfbo_calibrated_data',
                         sprintf('%i.CSV', did)))
@@ -263,7 +265,9 @@ kitandkaboodle <- function() {
     if(nrow(calib.tdr) > 0) {
       # Analyze dives and write to file
       dives <- analyze.dives(calib.tdr)
-      write.csv(dives,
+      write.csv(dives %>%
+                  mutate(Begin = format(Begin, '%Y-%m-%d %H:%M:%OS1'),
+                         End = format(End, '%Y-%m-%d %H:%M:%OS1')),
                 file.path('dive_identification',
                           '4b_rfbo_dive_data',
                           sprintf('%i.CSV', did)),
