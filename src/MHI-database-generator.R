@@ -187,15 +187,18 @@ DropTrackPoints <- Track %>%
   select(-Drop)
 Track <- anti_join(Track,
                    DropTrackPoints)
-Trip <- read.csv('trackcode/gps/All_tracks/AllSpecies_tripInfo_QAQC.csv') %>%
+Trip <- read.csv('trackcode/gps/All_tracks/AllSpecies_tripInfo_QAQC.csv',
+                 stringsAsFactors = FALSE) %>%
   select(DeployID = Deploy_ID,
          TripID = trip_no,
-         Begin = as.POSIXct(tripSt, tz = 'UTC') %>% as.numeric,
-         End = as.POSIXct(tripEnd, tz = 'UTC') %>% as.numeric,
+         Begin = tripSt,
+         End = tripEnd,
          BeginComplete = tripStComp, 
          EndComplete = tripEndComp,
          Duration = duration.hrs,
          Flag:Notes) %>%
+  mutate(Begin = as.POSIXct(Begin, tz = 'UTC', format = '%m/%d/%Y %H:%M') %>% as.numeric,
+         End = as.POSIXct(End, tz = 'UTC', format = '%m/%d/%Y %H:%M') %>% as.numeric) %>%
   as.data.frame
 
 # Test primary keys
@@ -221,10 +224,6 @@ if(all(valid.pkeys)) {
   dbWriteTable(MHIdb, 'Dive', Dive, overwrite = TRUE)
   dbWriteTable(MHIdb, 'Track', Track, overwrite = TRUE)
   dbWriteTable(MHIdb, 'Trip', Trip, overwrite = TRUE)
-  dbSendPreparedQuery(MHIdb, 
-                      'ALTER TABLE ? ADD PRIMARY KEY (?)', 
-                      data.frame(table = names(pkeys), 
-                                 keys = sapply(pkeys, paste, collapse = ', ')))
   dbDisconnect(MHIdb)
 } else {
   error("Error in primary keys. Check valid.pkeys")
