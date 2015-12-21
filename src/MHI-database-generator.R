@@ -6,9 +6,9 @@ library(data.table)
 ## Create SQLite Database for MHI data from CSV files
 # Read metadata CSV file
 OriginalMetadata <- read.csv('trackcode/gps/metadata_all_GPS.csv', stringsAsFactors = FALSE) %>%
-  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M'),
+  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M') %>% as.numeric,
          GPS_programmed_start_datetime_local2 = mapply(FUN = as.POSIXct, GPS_programmed_start_datetime_local, tz = paste0('Etc/GMT', UTC_LocalTime_offset_hours), format = '%m/%d/%Y %H:%M') %>%
-           as.POSIXct(origin = '1970-01-01 00:00.00 UTC', tz = 'UTC'))
+           as.POSIXct(origin = '1970-01-01 00:00.00 UTC', tz = 'UTC') %>% as.numeric)
 
 # Reformat metadata to one row per deployment
 DeploymentMetadataMinusTDRSettings <- OriginalMetadata %>%
@@ -85,7 +85,8 @@ TDRSettings <- foreach(deployid = DeploymentMetadataMinusTDRSettings$DeployID, t
 
 # Join metadata with TDR settings and rearrange columns
 DeploymentMetadata <- left_join(DeploymentMetadataMinusTDRSettings, TDRSettings) %>%
-  select(DeployID, DeploySession, Recovered, UTCDeployed, UTCRecovered, GPSDeployed, GPSRecovered, GPSID, GPSStart, GPSInterval, GPSNotes, GPSFile, TDRDeployed, TDRRecovered, TDRID, TDRStart, TDRInterval, TDRWetDry, TDRThreshold, TDRFile, Notes)
+  select(DeployID, DeploySession, Recovered, UTCDeployed, UTCRecovered, GPSDeployed, GPSRecovered, GPSID, GPSStart, GPSInterval, GPSNotes, GPSFile, TDRDeployed, TDRRecovered, TDRID, TDRStart, TDRInterval, TDRWetDry, TDRThreshold, TDRFile, Notes) %>%
+  as.data.frame
 
 # Extract bird metadata
 BirdMetadata <- OriginalMetadata %>%
@@ -116,7 +117,8 @@ BirdMetadata <- OriginalMetadata %>%
             Notes = paste(Notes, collapse = '; ')) %>%
   ungroup %>%
   mutate(Sex = ifelse(is.na(Sex), 'U', Sex),
-         HowSexed = ifelse(is.na(HowSexed), 'N', HowSexed))
+         HowSexed = ifelse(is.na(HowSexed), 'N', HowSexed)) %>%
+  as.data.frame
 
 # Gather dive data
 ValidBRBODives <- dir('dive_identification/5a_brbo_dive_plots/Dives') %>%
@@ -132,8 +134,9 @@ BRBODive <- lapply(dir('dive_identification/4a_brbo_dive_data/', full.names = TR
                    stringsAsFactors = FALSE) %>%
   rbindlist %>%
   semi_join(ValidBRBODives) %>%
-  mutate(Begin = as.POSIXct(Begin, tz = 'UTC'),
-         End = as.POSIXct(End, tz = 'UTC'))
+  mutate(Begin = as.POSIXct(Begin, tz = 'UTC') %>% as.numeric,
+         End = as.POSIXct(End, tz = 'UTC') %>% as.numeric) %>%
+  as.data.frame
 
 ValidRFBODives <- dir('dive_identification/5b_rfbo_dive_plots/Dives') %>%
   sub('.png', '', ., fixed = TRUE) %>%
@@ -148,22 +151,23 @@ RFBODive <- lapply(dir('dive_identification/4b_rfbo_dive_data/', full.names = TR
                    stringsAsFactors = FALSE) %>%
   rbindlist %>%
   semi_join(ValidRFBODives) %>%
-  mutate(Begin = as.POSIXct(Begin, tz = 'UTC'),
-         End = as.POSIXct(End, tz = 'UTC'))
+  mutate(Begin = as.POSIXct(Begin, tz = 'UTC') %>% as.numeric,
+         End = as.POSIXct(End, tz = 'UTC') %>% as.numeric) %>%
+  as.data.frame
 
 Dive <- rbind(BRBODive, RFBODive)
 
 # Gather track and trip data
 BRBOTracks <- read.csv('trackcode/gps/All_tracks/BRBO_1.5_trips_annotated.csv') %>%
   transmute(DeployID = Deploy_ID,
-            UTC = as.POSIXct(UTC, tz = 'UTC'),
+            UTC = as.POSIXct(UTC, tz = 'UTC') %>% as.numeric,
             Latitude,
             Longitude,
             TripID = trip_no)
 
 RFBOTracks <- read.csv('trackcode/gps/All_tracks/RFBO_1.5_trips_annotated.csv') %>%
   transmute(DeployID = Deploy_ID,
-            UTC = as.POSIXct(UTC, tz = 'UTC'),
+            UTC = as.POSIXct(UTC, tz = 'UTC') %>% as.numeric,
             Latitude,
             Longitude,
             TripID = trip_no)
@@ -186,12 +190,13 @@ Track <- anti_join(Track,
 Trip <- read.csv('trackcode/gps/All_tracks/AllSpecies_tripInfo_QAQC.csv') %>%
   select(DeployID = Deploy_ID,
          TripID = trip_no,
-         Begin = as.POSIXct(tripSt, tz = 'UTC'),
-         End = as.POSIXct(tripEnd, tz = 'UTC'),
-         BeginComplete = tripStComp,
+         Begin = as.POSIXct(tripSt, tz = 'UTC') %>% as.numeric,
+         End = as.POSIXct(tripEnd, tz = 'UTC') %>% as.numeric,
+         BeginComplete = tripStComp, 
          EndComplete = tripEndComp,
          Duration = duration.hrs,
-         Flag:Notes)
+         Flag:Notes) %>%
+  as.data.frame
 
 # Test primary keys
 pkeys <- list(DeploymentMetadata = 'DeployID',
@@ -211,11 +216,15 @@ valid.pkeys <- sapply(seq_along(pkeys), function(i) {
 # Create SQLite database
 if(all(valid.pkeys)) {
   MHIdb <- dbConnect(SQLite(), 'Hawaii_data/MHI_GPS_TDR.sqlite')
-  dbWriteTable(MHIdb, 'DeploymentMetadata', DeploymentMetadata %>% as.data.frame, overwrite = TRUE)
-  dbWriteTable(MHIdb, 'BirdMetadata', BirdMetadata %>% as.data.frame, overwrite = TRUE)
-  dbWriteTable(MHIdb, 'Dive', Dive %>% as.data.frame, overwrite = TRUE)
-  dbWriteTable(MHIdb, 'Track', Track %>% as.data.frame, overwrite = TRUE)
-  dbWriteTable(MHIdb, 'Trip', Trip %>% as.data.frame, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'DeploymentMetadata', DeploymentMetadata, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'BirdMetadata', BirdMetadata, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'Dive', Dive, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'Track', Track, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'Trip', Trip, overwrite = TRUE)
+  dbSendPreparedQuery(MHIdb, 
+                      'ALTER TABLE ? ADD PRIMARY KEY (?)', 
+                      data.frame(table = names(pkeys), 
+                                 keys = sapply(pkeys, paste, collapse = ', ')))
   dbDisconnect(MHIdb)
 } else {
   error("Error in primary keys. Check valid.pkeys")
