@@ -1,6 +1,6 @@
 SELECT D.DeployID, D.DiveID, D.Begin 'DiveBegin', D.Duration, D.MaxDepth 'DiveDepth',
 	T.TripID, T.Begin 'TripBegin', T.End 'TripEnd', 
-	BM.Species
+	BM.Species, BM.Sex
 FROM Dive D
 	JOIN Trip T
 		ON D.DeployID = T.DeployID

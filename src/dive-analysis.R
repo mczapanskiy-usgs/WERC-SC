@@ -63,7 +63,7 @@ MHIdb <- dbConnect(dbDriver('SQLite'), 'Hawaii_data/MHI_GPS_TDR.sqlite')
 dbGetQuery(MHIdb, 
 "SELECT D.DeployID, D.DiveID, D.Begin 'DiveBegin', D.Duration, D.MaxDepth 'DiveDepth',
   T.TripID, T.Begin 'TripBegin', T.End 'TripEnd', 
-  BM.Species
+  BM.Species, BM.Sex
 FROM Dive D
   JOIN Trip T
     ON D.DeployID = T.DeployID
@@ -125,3 +125,80 @@ t.test(log(InterDivePeriod) ~ Species, divesByTrip)
 
 # WE FIND:
 # No significant difference between the species as regards dive frequency
+
+
+## Repeat analysis with sex as a variable
+# Summarize dives by species and sex
+divesBySexSummary <- divesBySpecies %>%
+  filter(Sex != 'U') %>%
+  group_by(Species, Sex) %>%
+  summarize(Dives = n(),
+            Individuals = n_distinct(DeployID),
+            MeanDepth = mean(MaxDepth),
+            MedianDepth = median(MaxDepth),
+            SDDepth = sd(MaxDepth),
+            MaxDepth = max(MaxDepth)) %>%
+  ungroup
+
+ggplot(divesBySpecies %>% filter(Species == 'BRBO'),
+       aes(x = MaxDepth,
+           color = Sex)) +
+  geom_density() +
+  ggtitle('Relative dive depths between BRBO males and females')
+
+ggplot(divesBySpecies %>% filter(Species == 'RFBO', Sex != 'U'),
+       aes(x = MaxDepth,
+           color = Sex)) +
+  geom_density() +
+  ggtitle('Relative dive depths between RFBO males and females')
+
+# WE FIND:
+# In both species, females appear to dive to deeper depths than males. Is this in keeping with their greater size?
+
+# Run t test to determine if dive depth is significantly different between sexes
+t.test(log(MaxDepth) ~ Sex, filter(divesBySpecies, Species == 'BRBO', Sex != 'U'))
+t.test(log(MaxDepth) ~ Sex, filter(divesBySpecies, Species == 'RFBO', Sex != 'U'))
+
+# WE FIND:
+# Difference in dive depths between sexes is significant for RFBOs, not for BRBOs. Real phenomenon or sample size issue?
+
+# Compare inter-dive period between sexes
+divePeriodBySexSummary <- divesByTrip %>%
+  filter(Sex != 'U') %>%
+  group_by(Species, Sex) %>%
+  summarize(Dives = n(),
+            Individuals = n_distinct(DeployID),
+            MeanPeriod = mean(InterDivePeriod, na.rm = TRUE),
+            MedianPeriod = median(InterDivePeriod, na.rm = TRUE),
+            SDPeriod = sd(InterDivePeriod, na.rm = TRUE),
+            MaxPeriod = max(InterDivePeriod, na.rm = TRUE)) %>%
+  ungroup
+
+divesByTrip %>%
+  filter(Species == 'BRBO',
+         Sex != 'U') %>%
+ggplot(aes(x = InterDivePeriod,
+           color = Sex)) +
+  geom_density() +
+  scale_x_log10() +
+  ggtitle('Relative inter-dive periods between BRBO males and females (log transformed)')
+
+divesByTrip %>%
+  filter(Species == 'RFBO',
+         Sex != 'U') %>%
+  ggplot(aes(x = InterDivePeriod,
+             color = Sex)) +
+  geom_density() +
+  scale_x_log10() +
+  ggtitle('Relative inter-dive periods between RFBO males and females (log transformed)')
+
+# WE FIND:
+# Unlike with dive depth, differences between the sexes is pronounced in BRBOs and minor in RFBOs
+
+# Run t test to determine if inter-dive period is significantly different between sexes
+t.test(log(InterDivePeriod) ~ Sex, divesByTrip %>% filter(Species == 'BRBO', Sex != 'U'))
+t.test(log(InterDivePeriod) ~ Sex, divesByTrip %>% filter(Species == 'RFBO', Sex != 'U'))
+
+# WE FIND:
+# RFBO females dive significantly more often than males, BRBOs show no significant difference in mean.
+# However, BRBO females demonstrate much greater variability than males. But is that due to sample size?
