@@ -2,14 +2,14 @@ library(dplyr)
 library(ggplot2)
 library(RSQLite)
 library(oce)
+library(geosphere)
 
 # Load data from sqlite database
 MHIsrc <- src_sqlite('Hawaii_data/MHI_GPS_TDR.sqlite')
 dives <- tbl(MHIsrc, 'Dive') %>% as.data.frame
 trips <- tbl(MHIsrc, 'Trip') %>% as.data.frame
-birds <- tbl(MHIsrc, 'BirdMetadata') %>% as.data.frame
+birds <- tbl(MHIsrc, 'BirdMetadata') %>% as.data.frame %>% filter(SubColonyCode == 'LEH')
 deployments <- tbl(MHIsrc, 'DeploymentMetadata') %>% as.data.frame
-tracks <- tbl(MHIsrc, 'RediscretizedTrack') %>% as.data.frame
 
 # Join dive data with bird/deployment metadata
 divesBySpecies <- inner_join(dives, birds, by = 'DeployID') %>% 
@@ -78,7 +78,8 @@ FROM Dive D
 WHERE DM.TDRRecovered = 1
   AND DM.GPSRecovered = 1
   AND T.BeginComplete = 1
-  AND T.EndComplete = 1") %>%
+  AND T.EndComplete = 1
+  AND BM.SubColonyCode = 'LEH'") %>%
   as.data.frame %>%
   mutate(DiveBeginDT = POSIXct.from.db(DiveBegin),
          TripBeginDT = POSIXct.from.db(TripBegin),
@@ -111,7 +112,7 @@ ggplot(divesByTrip,
 
 # Test normality of inter-dive period
 ggplot(divesByTrip,
-       aes(sample = MaxDepth,
+       aes(sample = DiveDepth,
            color = Species)) +
   stat_qq() +
   ggtitle('Normality of Inter-dive Period')
@@ -136,7 +137,7 @@ divesByTrack <- dbGetQuery(MHIdb,
 "SELECT D.DeployID, D.DiveID, D.Begin 'DiveBegin', D.Duration, D.MaxDepth 'DiveDepth',
   RT.UTC, RT.Latitude, RT.Longitude,
   T.TripID, 
-  BM.Species, BM.Sex
+  BM.Species, BM.Sex, BM.ColonyLatitude, BM.ColonyLongitude
 FROM Dive D
   JOIN RediscretizedTrack RT
     ON D.DeployID = RT.DeployID
@@ -150,12 +151,14 @@ FROM Dive D
   JOIN BirdMetadata BM
     ON BM.DeployID = D.DeployID
 WHERE DM.TDRRecovered = 1
-AND DM.GPSRecovered = 1
-AND T.BeginComplete = 1
-AND T.EndComplete = 1") %>%
+  AND DM.GPSRecovered = 1
+  AND T.BeginComplete = 1
+  AND T.EndComplete = 1
+  AND BM.SubColonyCode = 'LEH'") %>%
   as.data.frame %>%
   mutate(UTC = POSIXct.from.db(UTC),
-         SunAltitude = sunAngle(UTC, Longitude, Latitude)$altitude)
+         SunAltitude = sunAngle(UTC, Longitude, Latitude)$altitude,
+         ColonyDistance = distHaversine(cbind(Longitude, Latitude), cbind(ColonyLongitude, ColonyLatitude)))
 
 divesByTrackSummary <- divesByTrack %>%
   group_by(Species) %>%
@@ -181,6 +184,32 @@ ggplot(divesByTrack,
 
 t.test(SunAltitude ~ Species, divesByTrack)
 # No significant difference either
+
+# Is there a difference in how spread out diving is? I.e. how far from colony.
+diveDistanceFromColony <- divesByTrack %>%
+  group_by(Species) %>%
+  summarize(Dives = n(),
+            Individuals = n_distinct(DeployID),
+            MeanColonyDistance = mean(ColonyDistance, na.rm = TRUE),
+            MedianColonyDistance = median(ColonyDistance, na.rm = TRUE),
+            SDColonyDistance = sd(ColonyDistance, na.rm = TRUE),
+            MinColonyDistance = min(ColonyDistance, na.rm = TRUE),
+            MaxColonyDistance = max(ColonyDistance, na.rm = TRUE)) %>%
+  ungroup
+
+# RFBOs dive >2x as far from colony as BRBOs, as with track data
+
+ggplot(divesByTrack,
+       aes(y = ColonyDistance,
+           x = Species)) +
+  geom_boxplot() +
+  ggtitle('Distribution of dives by distance from colony')
+ggplot(divesByTrack,
+       aes(x = Longitude,
+           y = Latitude)) +
+  geom_hex() +
+  facet_grid(. ~ Species) +
+  ggtitle('Spatial distribution of dives')
 
 ## Repeat analysis with sex as a variable
 # Summarize dives by species and sex
