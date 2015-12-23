@@ -1,6 +1,7 @@
 library(dplyr)
 library(ggplot2)
 library(RSQLite)
+library(oce)
 
 # Load data from sqlite database
 MHIsrc <- src_sqlite('Hawaii_data/MHI_GPS_TDR.sqlite')
@@ -8,6 +9,7 @@ dives <- tbl(MHIsrc, 'Dive') %>% as.data.frame
 trips <- tbl(MHIsrc, 'Trip') %>% as.data.frame
 birds <- tbl(MHIsrc, 'BirdMetadata') %>% as.data.frame
 deployments <- tbl(MHIsrc, 'DeploymentMetadata') %>% as.data.frame
+tracks <- tbl(MHIsrc, 'RediscretizedTrack') %>% as.data.frame
 
 # Join dive data with bird/deployment metadata
 divesBySpecies <- inner_join(dives, birds, by = 'DeployID') %>% 
@@ -49,7 +51,7 @@ ggplot(divesBySpecies,
   ggtitle('Normality of Log Dive Depth')
 
 # WE FIND:
-# Log of dive depth is close to normal due to long tail
+# Log of dive depth is closer to normal than untransformed data due to long tail
 
 # Run t test to determine if dive depth is significantly different
 t.test(log(MaxDepth) ~ Species, divesBySpecies)
@@ -78,6 +80,9 @@ WHERE DM.TDRRecovered = 1
   AND T.BeginComplete = 1
   AND T.EndComplete = 1") %>%
   as.data.frame %>%
+  mutate(DiveBeginDT = POSIXct.from.db(DiveBegin),
+         TripBeginDT = POSIXct.from.db(TripBegin),
+         TripEndDT = POSIXct.from.db(TripEnd)) %>%
   arrange(DeployID, DiveBegin) %>%
   mutate(InterDivePeriod = ifelse(DeployID == lead(DeployID) & TripID == lead(TripID), 
                                   lead(DiveBegin) - DiveBegin, 
@@ -126,6 +131,56 @@ t.test(log(InterDivePeriod) ~ Species, divesByTrip)
 # WE FIND:
 # No significant difference between the species as regards dive frequency
 
+# Is there a difference in timing of dives between species?
+divesByTrack <- dbGetQuery(MHIdb, 
+"SELECT D.DeployID, D.DiveID, D.Begin 'DiveBegin', D.Duration, D.MaxDepth 'DiveDepth',
+  RT.UTC, RT.Latitude, RT.Longitude,
+  T.TripID, 
+  BM.Species, BM.Sex
+FROM Dive D
+  JOIN RediscretizedTrack RT
+    ON D.DeployID = RT.DeployID
+      AND D.Begin >= RT.UTC
+      AND D.Begin < RT.UTC + 180 -- rediscretization interval
+  JOIN Trip T
+    ON D.DeployID = T.DeployID
+      AND RT.TripID = T.TripID
+  JOIN DeploymentMetadata DM
+    ON DM.DeployID = D.DeployID
+  JOIN BirdMetadata BM
+    ON BM.DeployID = D.DeployID
+WHERE DM.TDRRecovered = 1
+AND DM.GPSRecovered = 1
+AND T.BeginComplete = 1
+AND T.EndComplete = 1") %>%
+  as.data.frame %>%
+  mutate(UTC = POSIXct.from.db(UTC),
+         SunAltitude = sunAngle(UTC, Longitude, Latitude)$altitude)
+
+divesByTrackSummary <- divesByTrack %>%
+  group_by(Species) %>%
+  summarize(Dives = n(),
+            Individuals = n_distinct(DeployID),
+            MeanSunAltitude = mean(SunAltitude, na.rm = TRUE),
+            MedianSunAltitude = median(SunAltitude, na.rm = TRUE),
+            SDSunAltitude = sd(SunAltitude, na.rm = TRUE),
+            MinSunAltitude = min(SunAltitude, na.rm = TRUE),
+            MaxSunAltitude = max(SunAltitude, na.rm = TRUE)) %>%
+  ungroup
+
+ggplot(divesByTrack,
+       aes(x = SunAltitude,
+           color = Species)) +
+  geom_density() +
+  scale_x_continuous(limits = c(-90, 90),
+                     breaks = seq(-90, 90, by = 30)) +
+  ggtitle('Dive distribution by time of day')
+
+# WE FIND:
+# No apparent difference in dive timing between species
+
+t.test(SunAltitude ~ Species, divesByTrack)
+# No significant difference either
 
 ## Repeat analysis with sex as a variable
 # Summarize dives by species and sex
@@ -202,3 +257,4 @@ t.test(log(InterDivePeriod) ~ Sex, divesByTrip %>% filter(Species == 'RFBO', Sex
 # WE FIND:
 # RFBO females dive significantly more often than males, BRBOs show no significant difference in mean.
 # However, BRBO females demonstrate much greater variability than males. But is that due to sample size?
+
