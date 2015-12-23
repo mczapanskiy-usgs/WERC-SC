@@ -30,9 +30,21 @@ divesBySpeciesSummary <- divesBySpecies %>%
 
 ggplot(divesBySpecies,
        aes(x = MaxDepth,
-           color = Species)) +
-  geom_density() +
-  ggtitle('Relative dive depths between RFBO, BRBO')
+           fill = Species)) +
+  geom_density(alpha = .25) +
+  ggtitle('Distribution of dive depth') +
+  xlab('Dive depth (m)')
+
+ggplot(divesBySpecies,
+       aes(x = Species,
+           y = MaxDepth)) +
+  geom_boxplot() +
+  ggtitle('Distribution of dive depth') +
+  scale_y_continuous(limits = c(0, 4)) +
+  annotate('text', x = .75, y = 3.75, label = '+3 deeper dives') +
+  ylab('Dive depth (m)')
+  
+
 
 # WE FIND:
 # BRBOs appear to dive deeper than RFBOs
@@ -102,10 +114,19 @@ divesByTripSummary <- divesByTrip %>%
 
 ggplot(divesByTrip,
        aes(x = InterDivePeriod,
-           color = Species)) +
-  geom_density() +
+           fill = Species)) +
+  geom_density(alpha = .25) +
   scale_x_log10() +
-  ggtitle('Relative inter-dive periods between RFBO, BRBO (log transformed)')
+  ggtitle('Distribution of inter-dive period') +
+  xlab('Log of inter-dive period (s)')
+
+ggplot(divesByTrip,
+       aes(x = Species,
+           y = InterDivePeriod)) +
+  geom_boxplot() +
+  scale_y_log10() +
+  ggtitle('Distribution of inter-dive period') +
+  ylab('Log of inter-dive period (s)')
 
 # WE FIND:
 # Dive frequency within trips is very similar between the two species
@@ -130,9 +151,9 @@ ggplot(divesBySpecies,
 t.test(log(InterDivePeriod) ~ Species, divesByTrip)
 
 # WE FIND:
-# No significant difference between the species as regards dive frequency
+# No significant difference between the species' dive frequency
 
-# Is there a difference in timing of dives between species?
+# Do the species dive at different times of day?
 divesByTrack <- dbGetQuery(MHIdb, 
 "SELECT D.DeployID, D.DiveID, D.Begin 'DiveBegin', D.Duration, D.MaxDepth 'DiveDepth',
   RT.UTC, RT.Latitude, RT.Longitude,
@@ -160,7 +181,7 @@ WHERE DM.TDRRecovered = 1
          SunAltitude = sunAngle(UTC, Longitude, Latitude)$altitude,
          ColonyDistance = distHaversine(cbind(Longitude, Latitude), cbind(ColonyLongitude, ColonyLatitude)))
 
-divesByTrackSummary <- divesByTrack %>%
+divesBySunAngleSummary <- divesByTrack %>%
   group_by(Species) %>%
   summarize(Dives = n(),
             Individuals = n_distinct(DeployID),
@@ -173,10 +194,10 @@ divesByTrackSummary <- divesByTrack %>%
 
 ggplot(divesByTrack,
        aes(x = SunAltitude,
-           color = Species)) +
-  geom_density() +
-  scale_x_continuous(limits = c(-90, 90),
-                     breaks = seq(-90, 90, by = 30)) +
+           fill = Species)) +
+  geom_density(alpha = .25) +
+  annotate('rect', xmin = -6, xmax = 0, ymin = 0, ymax = .0175, alpha = .2) +
+  xlab('Angle of sun over horizon (degrees)\n(Shaded region indicates twilight)') +
   ggtitle('Dive distribution by time of day')
 
 # WE FIND:
