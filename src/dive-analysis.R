@@ -40,11 +40,9 @@ ggplot(divesBySpecies,
            y = MaxDepth)) +
   geom_boxplot() +
   ggtitle('Distribution of dive depth') +
-  scale_y_continuous(limits = c(0, 4)) +
+  scale_y_continuous(limits = c(.5, 4)) +
   annotate('text', x = .75, y = 3.75, label = '+3 deeper dives') +
   ylab('Dive depth (m)')
-  
-
 
 # WE FIND:
 # BRBOs appear to dive deeper than RFBOs
@@ -54,13 +52,15 @@ ggplot(divesBySpecies,
        aes(sample = MaxDepth,
            color = Species)) +
   stat_qq() +
-  ggtitle('Normality of Dive Depth')
+  ggtitle('Normality of Dive Depth') +
+  theme(legend.position = 'bottom')
 
 ggplot(divesBySpecies,
        aes(sample = log(MaxDepth),
            color = Species)) +
   stat_qq() +
-  ggtitle('Normality of Log Dive Depth')
+  ggtitle('Normality of Log Dive Depth') +
+  theme(legend.position = 'bottom')
 
 # WE FIND:
 # Log of dive depth is closer to normal than untransformed data due to long tail
@@ -200,6 +200,15 @@ ggplot(divesByTrack,
   xlab('Angle of sun over horizon (degrees)\n(Shaded region indicates twilight)') +
   ggtitle('Dive distribution by time of day')
 
+ggplot(divesByTrack,
+       aes(y = SunAltitude,
+           x = Species)) +
+  geom_boxplot() +
+  ylim(-10, 90) +
+  xlab('Angle of sun over horizon (degrees)\n(Shaded region indicates twilight)') +
+  annotate('rect', xmin = .5, xmax = 2.5, ymin = -6, ymax = 0, alpha = .2) +
+  ggtitle('Dive distribution by time of day')
+
 # WE FIND:
 # No apparent difference in dive timing between species
 
@@ -228,7 +237,9 @@ ggplot(divesByTrack,
 ggplot(divesByTrack,
        aes(x = Longitude,
            y = Latitude)) +
-  geom_hex() +
+  geom_hex(stat = function(x) x^2) +
+  annotate('point', x = -160.0975, y = 22.02, color = 'red', size = 10) +
+  xlab('Longitude\n(Red dot indicates Lehua') +
   facet_grid(. ~ Species) +
   ggtitle('Spatial distribution of dives')
 
@@ -245,16 +256,25 @@ divesBySexSummary <- divesBySpecies %>%
             MaxDepth = max(MaxDepth)) %>%
   ungroup
 
+ggplot(divesBySpecies %>% filter(Sex != 'U'),
+       aes(x = Species,
+           y = MaxDepth,
+           fill = Sex)) +
+  geom_boxplot() +
+  ggtitle('Distribution of dive depth') +
+  scale_y_continuous(limits = c(.5, 4)) +
+  ylab('Dive depth (m)')
+
 ggplot(divesBySpecies %>% filter(Species == 'BRBO'),
        aes(x = MaxDepth,
-           color = Sex)) +
-  geom_density() +
+           fill = Sex)) +
+  geom_density(alpha = .25) +
   ggtitle('Relative dive depths between BRBO males and females')
 
 ggplot(divesBySpecies %>% filter(Species == 'RFBO', Sex != 'U'),
        aes(x = MaxDepth,
-           color = Sex)) +
-  geom_density() +
+           fill = Sex)) +
+  geom_density(alpha = .25) +
   ggtitle('Relative dive depths between RFBO males and females')
 
 # WE FIND:
@@ -278,6 +298,15 @@ divePeriodBySexSummary <- divesByTrip %>%
             SDPeriod = sd(InterDivePeriod, na.rm = TRUE),
             MaxPeriod = max(InterDivePeriod, na.rm = TRUE)) %>%
   ungroup
+
+ggplot(divesByTrip %>% filter(Sex != 'U'),
+       aes(x = Species,
+           y = InterDivePeriod,
+           fill = Sex)) +
+  geom_boxplot() +
+  scale_y_log10() +
+  ggtitle('Distribution of inter-dive period') +
+  ylab('Log of inter-dive period (s)')
 
 divesByTrip %>%
   filter(Species == 'BRBO',
@@ -305,6 +334,18 @@ t.test(log(InterDivePeriod) ~ Sex, divesByTrip %>% filter(Species == 'BRBO', Sex
 t.test(log(InterDivePeriod) ~ Sex, divesByTrip %>% filter(Species == 'RFBO', Sex != 'U'))
 
 # WE FIND:
-# RFBO females dive significantly more often than males, BRBOs show no significant difference in mean.
-# However, BRBO females demonstrate much greater variability than males. But is that due to sample size?
+# Neither species shows a significant difference in dive frequency between sexes
 
+# Do males venture farther from the colony?
+ggplot(divesByTrack %>% filter(Sex != 'U'),
+       aes(y = ColonyDistance,
+           x = Species,
+           fill = Sex)) +
+  geom_boxplot() +
+  ylab('Distance from colony (m)') +
+  ggtitle('Distribution of dives by distance from colony')
+t.test(ColonyDistance ~ Sex, divesByTrack %>% filter(Species == 'BRBO', Sex != 'U'))
+t.test(ColonyDistance ~ Sex, divesByTrack %>% filter(Species == 'RFBO', Sex != 'U'))
+
+# WE FIND:
+# The opposite. Females forage significantly farther from the colony.
