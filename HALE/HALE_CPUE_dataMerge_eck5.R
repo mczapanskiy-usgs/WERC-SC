@@ -4,6 +4,8 @@
 library("data.table", lib.loc="~/R/win-library/3.2")
 library("dplyr", lib.loc="~/R/win-library/3.2")
 
+# load trap metadata: 
+# add "filler" start and end dates where there were "NA"s, pull out just neccessary data: trap type and location
 read.csv('~/PredControl/analysis/trap_metadata.csv',
          stringsAsFactors = FALSE) %>%
   mutate(StartDate = as.Date(ifelse(is.na(StartYear), 
@@ -14,43 +16,46 @@ read.csv('~/PredControl/analysis/trap_metadata.csv',
                                   '2100-01-01', 
                                   paste(EndYear, EndMonth, EndDay, sep = '-')), 
                            format = '%Y-%m-%d')) %>% ## adds new columns "StartDate" and "EndDate" in correct formats
-  select(Trapline, TrapNum, StartDate, EndDate, Easting, Northing) %>% ## 
+  select(Trapline, TrapNum, StartDate, EndDate, Trap_Brand, Trap_size, Easting, Northing) %>% ## 
   data.table %>%
   setkeyv(c('Trapline', 'TrapNum', 'StartDate', 'EndDate')) -> trap_metadata ## created datatable of columns selected above, ordered by these variables
 
+# load catch data: 
+# remove duplicates, create duplicate for "join" command
 read.csv('~/PredControl/analysis/catch_duplicateID2.csv',
          stringsAsFactors = FALSE) %>% # 293714 obs.
   data.table %>%
   filter(!is.na(TrapNum),  # remove entries w/o trap number (shouldn't be any left though)
          duplicate %in% 0:1) %>% # select duplicate codes 0 & 1 (leave out unresolved duplicates)
-  mutate(ObsDate = as.Date(as.character(dateStr), format = '%Y%m%d'),
-         Dummy = ObsDate) %>%
-  setkeyv(c('Trapline', 'TrapNum', 'ObsDate', 'Dummy')) -> trap_catches
-group_by(trap_catches, Trapline, TrapNum, ObsDate) %>% summarize(N = n()) %>% ungroup %>% arrange(-N) %>% nrow # 290,614 obs, which makes sense because there are 3100 duplicate IDs that are not 0 or 1
+  mutate(date = as.Date(as.character(dateStr), format = '%Y%m%d'),
+         Dummy = date) %>%
+  setkeyv(c('Trapline', 'TrapNum', 'date', 'Dummy')) -> trap_catches
+group_by(trap_catches, Trapline, TrapNum, date) %>% summarize(N = n()) %>% ungroup %>% arrange(-N) %>% nrow # 290,614 obs, which makes sense because there are 3100 duplicate IDs that are not 0 or 1
 
-# Catches without corresponding trap location
+# merge Catches without corresponding trap location
 trap_catches %>%
   left_join(trap_metadata, by = c('Trapline', 'TrapNum')) %>%
-  mutate(CaughtAtLocation = !is.na(StartDate) & ObsDate >= StartDate & ObsDate <= EndDate) %>% 
-  group_by(Trapline, TrapNum, ObsDate) %>%
+  mutate(CaughtAtLocation = !is.na(StartDate) & date >= StartDate & date <= EndDate) %>% 
+  group_by(Trapline, TrapNum, date) %>%
   summarize(missing_metadata = !any(CaughtAtLocation)) %>% 
   filter(missing_metadata) -> missing_metadata
   write.csv('~/PredControl/analysis/missing_metadata.csv',
             row.names = FALSE) ## %>% nrow # 6408 (was 6698)
 
-# add data from trap_metadata (easting and northing) to trap_catches
+# add data from trap_metadata (trap type, trap size, easting and northing) to trap_catches
 foverlaps(x = trap_catches, 
           y = trap_metadata,
-          by.x = c('Trapline', 'TrapNum', 'ObsDate', 'Dummy'),  # foverlaps {data.table} - vector of column names to compute the overlap joins. last 2 columns in both by.x & by.y should each correspond to the start and end interval columns in x and y respectively. Start column should always be <= end column. If x is keyed, by.x = key(x), else key(y). by.y defaults to key(y)
+          by.x = c('Trapline', 'TrapNum', 'date', 'Dummy'),  # foverlaps {data.table} - vector of column names to compute the overlap joins. last 2 columns in both by.x & by.y should each correspond to the start and end interval columns in x and y respectively. Start column should always be <= end column. If x is keyed, by.x = key(x), else key(y). by.y defaults to key(y)
           by.y = c('Trapline', 'TrapNum', 'StartDate', 'EndDate'),
           type = 'within') %>% 
-  filter(StartDate != ObsDate) -> catches_with_traploc_partial
+  filter(StartDate != date) -> catches_with_traploc_partial
 
 anti_join(trap_catches, ## anti_join - return all rows from x where there are not matching values in y, keeping just columns from x
           catches_with_traploc_partial,
-          by = c('Trapline', 'TrapNum', 'ObsDate')) %>% 
-  list(select(catches_with_traploc_partial, Easting:Northing, Trapline:TrapNum, Year:Dummy, StartDate:EndDate), .) %>% ## -> catch_duplicateID_withtraploc
+          by = c('Trapline', 'TrapNum', 'date')) %>% 
+  list(select(catches_with_traploc_partial, date:catchID, StartDate:EndDate, Trapline:TrapNum, Trap_Brand:Northing, Year:dateStr, duplicate:Dummy), .) %>%  ## StartDate:EndDate, Trapline:TrapNum, Year:Dummy, Trap_Brand:Northing), .) %>% 
   rbindlist(fill = TRUE) %>%
-  write.csv(.,file = '~/PredControl/analysis/catch_duplicateID_withtraploc.csv')
+  write.csv(.,file = '~/PredControl/analysis/catch_duplicateID_withtraploc.csv',
+            row.names = FALSE)
 
 
