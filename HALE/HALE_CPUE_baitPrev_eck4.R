@@ -8,9 +8,9 @@ read.csv('~/PredControl/analysis/catch_duplicateID.csv',
          stringsAsFactors = FALSE) %>%
   data.table %>%  # can use column names as variables directly (no $ needed)
   filter(!is.na(TrapNum)) %>% # remove all rows that don't have a trap number (28 entires)
-  mutate(ObsDate = as.Date(as.character(dateStr), format = '%Y%m%d')) %>% # adds new column "ObsDate"
+  # mutate(ObsDate = as.Date(as.character(dateStr), format = '%Y%m%d')) %>% # adds new column "ObsDate"
   # select(Trapline, TrapNum, ObsDate, BaitPrev, BaitSet) %>%
-  setkeyv(c('Trapline', 'TrapNum', 'ObsDate')) %>% # sort data by these values, in this order
+  setkeyv(c('Trapline', 'TrapNum', 'date')) %>% # sort data by these values, in this order
   group_by(Trapline, TrapNum) %>% # distinct trap groups, so that lag(BaitSet) isn't accidentally associated with any other traplines/numbers
   mutate(BaitPrevOld = BaitPrev, 
          BaitPrev = as.character(ifelse(BaitPrevOld != '', BaitPrevOld, lag(BaitSet)))) %>% ## recreated BaitPrev to include all values and renamed BaitPrevOld
