@@ -208,7 +208,7 @@ RediscretizedTrack <- as.ltraj(xy = Track[,c('Longitude', 'Latitude')],
                                date = Track$UTC,
                                id = Track$DeployID,
                                burst = paste(Track$DeployID, Track$TripID, sep = '-')) %>%
-  redisltraj(u = 180, 
+  redisltraj(u = 120, 
              samplex0 = TRUE, 
              type = 'time') %>% 
   lapply(function(burst) {

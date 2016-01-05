@@ -80,51 +80,77 @@ foreach(trip = iter(trips[13,], by = 'row'), .combine = rbind) %do% {
                     fpt = get.fpt.at.r(fptresults, ars_radius),
                     behavior = ifelse(fpt < behavior_changepoint, 'transit', 'forage'))
   
-  png(sprintf('Hawaii_data/Lehua/ars/plots/%i_%i.png', trip$DeployID, trip$TripID),
-      width = 1200,
-      height = 900)
+#   png(sprintf('Hawaii_data/Lehua/ars/plots/%i_%i.png', trip$DeployID, trip$TripID),
+#       width = 1200,
+#       height = 900)
+# 
+#   map_plot <- ggplot(trackxy,
+#          aes(x = x,
+#              y = y)) +
+#     geom_point(aes(color = fpt,
+#                    size = 4)) +
+#     geom_path(aes(alpha = .5)) +
+#     coord_fixed() +
+#     scale_size_continuous(guide = FALSE) +
+#     scale_alpha_continuous(guide = FALSE) +
+#     theme(legend.position = 'bottom')
+#   
+#   varfpt_plot <- data.frame(radius = attr(fptresults, 'radii'),
+#                             variance = apply(fptresults[[1]], 2, function(f) var(log(f), na.rm = TRUE))) %>%
+#     ggplot(aes(radius, 
+#                variance)) + 
+#     geom_line() +
+#     geom_vline(xintercept = ars_radius, linetype = 'dashed') +
+#     ggtitle(sprintf('ARS scale = %.0fm', ars_radius))
+#   
+#   behavior_plot <- ggplot(trackxy,
+#                           aes(fpt)) +
+#     geom_density() +
+#     geom_vline(xintercept = behavior_changepoint, linetype = 'dashed') +
+#     ggtitle(sprintf('Behavior changepoint = %.0fs', behavior_changepoint))
+#   
+#   # from http://stackoverflow.com/questions/9490482/combined-plot-of-ggplot2-not-in-a-single-plot-using-par-or-layout-functio
+#   lay_out = function(...) {    
+#     x <- list(...)
+#     n <- max(sapply(x, function(x) max(x[[2]])))
+#     p <- max(sapply(x, function(x) max(x[[3]])))
+#     grid::pushViewport(grid::viewport(layout = grid::grid.layout(n, p)))    
+#     
+#     for (i in seq_len(length(x))) {
+#       print(x[[i]][[1]], vp = grid::viewport(layout.pos.row = x[[i]][[2]], 
+#                                              layout.pos.col = x[[i]][[3]]))
+#     }
+#   } 
+# 
+#   lay_out(list(map_plot, 1:2, 1:2),
+#          list(varfpt_plot, 1, 3:4),
+#          list(behavior_plot, 2, 3:4))
+#   
+#   dev.off()
+  
+  # Tortuosity analysis
+  distance <- function(x1, y1, x2, y2) sqrt((x2 - x1)^2 + (y2 - y1)^2)
+  trackxy <- mutate(trackxy,
+                    tortuosity = (lag(step, 4) +
+                                    lag(step, 3) +
+                                    lag(step, 2) +
+                                    lag(step, 1) +
+                                    step +
+                                    lead(step, 1) +
+                                    lead(step, 2) +
+                                    lead(step, 3))/
+                      distance(lag(x, 4), lag(y, 4), lead(x, 4), lead(y, 4)))
+browser()
 
-  map_plot <- ggplot(trackxy,
-         aes(x = x,
-             y = y)) +
-    geom_point(aes(color = fpt,
-                   size = 4)) +
-    geom_path(aes(alpha = .5)) +
-    coord_fixed() +
-    scale_size_continuous(guide = FALSE) +
-    scale_alpha_continuous(guide = FALSE) +
-    theme(legend.position = 'bottom')
-  
-  varfpt_plot <- data.frame(radius = attr(fptresults, 'radii'),
-                            variance = apply(fptresults[[1]], 2, function(f) var(log(f), na.rm = TRUE))) %>%
-    ggplot(aes(radius, 
-               variance)) + 
-    geom_line() +
-    geom_vline(xintercept = ars_radius, linetype = 'dashed') +
-    ggtitle(sprintf('ARS scale = %.0fm', ars_radius))
-  
-  behavior_plot <- ggplot(trackxy,
-                          aes(fpt)) +
-    geom_density() +
-    geom_vline(xintercept = behavior_changepoint, linetype = 'dashed') +
-    ggtitle(sprintf('Behavior changepoint = %.0fs', behavior_changepoint))
-  
-  # from http://stackoverflow.com/questions/9490482/combined-plot-of-ggplot2-not-in-a-single-plot-using-par-or-layout-functio
-  lay_out = function(...) {    
-    x <- list(...)
-    n <- max(sapply(x, function(x) max(x[[2]])))
-    p <- max(sapply(x, function(x) max(x[[3]])))
-    grid::pushViewport(grid::viewport(layout = grid::grid.layout(n, p)))    
-    
-    for (i in seq_len(length(x))) {
-      print(x[[i]][[1]], vp = grid::viewport(layout.pos.row = x[[i]][[2]], 
-                                             layout.pos.col = x[[i]][[3]]))
-    }
-  } 
-
-  lay_out(list(map_plot, 1:2, 1:2),
-         list(varfpt_plot, 1, 3:4),
-         list(behavior_plot, 2, 3:4))
-  
-  dev.off()
+ggplot(trackxy,
+       aes(log(tortuosity))) +
+  geom_density()
+png('test.png', 800, 800)
+ggplot(trackxy,
+       aes(x,
+           y)) +
+  geom_point(aes(color = log(tortuosity)),
+             size = 3) +
+  geom_path(alpha = .5)
+dev.off()
 } 
