@@ -12,11 +12,14 @@
 # clear all
 rm(list=ls())
 
-library('plyr')
 library('dplyr')
 
 # select a spp
 spp="PFSH"
+
+# 1=WTSH
+# 1.5=RTTR, BRBO, RFBO
+# 2.5 = PFSH
 
 radius="2.5"
 
@@ -79,12 +82,12 @@ if (at.nest$Nest_loc_use[i]==0) {
   annotated.tracks <- arrange(rbind(annotated.tracks, interpolated.points), Deploy_ID, trip_no, UTC)
 }
 
-# check for and remove duplicates c(time, Lat, Lons) from annotated.tracks (trip breaker may put these in under certain conditions)
-check<-paste(as.character(annotated.tracks$UTC),as.numeric(annotated.tracks$Deploy_ID+(annotated.tracks$trip_no*.01)),annotated.tracks$Latitude,annotated.tracks$Longitude,sep="_")
+# check for and remove duplicates c(UTC,deploy_id,trip_no) from annotated.tracks (trip breaker may put these in under certain conditions)
+check<-paste(as.character(annotated.tracks$UTC),as.numeric(annotated.tracks$Deploy_ID+(annotated.tracks$trip_no*.01)),sep="_")
 annotated.tracks<-annotated.tracks[duplicated(check)==0,]
 
-### adjust any duplicate UTC, deploy_ID, trip_no (which may have resulted from rounding UTC to seconds)
-annotated.tracks$UTC[(duplicated(paste(as.character(annotated.tracks$Deploy_ID+(annotated.tracks$trip_no*.01)),as.character(annotated.tracks$UTC),sep="_")))]=annotated.tracks$UTC[(duplicated(paste(as.character(annotated.tracks$Deploy_ID+(annotated.tracks$trip_no*.01)),as.character(annotated.tracks$UTC),sep="_")))]+1
+# ### adjust any duplicate UTC, deploy_ID, trip_no (which may have resulted from rounding UTC to seconds)
+# annotated.tracks$UTC[duplicated(paste(as.character(annotated.tracks$Deploy_ID+(annotated.tracks$trip_no*.01)),as.character(annotated.tracks$UTC),sep="_"))==0,]=annotated.tracks$UTC[(duplicated(paste(as.character(annotated.tracks$Deploy_ID+(annotated.tracks$trip_no*.01)),as.character(annotated.tracks$UTC),sep="_")))]+1
 
 write.table(annotated.tracks, paste(dir.out,filename,'_trips_annotated.csv',sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
 

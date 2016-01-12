@@ -69,7 +69,7 @@ dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 
 #### set species
-species="COMU"
+species="SOSH"
 
 #### set hrs for minimum gap in second (converted to sec with time gap used create new segment each time animal leaves and returns in to box)
 hrs<-60
@@ -81,7 +81,7 @@ print(clipPolyList) # show a list of the clipper files
 
 # select clipperfile
 ### uid
-rno<-19 # row number of file list
+rno<-21 # row number of file list
 clip.name<-(paste(as.character(clipPolyList$name[rno]),"Buffer",sep=""))
 print(clip.name)
 

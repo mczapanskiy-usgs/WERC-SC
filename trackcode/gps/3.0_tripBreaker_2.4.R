@@ -34,6 +34,7 @@ library(fields) # contains a great circle distance function that uses radius at 
 library(ggplot2)
 library(trip)
 library(plyr)
+library(geosphere)
 
 ####  dir.in for .csv files
 dir.in <- "D:/Share_Data/Tracking_Data/"
@@ -45,7 +46,7 @@ dir.out <- "D:/Share_Data/Tracking_Data/GPS/"
 metadata<-read.table(paste("D:/Share_Data/GitHub/WERC-SC/trackcode/gps/","metadata_all_GPS.csv",sep=""),header=T, sep=",", strip.white=T)
 
 #### enter species to process
-species<-"PFSH"
+species<-"RFBO"
 
 #### Plot or not?
 plot<-"Y"
@@ -66,16 +67,17 @@ radCol<-p$radCol.km # in km
 ## enter time limits that are used to characterize trips
 minDepAdj<-60*p$minDepAdj.min # p$minDepAdj.min = time in minutes to accept a difference in recorded deployment release time if release time < minDepAdj
 minRecAdj<-60*p$minRecAdj.min # p$minRecAdj.min = time in minutes to accept a difference in recorded deployment recovery time if recovery time < minRecAdj
-noLocsSpeed<-p$noLocsSpeed # number of locations to use to generate an average speed for back/forward calculating a trip start or end time using the time of first/last location at sea
+noLocsSpeed<-p$noLocsSpeed # code now defaults to gps_vmax, number of locations to use to generate an average speed for back/forward calculating a trip start or end time using the time of first/last location at sea
 timeStLim<-60*p$timeStLim.min # p$timeStLim.min = time in minutes allowed to designate a start as complete if the tag begins logging when at sea
   #NOTE THIS NUMBER IS SENSITIVE AT LARGE VALUES IF BIRD IS TRAVELING ABNORMALLY SLOW DURING FIRST LOCATIONS
 timeEndLim<-60*p$timeEndLim.min # p$timeEndLim.min = time in minutes allowed to designate a end as complete if the tag ends logging when at sea
   #NOTE THIS NUMBER IS SENSITIVE AT LARGE VALUES IF BIRD IS TRAVELING ABNORMALLY SLOW DURING LAST LOCATIONS
 minTripDur<-60*60*p$minTripDur.h # min trip duration in seconds (sec,min,hr)
+gps_vmax<-p$gps_vmax
 ##########
 
 #### Create specs table
-Trip_Characterization_Specs<-data.frame(species,minDepAdj,minRecAdj,noLocsSpeed,timeStLim,timeEndLim,minTripDur)
+Trip_Characterization_Specs<-data.frame(species,minDepAdj,minRecAdj,noLocsSpeed,timeStLim,timeEndLim,minTripDur,gps_vmax)
 
 # ColLocs<-read.table (paste("/Users/henry/Documents/Work/Projects/USGS/Latest/Tracking Data/GPS/All_Tracks/","GPS_Colony_locs.csv",sep = ""),header=T, sep=",", strip.white=T, stringsAsFactors=FALSE)
 # 
@@ -98,7 +100,8 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
   # head(metaWants)
   
   # loop through tracks
-  # j<-45
+  # i<-1
+  # j<-25
   for (j in 1:length(metaWants$GPS_Track_File)) {
     
     file.idWant<-metaWants$GPS_Track_File[j]
@@ -123,8 +126,14 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
     }
     
     # distance to colony in km
-    dist2Col<-(t(rdist.earth((matrix(c(start.lon,start.lat), ncol=2)),(matrix(c(track$Longitude,track$Latitude),ncol=2)),miles=FALSE)))
-    track$dist2Nest<-(t(rdist.earth((matrix(c(metaTrack$Nest_Long_DD,metaTrack$Nest_Lat_DD), ncol=2)),(matrix(c(track$Longitude,track$Latitude),ncol=2)),miles=FALSE)))
+    # dist2Col<-(t(rdist.earth(matrix(c(start.lon,start.lat), ncol=2),matrix(c(track$Longitude,track$Latitude),ncol=2),miles=FALSE)))
+    dist2Col<-matrix(distGeo(matrix(c(start.lon,start.lat), ncol=2),matrix(c(track$Longitude,track$Latitude),ncol=2))/1000)
+        # (distGeo uses the default ellipsoid a=6378137, f=1/298.257223563)
+    
+    # track$dist2Nest<-(t(rdist.earth((matrix(c(metaTrack$Nest_Long_DD,metaTrack$Nest_Lat_DD), ncol=2)),(matrix(c(track$Longitude,track$Latitude),ncol=2)),miles=FALSE)))
+    track$dist2Nest<-distGeo(matrix(c(metaTrack$Nest_Long_DD,metaTrack$Nest_Lat_DD), ncol=2),matrix(c(track$Longitude,track$Latitude),ncol=2))/1000
+        # (distGeo uses the default ellipsoid a=6378137, f=1/298.257223563)
+    
     onCol<-ifelse(dist2Col>=radCol, 1, 0)
     
     #### convert to using logicals not if statements then decide on minimum time or dist from colony to dilineate true trip
@@ -166,7 +175,7 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
     
     # k=1
     # k=2
-    # k=3
+    # k=7
     for (k in 1:length(departsArrives))  { # loop through number departs arrives    
     ######################### 
     ##### Trip Starts
@@ -189,11 +198,14 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         #         track[1,5:6]<-c("trip1St","trip1St")
         # head(track)
       } else if (as.POSIXlt(deployUTC,"GMT")>=(as.POSIXlt(departsArrives[1],"GMT")-timeStLim)) { # f1.1.2 time between deployment and first loc at sea is less than or equal to timeStLim of deployment UTC
-        # f1.1.2 SET make colony loc the first position and recalculate departure time using mean speed of first 10 locations and label trip start as complete
+        # f1.1.2 SET make colony loc the first position and recalculate departure time using mean speed of gps_vmax and label trip start as complete
         tripSt<-format(strptime(as.character(as.POSIXlt(track$UTC[1], tz="GMT")-(dist2Col[1]*1000/
           # trackDistance units in km
-          mean(((trackDistance(cbind(track$Longitude[1:(1+noLocsSpeed)],track$Latitude[1:(1+noLocsSpeed)]), longlat = TRUE, prev = FALSE)*1000)/
-                 (as.numeric(as.POSIXlt(track$UTC[2:(1+noLocsSpeed)],"GMT")-as.POSIXlt(track$UTC[1:(noLocsSpeed)],"GMT"))*60)), na.rm=TRUE))), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
+        gps_vmax
+#           mean(((trackDistance(cbind(track$Longitude[1:(1+noLocsSpeed)],track$Latitude[1:(1+noLocsSpeed)]), longlat = TRUE, prev = FALSE)*1000)/
+#                  (as.numeric(as.POSIXlt(track$UTC[2:(1+noLocsSpeed)],"GMT")-as.POSIXlt(track$UTC[1:(noLocsSpeed)],"GMT"))*60)), na.rm=TRUE)
+          
+          )), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
         
         if (as.POSIXlt(tripSt,"GMT")<=as.POSIXlt(deployUTC,"GMT")) { # check that corrected time is not before deployment time, if so set to release time
           tripSt=deployUTC
@@ -227,15 +239,17 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         #           track[which(track$UTC==departsArrives[k])-1,5:6]<-c(paste("trip",k,"St",sep=""),paste("trip",k,"St",sep=""))
         # head(track)
       } else if (as.POSIXlt(track$UTC[which(track$UTC==departsArrives[k])-1],"GMT")>=(as.POSIXlt(departsArrives[k],"GMT")-timeStLim)) { # f1.3.2 if time of on col loc prior to first at sea loc of trip k is within timeStLim of deployment UTC
-        # f1.3.2 SET insert colony loc as the prior position and recalculate departure time using mean speed of first noLocsSpeed locations and label trip start as complete
+        # f1.3.2 SET insert colony loc as the prior position and recalculate departure time using mean speed of gps_vmax and label trip start as complete
         tripSt<-format(strptime(as.character(as.POSIXlt(track$UTC[which(track$UTC==departsArrives[k])], tz="GMT")
         -(dist2Col[which(track$UTC==departsArrives[k])]*1000/
+            gps_vmax
         # trackDistance units in km
-        mean(((trackDistance(cbind(track$Longitude[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed)],
-        track$Latitude[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed)]),longlat = TRUE, prev = FALSE)*1000)/
-        (as.numeric(as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])+1):(which(track$UTC==departsArrives[k])+noLocsSpeed)],"GMT")
-        -as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed-1)],"GMT"))*60)),
-        na.rm=TRUE))), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")        
+#         mean(((trackDistance(cbind(track$Longitude[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed)],
+#         track$Latitude[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed)]),longlat = TRUE, prev = FALSE)*1000)/
+#         (as.numeric(as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])+1):(which(track$UTC==departsArrives[k])+noLocsSpeed)],"GMT")
+#         -as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])):(which(track$UTC==departsArrives[k])+noLocsSpeed-1)],"GMT"))*60)),
+#         na.rm=TRUE)
+        )), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")        
         tripStComp<-3
         # track[which(track$UTC==departsArrives[k])-1,1:3]<-c(trip1St,ColLocWant$lat,ColLocWant$lon)
         #           rowIns<-track[which(track$UTC==departsArrives[k])-1,]
@@ -284,14 +298,15 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
         #         track[length(track[,1]),5:6]<-c("trip1End","trip1End")
         # tail(track)
       } else if (as.POSIXlt(recoverUTC,"GMT")<(as.POSIXlt(track$UTC[length(track$UTC)],"GMT")+timeEndLim)) { # f2.1.2 if recover UTC not within minRecAdj but within timeEndLim of UTC of last loc
-        # f2.1.2 SET colony loc the last position and recalculate arrival time using mean speed of last noLocsSpeed locations and label trip end as complete
+        # f2.1.2 SET colony loc the last position and recalculate arrival time using mean speed of gps_vmax and label trip end as complete
         tripEnd<-format(strptime(as.character(as.POSIXlt(track$UTC[length(track$UTC)], tz="GMT")+(dist2Col[length(dist2Col)]*1000/
+          gps_vmax
           # trackDistance units in km
-          mean(((trackDistance(cbind(track$Longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$Latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
-          longlat = TRUE, prev = FALSE)*1000)/
-          (as.numeric(as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed+1):length(track$UTC)])-as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed):(length(track$UTC)-1)]))*60)), 
-          na.rm=TRUE))),
-          "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
+#           mean(((trackDistance(cbind(track$Longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$Latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
+#           longlat = TRUE, prev = FALSE)*1000)/
+#           (as.numeric(as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed+1):length(track$UTC)])-as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed):(length(track$UTC)-1)]))*60)), 
+#           na.rm=TRUE)
+          )),"%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
         
         if (as.POSIXlt(tripEnd,"GMT")>=as.POSIXlt(recoverUTC,"GMT")) { # check that corrected time is not after recovery time, if so set to release time
           tripEnd=recoverUTC
@@ -335,14 +350,14 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
       #         track[length(track[,1]),5:6]<-c("trip1End","trip1End")
       # tail(track)
       } else if (as.POSIXlt(recoverUTC,"GMT")<(as.POSIXlt(track$UTC[length(track$UTC)],"GMT")+timeEndLim)) { # 2.2.2 if recover UTC not within minRecAdj but within timeEndLim of UTC of last loc
-        # f2.2.2 SET colony loc the last position and recalculate arrival time using mean speed of last noLocsSpeed locations and label trip end as complete
-        tripEnd<-format(strptime(as.character(as.POSIXlt(track$UTC[length(track$UTC)], tz="GMT")+(dist2Col[length(dist2Col)]*1000/
+        # f2.2.2 SET colony loc the last position and recalculate arrival time using mean speed of gps_vmax and label trip end as complete
+        tripEnd<-format(strptime(as.character(as.POSIXlt(track$UTC[length(track$UTC)], tz="GMT")+(dist2Col[length(dist2Col)]*1000/gps_vmax
         # trackDistance units in km
-        mean(((trackDistance(cbind(track$Longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$Latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
-        longlat = TRUE, prev = FALSE)*1000)/
-        (as.numeric(as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed+1):length(track$UTC)])-as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed):(length(track$UTC)-1)]))*60)), 
-        na.rm=TRUE))),
-        "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
+#         mean(((trackDistance(cbind(track$Longitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))],track$Latitude[(length(track$UTC)-(noLocsSpeed)):(length(track$UTC))]),
+#         longlat = TRUE, prev = FALSE)*1000)/
+#         (as.numeric(as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed+1):length(track$UTC)])-as.POSIXlt(track$UTC[(length(track$UTC)-noLocsSpeed):(length(track$UTC)-1)]))*60)), 
+#         na.rm=TRUE)
+        )),"%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
         
         if (as.POSIXlt(tripEnd,"GMT")>=as.POSIXlt(recoverUTC,"GMT")) { # check that corrected time is not after recovery time, if so set to recover capture time
           tripEnd=recoverUTC
@@ -375,14 +390,16 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
       #         track[length(track[,1]),5:6]<-c("trip1End","trip1End")
       # tail(track)
       } else if (as.POSIXlt(track$UTC[which(track$UTC==departsArrives[k])],"GMT")<=(as.POSIXlt(track$UTC[which(track$UTC==departsArrives[k])-1],"GMT")+timeEndLim)) { # f2.3.2 if on colony not within minRecAdj but within timeEndLim of UTC of last loc
-        # f2.3.2 SET colony loc the last position and recalculate arrival time using mean speed of last 10 locations and label trip end as complete
+        # f2.3.2 SET colony loc the last position and recalculate arrival time using mean speed of gps_vmax and label trip end as complete
         tripEnd<-format(strptime(as.character(as.POSIXlt(track$UTC[which(track$UTC==departsArrives[k])-1], tz="GMT")+(dist2Col[which(track$UTC==departsArrives[k])-1]*1000/
+        gps_vmax
         # trackDistance units in km        
-        mean(((trackDistance(cbind(track$Longitude[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-1)],
-        track$Latitude[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-1)]), 
-        longlat = TRUE, prev = FALSE)*1000)/
-        (as.numeric(as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])-noLocsSpeed):(which(track$UTC==departsArrives[k])-1)])-as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-2)]))*60)),
-        na.rm=TRUE))), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
+#         mean(((trackDistance(cbind(track$Longitude[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-1)],
+#         track$Latitude[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-1)]), 
+#         longlat = TRUE, prev = FALSE)*1000)/
+#         (as.numeric(as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])-noLocsSpeed):(which(track$UTC==departsArrives[k])-1)])-as.POSIXlt(track$UTC[(which(track$UTC==departsArrives[k])-noLocsSpeed-1):(which(track$UTC==departsArrives[k])-2)]))*60)),
+#         na.rm=TRUE)
+        )), "%Y-%m-%d %H:%M:%S", tz = ""), "%Y-%m-%d %H:%M:%S")
         
         if (as.POSIXlt(tripEnd,"GMT")>=as.POSIXlt(recoverUTC,"GMT")) { # check that corrected time is not after recovery time, if so set to recover capture time
           tripEnd=recoverUTC

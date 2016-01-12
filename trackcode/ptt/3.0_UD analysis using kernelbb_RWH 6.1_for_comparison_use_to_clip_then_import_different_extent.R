@@ -133,7 +133,7 @@ print(clipPolyList) # show a list of the clipper files
 
 #### select clipperfile
 #### ui set rno for clipPolyList
-rno<-20 # row number of file list
+rno<-21 # row number of file list
 clipper<-as.character(clipPolyList$clipFileName[rno])
 clipperName<-as.character(clipPolyList$name[rno])
 
@@ -220,6 +220,80 @@ tracks.sp@proj4string <- CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +
 # transform the track to CCS LME preferred projection
 tracks.sp_proj<-spTransform(tracks.sp, CRS(paste("+",projWant,sep="")))
 #   plot(tracks.sp_proj, add=TRUE, col = 'blue', pch=1, cex=.5)
+
+id_2<-clipPolyList$id_2[rno]
+
+
+if (id_2==0) {
+  id<- ptt$ptt_deploy_id
+  # head(ptt)
+} else {
+  id<- ptt[,paste(clipperName,'Buffer_id2',sep='')]
+}
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+########################################################################################################
+######## THIS SECTION USED TO PULL IN DIFFERENT EXTENT TO BE USED DURING THE KERNELING PROCESS  ######## 
+######## ALLOWS FOR COMPARISION WITH KERNAL OUTPUTS USING DIFFERENT CLIPPING EXTENTS (ie that by########  
+######## Adams for previous papers)                                                             ########
+
+
+#### select clipperfile
+#### ui set rno for clipPolyList
+rno<-20 # row number of file list
+clipper1<-as.character(clipPolyList$clipFileName[rno])
+clipperName1<-as.character(clipPolyList$name[rno])
+
+
+# read in polygon, set to projection, shapefiles should all come in as WGS84
+clipper1 <- readOGR(dir.in.poly,clipper1) # clipper comes in as unprojected WGS84
+
+################# check this next string as you may not need to run!!!!!!
+# clipper@proj4string <- CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+# plot(clipper, axes=T)
+
+# if polygon multipart, select polygon
+if (clipPolyList$mult_polygons[rno]==1) {
+  clipper1<-subset(clipper1,(clipper1@data[,grep("*NAME",colnames(clipper1@data))])==as.character(clipPolyList$poly_want[rno]))
+} else {
+  clipper1@data$NAME<-(as.character(clipPolyList$name[rno]))
+}
+# plot(clipper, axes=T)
+
+# read in projection best for selected polygon (contained in table clipPolyList)
+projWant<-as.character(clipPolyList$Proj4.specs[rno])
+# for USGS Albers Equal Area projWant<-"+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23.0 +lon_0=-96.0 +x_0=0.0 +y_0=0.0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "
+# for CCS LME projWant<-"+proj=aea +lat_1=30 +lat_2=50 +lat_0=40 +lon_0=-125 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+# we're using ccs_lme projection
+
+# transform spatial polygons to projection appropriate for region in question (California Current in this case)
+clipper_proj1<-spTransform(clipper1, CRS(paste("+",projWant,sep="")))
+# plot(clipper_proj, axes=T)
+
+# get buffer distance
+buffDist1<-clipPolyList$buffer_to_km[rno]*1000 # note convert buffer dist from km to m
+
+# create buffer
+clipperBuff_proj1<-gBuffer(clipper_proj1, byid=F, id=NULL, width=buffDist1, quadsegs=5, capStyle="ROUND", joinStyle="ROUND", mitreLimit=1.0)
+# print(proj4string(clipper))
+# plot(clipper_proj1,axes=T)
+# plot(clipperBuff_proj1, add=T, border="gray")
+
+# get extent of shapefile in question
+ext<-extent(clipperBuff_proj1[1,1])
+
+
+
+
+########################################################################################################
+########################################################################################################
+########################################################################################################
+########################################################################################################
+
+
+
 
 ##
 # # plot(tracks.sp_aea, axes=TRUE)

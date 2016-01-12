@@ -1,7 +1,10 @@
 #############################################
 # EBOS Trip analyses
 # Bill Henry USGS
-# Sept 10, 15
+# Sept 10, 15 intial
+# Dec 10, 15 add to movement parameters calculated
+# Jan 9, 16 add diel calculations
+# Jan 11, 16 cleaner diel function (Max Czapanskiy)
 #
 # uses broken GPS trip data to quantify trips
 # 
@@ -11,7 +14,7 @@
 rm(list=ls())
 
 library(sp)
-library(plyr)
+library(dplyr)
 library(proj4)
 library(ggplot2)
 library(rgdal)
@@ -54,7 +57,7 @@ dir.in <- 'D:/Share_Data/Tracking_Data/GPS/All_tracks/'
 ####
 # dir.out <- 'D:/Share_Data/Tracking_Data/EOBS/All_tracks/'
 # dir.out <- '/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.11.2015/Tracking_Data/EOBS/Analyses/'
-dir.out <- 'D:/Share_Data/Tracking_Data/GPS/All_tracks/Analyses/'
+dir.out <- 'D:/Share_Data/Tracking_Data/GPS/Analyses/'
 
 #### directory for world background to read in
 #dir.in.poly <- 'D:/Share_Data/ARCMAP/World'
@@ -94,7 +97,7 @@ tracks$unique_trip<-as.numeric(tracks$Deploy_ID+(tracks$trip_no*.01))
 
 # tag.serial.number,UTC,latitude,longitude,height.above.ellipsoid,SPDfilter,temperature,dt,dist.pckArgos.SPD,speed.pckArgos.SPD,dist.pckTrip.SPD,speed.pckTrip.SPD,azimuth.SPD,Deploy_ID,species,year,Site
 
-tracks<-rename(tracks, c("Longitude"="longitude", "Latitude"="latitude"))
+tracks<-rename(tracks, longitude=Longitude, latitude=Latitude)
 
 # convert tracks into a spatial data frame
 tracks$longitude360<-tracks$longitude
@@ -102,7 +105,7 @@ tracks$longitude360[(tracks$longitude360 < 0)] <- (tracks$longitude360[(tracks$l
 tracks.sp <- SpatialPointsDataFrame(coords = tracks[c("longitude360","latitude")], data = tracks)
 # define projection, use the WGS84 projection that Argos Data is delivered in
 tracks.sp@proj4string <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
-plot(tracks.sp, pch=3,cex=.01)
+#plot(tracks.sp, pch=3,cex=.01)
 
 # get grid point data
 # point.grid<-read.table ('D:/Share_Data/ARCMAP/Fisheries/Longline/LONGLINE_00.csv',header=T, sep=,", strip.white=T)
@@ -136,14 +139,14 @@ dir.in.poly <- "D:/Share_Data/Clip Polygons/"
   # transform the track to projection defined for the polygon
   track.sp_trans<-spTransform(tracks.sp, CRS(paste("+",projWant,sep='')))
   ######
-  plot(track.sp_trans, pch=3,cex=.01)
+  #plot(track.sp_trans, pch=3,cex=.01)
 
   ## compare the coords
   # cbind(track.sp_trans@coords,tracks_all[c("Longitude","Latitude")])
   
   ## get transformed tracks for to calc speed and distance calculations
   tracks_trans<-as.data.frame(track.sp_trans@coords)
-  tracks_trans<-rename(tracks_trans, c("longitude360"="longitude_trans", "latitude"="latitude_trans"))
+  tracks_trans<-rename(tracks_trans, longitude_trans=longitude360, latitude_trans=latitude)
   
   tracks<-cbind(tracks, tracks_trans)
   
@@ -209,33 +212,62 @@ unique_trip <- unique(tracks$unique_trip)
     # get speed between locations and distance to colony
     DT$vel<-NA
     DT$dist2col<-NA
-    # i=71
+    DT$diel.naut<-NA
+    
+    # i=16
     for (i in 1:length(unique(DT$burst))) {
       DTsub<-DT[DT$burst==unique_trip[i],]
-      
-      ########### you are here shift DTsub down and add bottom to top
-      
       
       DTsub[,c(dy,dy,dist,dt,abs.angle,rel.angle)]
       
       # get dist to col
       # get colony locs and project
       Deploy_ID.want<-unique(as.integer(as.character(DTsub$id)))
-      col.loc<-cbind(metadata$Col_Long_DD[metadata$Deploy_ID==Deploy_ID.want],metadata$Col_Lat_DD[metadata$Deploy_ID==Deploy_ID.want])
+      col.loc.sp<-SpatialPointsDataFrame(coords = cbind(metadata$Col_Long_DD[metadata$Deploy_ID==Deploy_ID.want],metadata$Col_Lat_DD[metadata$Deploy_ID==Deploy_ID.want]),data=as.data.frame(1))
+      col.loc.sp@proj4string <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+      # col.loc.sp_trans<-spTransform(col.loc.sp, CRS(paste("+",projWant,sep='')))
+
+      DTsub.sp<-SpatialPointsDataFrame(coords = cbind(DTsub$longitude,DTsub$latitude),data=as.data.frame(cbind(DTsub$longitude,DTsub$latitude)))
+      DTsub.sp@proj4string <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+      # DTsub.sp_trans<-spTransform(DTsub.sp, CRS(paste("+",projWant,sep='')))
       
       #### calculate distance to colony (uses wgs84 ellipsoid) package geosphere
-      DTsub$dist2col<-distGeo(cbind(DTsub$longitude,DTsub$latitude), col.loc)
-      # (this uses the default ellipsoid a=6378137, f=1/298.257223563)
+      DTsub$dist2col<-distGeo(DTsub.sp, col.loc.sp) # (this uses the default ellipsoid a=6378137, f=1/298.257223563)
+      # DTsub$dist2col<-distVincentyEllipsoid(DTsub.sp, col.loc.sp, a=6378137, b=6356752.3142, f=1/298.257223563)
       
-      DTsub$dist[1]<-
       # get velocity for between each location    
-      DTsub$vel<-DTsub$dist[1/DTsub$dt
-      
-      
+      DTsub$vel<-DTsub$dist/DTsub$dt
       
       DT$vel[DT$burst==unique_trip[i]]<-DTsub$vel
       DT$dist2col[DT$burst==unique_trip[i]]<-DTsub$dist2col
+      
+      # Nautical dawn/dusk
+      library (oce)
+      utc<-as.POSIXct(format(DTsub$date), tz="UTC")
+      lat<-DTsub.sp@coords[,1]
+      lon<-DTsub.sp@coords[,2]
+      
+#       old diel calculation
+#       DTsub$diel.naut<-NA
+#       sunElevationNow <- sunAngle(utc, lat, lon)$altitude
+#       sunElevation1hr <- sunAngle(utc + 3600, lat, lon)$altitude
+#       DTsub$diel.naut[((sunElevationNow <= 0 & sunElevationNow > -12 )& sunElevationNow<sunElevation1hr)]<-"dawn.naut"
+#       DTsub$diel.naut[((sunElevationNow <= 0 & sunElevationNow > -12) & sunElevationNow>sunElevation1hr)]<-"dusk.naut"
+#       DTsub$diel.naut[(sunElevationNow > 0)]<-"day"
+#       DTsub$diel.naut[sunElevationNow <= -12]<-"night"
+#       DT$diel.naut[DT$burst==unique_trip[i]]<-DTsub$diel.naut
+      
+      # diel function (Max Czapazanskiy, Jan 12, 2016)
+      calc.diel.naut <- function(utc, lat, lon) {
+        sunElevationNow <- sunAngle(utc, lat, lon)$altitude
+        sunElevation1hr <- sunAngle(utc + 3600, lat, lon)$altitude
+        ifelse(sunElevationNow <= 0 & sunElevationNow > -12, # -12 = nautical twilight, -6 = civil twilight
+               ifelse(sunElevationNow < sunElevation1hr, 'dawn.naut', 'dusk.naut'),
+               ifelse(sunElevationNow > 0, 'day', 'night'))
       }
+      DTsub <- mutate(DTsub, diel.naut = calc.diel.naut(utc, lat, lon))
+          
+    }
     
 #########    uncomment to export annotated trips
 #     #### export example annotated trip
@@ -277,9 +309,18 @@ unique_trip <- unique(tracks$unique_trip)
     out$id<-as.numeric(as.character(out$id), digits=2)
     out<-out[order(out$id),]
 
+    sum.trackObjs<-summary(trackObjs)
+    sum.trackObjs<-sum.trackObjs[order(sum.trackObjs$id),]
+    sum.trackObjs <- sum.trackObjs[,c('id','nb.reloc','date.begin','date.end')]
 
-write.table(out, paste(dir.out,species,"_rad_",rad,"_","trip_summarys.csv",sep = ""),sep=",",quote=TRUE,col.names=TRUE,row.names=FALSE)
-  
+    out<-merge(out,sum.trackObjs,by.x="id",by.y="id",all.x=TRUE,all.y=FALSE)
+    
+    out[out==-Inf]="NA"
+
+    
+write.table(DT,paste(dir.out,species,"_rad_",rad,"_","locs.behav.annotation.csv",sep = ""),sep=",",quote=TRUE,col.names=TRUE,row.names=FALSE)
+write.table(out,paste(dir.out,species,"_rad_",rad,"_","trip_summarys.csv",sep = ""),sep=",",quote=TRUE,col.names=TRUE,row.names=FALSE)
+
 
 # some plotting
 library(ggplot2)
@@ -303,3 +344,29 @@ legend_title <- "Trip duration hrs by Sex"
 p <- ggplot(out, aes(x=tracks.duration.hrs))
             p <- p + geom_density(aes(fill=factor(Sex)), alpha=.4)
             p + scale_fill_manual(legend_title,values = c("pink","blue","yellow"))
+
+#### plot 4
+            # plot diel of locs > than 2m/s
+            DTwant<-DT[DT$vel>1,]
+            counts <- table(DTwant$diel.naut)
+            counts <- counts/sum(counts)
+            barplot(counts, main="Diel Locations", 
+                    xlab="% locs in Diel Class")
+            
+            # plot diel of locs < than 5m/s
+            DTwant<-DT[DT$vel<.5,]
+            counts <- table(DTwant$diel.naut)
+            counts <- counts/sum(counts)
+            barplot(counts, main="Diel Locations", 
+                    xlab="% locs in Diel Class")
+            
+#### plot 5
+            legend_title <- "locs by diel state"
+            DTwant<-DT[DT$vel<10,]
+            p <- ggplot(DTwant, aes(x=vel))
+            p <- p + geom_density(aes(fill=factor(diel.naut)), alpha=.4)
+            p + scale_fill_manual(legend_title,values = c("light blue","red", "blue","black"))
+
+species = 'WTSH'
+rad = '1'
+DT<-read.table (paste(dir.out,species,"_rad_",rad,"_","locs.behav.annotation.csv",sep = ""),header=T, sep=",", strip.white=T)
