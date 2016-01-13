@@ -14,6 +14,12 @@ read.csv('~/WERC-SC/HALE/catch_duplicateID_withtraploc.csv',
   ungroup %>%
   mutate(TrapChecked = !is.na(CheckInterval) & CheckInterval < 14) -> catch_traploc_weekChecks # change the number to adjust the "effort" interval
 
+## remove entries with unknown BaitStatus (for Raina to review)
+catch_traploc_weekChecks %>%
+  filter(BaitStatus != "N" & BaitStatus != "Y" & BaitStatus != "NR"
+         & BaitStatus != "y" & BaitStatus != "n" & BaitStatus != "") -> catch_unkBaitStatus
+write.csv(catch_unkBaitStatus, '~/WERC-SC/HALE/catch_unk_BaitStatus.csv',
+            row.names = FALSE)
 
 ## stats
 # average interval between checks
