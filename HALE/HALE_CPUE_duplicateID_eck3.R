@@ -2,7 +2,7 @@
 # previous: run data from TRAPS database through eck1 script,
 #          in excel, extracted and sorted duplicates and added duplicate codes
 
-setwd("~/PredControl/analysis")
+setwd("~/WERC-SC/HALE") ## setwd("~/PredControl/analysis")
 
 ## import .csv data
 catch <- read.csv("catch.csv")   

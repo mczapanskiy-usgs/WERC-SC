@@ -1,6 +1,6 @@
 ### import HALE pred control data 2000-2015 and make catchID, remove duplicates
 
-setwd("~/PredControl/analysis")
+setwd("~/WERC-SC/HALE") ## setwd("~/PredControl/analysis")
 
 ## import .csv data
 traps <- read.csv("traps2014.csv")   ##("Traps_AllYears.csv")  _2000-2013
