@@ -158,6 +158,48 @@ RFBODive <- lapply(dir('dive_identification/4b_rfbo_dive_data/', full.names = TR
 
 Dive <- rbind(BRBODive, RFBODive)
 
+# Gather wet/dry data
+WetDry <- foreach(DeployID = DeploymentMetadata$DeployID,
+                  TDRwd = DeploymentMetadata$TDRWetDry,
+                  TDRfile = DeploymentMetadata$TDRFile,
+                  .combine = rbind) %do% {
+  if(is.na(TDRwd)) { 
+    NULL
+  } else if(TDRwd == TRUE) {
+    wetdrypattern <- '[0-9]{2}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}       [0-9]{2}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}'
+    readLines(file.path('dive_identification',
+                        '1_CEFAS_output',
+                        sprintf('%s.CSV', TDRfile))) %>%
+      grep(pattern = wetdrypattern, x = ., value = TRUE) %>%
+      (function(wetdrylines) {
+        strsplit(wetdrylines, '[[:space:]]{2,}') %>%
+          unlist %>%
+          matrix(nrow = length(wetdrylines), ncol = 2, byrow = TRUE) %>%
+          data.frame %>%
+          transmute(DeployID = DeployID,
+                    Begin = as.POSIXct(X1, format = '%d/%m/%y %H:%M:%OS', tz = 'UTC') + .05, 
+                    End = as.POSIXct(X2, format = '%d/%m/%y %H:%M:%OS', tz = 'UTC') + .05)
+      })
+  } else if(TDRwd == FALSE && file.exists(file.path('dive_identification',
+                                                    '2_tdr_data',
+                                                    sprintf('%s.CSV', TDRfile)))) {
+    read.csv(file.path('dive_identification',
+                       '2_tdr_data',
+                       sprintf('%s.CSV', TDRfile))) %>%
+      filter(EventId > 0) %>%
+      mutate(UTC = as.POSIXct(UTC, tz = 'UTC') + .05) %>%
+      group_by(EventId) %>%
+      summarize(Begin = min(UTC),
+                End = max(UTC)) %>%
+      ungroup %>%
+      transmute(DeployID = DeployID,
+                Begin,
+                End)
+  } else {
+    NULL
+  }
+}
+
 # Gather track and trip data
 BRBOTracks <- read.csv('trackcode/gps/All_tracks/BRBO_1.5_trips_annotated.csv') %>%
   transmute(DeployID = Deploy_ID,
@@ -227,6 +269,7 @@ Track <- mutate(Track, UTC = as.numeric(UTC))
 pkeys <- list(DeploymentMetadata = 'DeployID',
      BirdMetadata = 'DeployID',
      Dive = c('DeployID', 'DiveID'),
+     WetDry = c('DeployID', 'Begin'),
      Track = c('DeployID', 'UTC'),
      RediscretizedTrack = c('DeployID', 'UTC'),
      Trip = c('DeployID', 'TripID'))
@@ -245,6 +288,7 @@ if(all(valid.pkeys)) {
   dbWriteTable(MHIdb, 'DeploymentMetadata', DeploymentMetadata, overwrite = TRUE)
   dbWriteTable(MHIdb, 'BirdMetadata', BirdMetadata, overwrite = TRUE)
   dbWriteTable(MHIdb, 'Dive', Dive, overwrite = TRUE)
+  dbWriteTable(MHIdb, 'WetDry', WetDry, overwrite = TRUE)
   dbWriteTable(MHIdb, 'Track', Track, overwrite = TRUE)
   dbWriteTable(MHIdb, 'RediscretizedTrack', RediscretizedTrack, overwrite = TRUE)
   dbWriteTable(MHIdb, 'Trip', Trip, overwrite = TRUE)
