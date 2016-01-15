@@ -4,15 +4,38 @@
 library("data.table", lib.loc="~/R/win-library/3.2")
 library("dplyr", lib.loc="~/R/win-library/3.2")
 
+# write RatInvalid loop function to call to later
+is.RatInvalid <- function(predCaught, TrapStatus) {
+  RatInvalid <- rep(FALSE, length(predCaught))
+  flag <- FALSE
+  for(i in seq(predCaught)) {
+    if(flag && TrapStatus[i] == 'C')
+      RatInvalid[i] <- TRUE
+    if(predCaught[i] == 'RR')
+      flag <- TRUE
+    else if(TrapStatus[i] == 'O')
+      flag <- FALSE
+  }
+  RatInvalid
+}
+
 read.csv('~/WERC-SC/HALE/catch_duplicateID_withtraploc.csv',
          stringsAsFactors = FALSE) %>%
+  
+  # remove entries for traps that are not present/inactive
   filter(TrapStatus != "M") %>% # TrapStatus = M = missing = trap not present
+  
+  # flag trap checks with closed rat
+  mutate(RatInvalid = is.RatInvalid(predCaught, TrapStatus)) %>% 
+  filter(!RatInvalid) %>%
+  
+  # count check interval days, flag intervals >14 days
   mutate(date = as.POSIXct(date, format = '%Y-%m-%d')) %>%
   arrange(Trapline, TrapNum, date) %>%
   group_by(Trapline, TrapNum, StartDate) %>%
-  mutate(CheckInterval = difftime(lead(date), date, units = 'days') %>% as.numeric %>% floor) %>% 
+  mutate(prevCheckInterval = difftime(lead(date), date, units = 'days') %>% as.numeric %>% floor) %>% 
   ungroup %>%
-  mutate(TrapChecked = !is.na(CheckInterval) & CheckInterval < 14) -> catch_traploc_weekChecks # change the number to adjust the "effort" interval
+  mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14) -> catch_traploc_weekChecks # change the number to adjust the "effort" interval
 
 ## remove entries with unknown BaitStatus (for Raina to review)
 catch_traploc_weekChecks %>%
@@ -37,3 +60,7 @@ ggplot(filter(catch_traploc_weekChecks, TrapChecked),
 
 write.csv(catch_traploc_weekChecks, file = '~/WERC-SC/HALE/catch_traploc_weekChecks.csv',
           row.names = FALSE)  
+
+#   setkeyv(c('Trapline', 'TrapNum', 'date')) %>% # sort data by these values, in this order
+#   group_by(Trapline, TrapNum) %>% # distinct trap groups, so that function isn't accidentally associated with any other traplines/numbers
+#   mutate(nobait = (ifelse(BaitPrev = '', BaitPrevOld, lag(BaitSet)))) %>%
