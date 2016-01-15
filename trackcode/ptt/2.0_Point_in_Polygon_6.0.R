@@ -49,7 +49,7 @@ dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 
 #### set species AUO Code
-species<-"SOSH"
+species<-"HAPE"
 
 #### read in metadata
 meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
@@ -77,7 +77,7 @@ clipPolyList<-read.csv (paste(dir.in.poly,"/clipPolyList.csv", sep=""), header=T
 print(clipPolyList) # show a list of the clipper files
 
 #### select clipperfile
-rno<-21 # row number of file list
+rno<-22 # row number of file list
 clipper<-as.character(clipPolyList$clipFileName[rno])
 clipperName<-as.character(clipPolyList$name[rno])
 
@@ -100,7 +100,7 @@ if (clipPolyList$mult_polygons[rno]==1) {
 # transform spatial polygons to projection appropriate for region in question (California Current in this case)
 clipper_proj<-spTransform(clipper, CRS(projWant))
 
-# plot(clipper_aea)
+# plot(clipper_proj)
 
 #### ui enter buffer distance
 buffDist<-clipPolyList$buffer_to_km[rno]*1000 # convert km to m

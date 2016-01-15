@@ -43,7 +43,7 @@ dir.error<-"D:/Share_Data/Tracking_Data/Support_Files/"
 data_filt_ext="FALSE"
 
 #### set species
-species="COMU"
+species="HAPE"
 
 #### read in metadata
 meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")

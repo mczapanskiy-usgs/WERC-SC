@@ -27,7 +27,7 @@ library(argosfilter)
 library(plyr)
 
 # set species AUO Code
-species<-"COMU"
+species<-"NESH"
 
 # set year (optional)
 year=NA
@@ -68,10 +68,10 @@ if(lcerrref=="costa"){
 meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
 
 #### select metadata want
-if !is.na(year) {
-meta<-meta[meta$species==species & meta$year==year & meta$loc_data==1,]
-} else{
+if (is.na(year)) {
   meta<-meta[meta$species==species & meta$loc_data==1,]
+} else{
+  meta<-meta[meta$species==species & meta$year==year & meta$loc_data==1,]
 }
 
 meta<-transform(meta, 
@@ -81,7 +81,7 @@ meta<-transform(meta,
   datetime_end_track_UTC = as.POSIXct(datetime_end_track_UTC, tz = "GMT", format = "%m/%d/%Y %H:%M"))
 
 # loop through birds want
-# i=45
+# i=145
 for (i in 1:length(meta[,1])) {			  
 
 animal.id <- meta$animal_id[i]
@@ -91,10 +91,10 @@ print(animal.id)
 
 #### read in track
 track <- read.table(paste(dir.in,species,"/1_SeaTurtle_out/",file_name,".csv",sep = ""),header=T, sep=",",strip.white=T)
-# print ('Total rows')
+print ('Total rows')
 track$utc<-as.character(track$utc)
 TrackLengthOrig<-(length (track[,1]))
-# print (length (track[,1]))
+print (length (track[,1]))
 track<-transform(track, utc= as.POSIXct(utc, tz = "GMT", format = "%m/%d/%Y %H:%M"))
 
 #### cut start/end track based on metadata and insert deployment/recovery locations if specified in metadata
@@ -164,11 +164,10 @@ if ((!is.na(meta$incl_recovery_loc[i])) & (meta$incl_recovery_loc[i]!=0)) {
 # initiate track filtered vector
 track$filtered<-rep(0,length(track[,1]))
 
-#### remove all lat-long values = 0 
-track$filtered[track$lat1 == 0]="lat0"
-track$filtered[track$lon1 == 0]="lon0"
-#	print ('Total rows after 0 locations removed')
-#  print (length(track[,1]))
+#### remove all lat-long values = 0
+latlon0=sum(as.numeric(track$lat1 == 0 | track$lon1 == 0))
+track<-track[(track$lat1 != 0 | track$lon1 != 0),]
+print (c('Total rows after latlon=0 removed',length(track[,1])))
 
 #### edit lc levels
 	# argos classes are 
@@ -219,17 +218,17 @@ track$filtered[track$lon1 == 0]="lon0"
     }
     dupremoved=length(track$filtered[track$filtered=="dup"])
 
-#### set up vectors for argosfilter, ### swapping of location1/location2 has occured in Sea Turtle (CHECK?)	
-	track.0dup <- track[track$filtered!="dup",]
-
 # plot unfiltered data, for QAQC pre SDA
 # for windows machine use window() for mac use quartz()
 # windows() 
 if(plot== TRUE){
 	#quartz()
-	plot(track.0dup$lon1,track.0dup$lat1,col="lightgrey",type="l", xlab="Longitude",ylab="Latitude")
+	plot(track$lon1[track$filtered!="dup"],track$lat1[track$filtered!="dup"],col="lightgrey",type="l", xlab="Longitude",ylab="Latitude")
 }	
 
+# remove dups
+    track<-track[track$filtered!="dup",]
+    
 #### for speed filter only use this - however not used in Atlas, use SDA
 #
 # # filter by speed only [set max speed to equivalent to vmax]
@@ -241,35 +240,26 @@ if(plot== TRUE){
 ####	
 		
 #### filter data using sdafilter [set max speed to equivalent to vmax]
-track.0dup$cfilter<- sdafilter (track.0dup$lat1, track.0dup$lon1, track.0dup$utc, track.0dup$lc, vmax, ang, distlim)
+track$cfilter<- sdafilter (track$lat1, track$lon1, track$utc, track$lc, vmax, ang, distlim)
 #	cfilter[1:20]
 
 #### plots retained SDA points on plot in blue	
 if(plot== TRUE){
-	lines(track.0dup$lon1[which(track.0dup$cfilter=="not")],track.0dup$lat1[which(track.0dup$cfilter=="not")],col="blue")
+	lines(track$lon1[which(track$cfilter=="not")],track$lat1[which(track$cfilter=="not")],col="blue")
 }	
-	
-print(animal.id)
 
-# #### add filtered data back into original track
-# track.0dup<-track.0dup[,c(1,length(track.0dup[1,]))]
-# track<-merge(track, track.0dup, by = 'uid', all = TRUE)
-track<-track.0dup
-
-#### edit end_location data to remove low quality records accepted by Fritas filter
+#### remove low quality endlocation records accepted by Fritas filter
 track$filtered[(track$cfilter == "end_location" & track$lc <= -2)]="end_location_rem" ## -2 = LC B
 track$ptt_deploy_id <- rep(meta$ptt_deploy_id[i], length(track[,1]))
 
 #### create vector for points kept
-track$keeps <- (as.numeric((track$cfilter=="not") | (track$cfilter=="end_location")) * (1-as.numeric((track$filtered=="end_location_rem") | (track$filtered=="lat0") | (track$filtered=="lon0") | (track$filtered=="dup"))))
+track$keeps <- (as.numeric((track$cfilter=="not") | (track$cfilter=="end_location")) * (1-as.numeric(track$filtered=="end_location_rem")))
 
-#--------------------------------------revised below by C. MacLeod 8/17/08---------------------------------	
 retained <- sum(track$keeps)
 filtered<- (length(track[,1]) - sum(track$keeps))
-#-----------------------------------------------------------------------------------------------------------	
 
 #### screen output		
-print(c("TrackLengthOrig",TrackLengthOrig,"Tracklength_clipped",Tracklength_clipped,"TrackLength_ends_added",TrackLength_ends_added,"dup removed", dupremoved,"filtered",filtered,"retained",retained))
+print(c("TrackLengthOrig",TrackLengthOrig,"Tracklength_clipped",Tracklength_clipped,"TrackLength_ends_added",TrackLength_ends_added,"latlong=0",latlon0,"dup removed", dupremoved,"filtered",filtered,"retained",retained))
 
 #### output filtered data for each birds
 # create output directory, will not replace if already exists
