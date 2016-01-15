@@ -29,6 +29,16 @@ read.csv('~/WERC-SC/HALE/catch_duplicateID_withtraploc.csv',
   mutate(RatInvalid = is.RatInvalid(predCaught, TrapStatus)) %>% 
   filter(!RatInvalid) %>%
   
+  # remove "not rebaited" data (traps where BaitStatus = N and Comments said not rebaited)
+  mutate(NotRebaited = grepl('not rebaited', 
+                             Comments, 
+                             ignore.case = TRUE) | 
+                       grepl("didn't rebait", 
+                             Comments, 
+                             ignore.case = TRUE), 
+         BaitPresent = !(BaitStatus == 'N' & NotRebaited)) %>% 
+  filter(BaitPresent) %>% 
+  
   # count check interval days, flag intervals >14 days
   mutate(date = as.POSIXct(date, format = '%Y-%m-%d')) %>%
   arrange(Trapline, TrapNum, date) %>%
