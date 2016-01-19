@@ -6,6 +6,7 @@ library(adehabitatLT)
 library(foreach)
 library(iterators)
 library(ggplot2)
+library(data.table)
 
 POSIXct.from.db <- function(x) as.POSIXct(x, tz = 'UTC', origin = '1970-01-01 00:00.00 UTC')
 MHIdb <- dbConnect(dbDriver('SQLite'), 'Hawaii_data/MHI_GPS_TDR.sqlite')
@@ -26,17 +27,18 @@ WHERE DM.TDRRecovered = 1
   AND BM.Species IN ('BRBO', 'RFBO')
   AND BM.SubColonyCode = 'LEH'")
 
-foreach(trip = iter(trips[1:20,], by = 'row'), .combine = rbind) %do% {
+trips <- trips %>%
+  mutate(EXCLUDE = DeployID == 397 & TripID == 2) %>%
+  filter(!EXCLUDE) %>%
+  dplyr::select(-EXCLUDE)
+
+foreach(trip = iter(trips, by = 'row')) %do% {
   track <- dbGetPreparedQuery(MHIdb,
-    "SELECT T.*, W.DeployID IS NOT NULL AS 'Wet'
-    FROM RediscretizedTrack T
-      LEFT JOIN WetDry W
-        ON T.DeployID = W.DeployID
-          AND T.UTC >= W.Begin
-          AND T.UTC < W.End
-    WHERE T.DeployID = ?
-      AND T.TripID = ?",
-    dplyr::select(trip, DeployID, TripID))
+                              "SELECT *
+                              FROM RediscretizedTrack T
+                              WHERE T.DeployID = ?
+                              AND T.TripID = ?",
+                              dplyr::select(trip, DeployID, TripID))
   
   x0 <- mean(track$Longitude)
   y0 <- mean(track$Latitude)
@@ -49,69 +51,46 @@ foreach(trip = iter(trips[1:20,], by = 'row'), .combine = rbind) %do% {
                     x = d * -sin(b * pi / 180),
                     y = d * -cos(b * pi / 180),
                     step = sqrt((lead(x) - x)^2 + (lead(y) - y)^2))
-
+  
   tracklt <- with(trackxy, as.ltraj(cbind(x, y), 
                                     date = UTC, 
                                     id = paste(trip$DeployID, trip$TripID, sep = '_')))
   fptresults <- fpt(tracklt, radii = seq(from = 1e3, to = 500e3, by = 1e3), units = 'seconds')
   
-  get.fpt.at.r <- function(fpt, r) {
-    fpt[[1]][, which(attr(fpt, 'radii') == r)]
+  rv <- data.frame(radius = attr(fptresults, 'radii'),
+                   variance = apply(fptresults[[1]], 2, function(f) var(log(f), na.rm = TRUE))) %>%
+    na.omit
+  
+  smoother <- function(vec, fil) {
+    wing <- (length(fil) - 1) / 2
+    vec2 <- c(rep(vec[1], wing),
+              vec,
+              rep(vec[length(vec)], wing))
+    fil2 <- fil / sqrt(sum(fil)^2)
+    convolve(vec2, fil2, type = 'filter')
   }
   
-  smoothed <- function(x, y) loess(y ~ x, span = .1)$fitted
+  rv <- rv %>%
+    mutate(log_var = log(variance),
+           log_var_smooth = smoother(log_var, c(2,3,5,3,2)),
+           dv_dr = (lead(log_var_smooth) - log_var_smooth) / (lead(radius) - radius),
+           d2v_dr2 = (lead(dv_dr) - dv_dr) / (lead(radius) - radius))
   
-  rv_data <- data.frame(radius = attr(fptresults, 'radii'),
-                        variance = apply(fptresults[[1]], 2, function(f) var(log(f), na.rm = TRUE))) %>%
-    na.omit %>%
-    mutate(variance_smoothed = smoothed(radius, variance),
-           dv_dr = (lead(variance_smoothed) - variance_smoothed) / (lead(radius) - radius),
-           dv_2dr = (lead(dv_dr) - dv_dr) / (lead(radius) - radius))
-  
-  ars_radius <- rv_data$radius[which.min(rv_data$dv_2dr)]
-  
-  trackxy$fpt <- get.fpt.at.r(fptresults, ars_radius)
-  
-  png(sprintf('Hawaii_data/Lehua/ars/plots/%i_%i.png', trip$DeployID, trip$TripID),
-      width = 1200,
-      height = 600)
-
-  map_plot <- ggplot(trackxy,
-         aes(x = x,
-             y = y)) +
-    geom_point(aes(color = fpt,
-                   size = 4)) +
-    geom_path(aes(alpha = .5)) +
-    coord_fixed() +
-    scale_size_continuous(guide = FALSE) +
-    scale_alpha_continuous(guide = FALSE) +
-    theme(legend.position = 'bottom')
-  
-  varfpt_plot <- rv_data %>%
-    ggplot(aes(radius, 
-               variance)) + 
-    geom_line() +
-    stat_smooth(method = 'loess', span = .1) +
-    geom_vline(xintercept = ars_radius, linetype = 'dashed') +
-    ggtitle(sprintf('ARS scale = %.0fm', ars_radius))
-  
-  # from http://stackoverflow.com/questions/9490482/combined-plot-of-ggplot2-not-in-a-single-plot-using-par-or-layout-functio
-  lay_out = function(...) {    
-    x <- list(...)
-    n <- max(sapply(x, function(x) max(x[[2]])))
-    p <- max(sapply(x, function(x) max(x[[3]])))
-    grid::pushViewport(grid::viewport(layout = grid::grid.layout(n, p)))    
-    
-    for (i in seq_len(length(x))) {
-      print(x[[i]][[1]], vp = grid::viewport(layout.pos.row = x[[i]][[2]], 
-                                             layout.pos.col = x[[i]][[3]]))
-    }
-  } 
-
-  lay_out(list(map_plot, 1:2, 1),
-          list(varfpt_plot, 1:2, 2))
-  
+  x11()
+  plot(log_var ~ radius, filter(rv, log_var >= -10))
+  lines(log_var_smooth ~ radius, rv)
+  ars_radii <- rv$radius[with(rv, identify(radius, log_var, labels = radius))]
   dev.off()
-  
-  trip %>% transmute(DeployID, TripID, Species, ars_radius = ars_radius)
-} 
+
+  list(DeployID = trip$DeployID, 
+       TripID = trip$TripID,
+       Nfpt = nrow(rv),
+       ARS_radii = ars_radii)
+} %>%
+  lapply(function(trip) {
+    data.frame(DeployID = trip$DeployID, 
+               TripID = trip$TripID, 
+               Nfpt = trip$Nfpt, 
+               ARS_radii = if(length(trip$ARS_radii) == 0) NA else trip$ARS_radii)
+  }) %>%
+  rbindlist -> ars_scales
