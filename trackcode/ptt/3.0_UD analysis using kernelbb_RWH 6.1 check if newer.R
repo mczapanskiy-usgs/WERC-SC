@@ -87,7 +87,7 @@ dir.in.params <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.out.rast <- "D:/Share_Data/Tracking_Data/PTT/"
 
 # set species
-species="SOSH"
+species="NESH"
 
 #### Get years from file names in the 3_Freitas_Shapes directory
 #year.site.id<-as.numeric(na.omit(list.files(paste("D:/RWH/CA Atlas/",species,"/3_Freitas_Shapes/",sep = ""), include.dirs = TRUE)))
@@ -100,7 +100,7 @@ species="SOSH"
 meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
 
 #### select metadata want
-meta<-meta[meta$species==species & meta$loc_data==1 & meta$year %in% c(2008,2009),]
+meta<-meta[meta$species==species & meta$loc_data==1,] #%in% c(2008,2009),]
 year.id<-unique(meta$year)
 site.id<-unique(meta$year)
 year.site.id<-unique(paste(meta$year,"_",meta$site_abbrev,sep=""))
@@ -133,7 +133,7 @@ print(clipPolyList) # show a list of the clipper files
 
 #### select clipperfile
 #### ui set rno for clipPolyList
-rno<-20 # row number of file list
+rno<-22 # row number of file list
 clipper<-as.character(clipPolyList$clipFileName[rno])
 clipperName<-as.character(clipPolyList$name[rno])
 
