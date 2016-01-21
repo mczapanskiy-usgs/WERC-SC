@@ -161,13 +161,25 @@ ARS_zones <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do%
 }
 write.csv(ARS_zones, 'Hawaii_data/Lehua/ars/zones.csv', row.names = FALSE)
 
+scales_per_trip <- ars_scales %>%
+  group_by(DeployID,
+           TripID) %>%
+  summarize(Nscales = n_distinct(ARS_radii)) %>%
+  ungroup %>%
+  mutate(weight = 1 / Nscales)
+
 FPT_TRACKS <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do% {
   if(is.na(trip$ARS_radii)) return(NULL)
   track <- dbGetPreparedQuery(MHIdb,
-                              "SELECT *
+                              "SELECT T.*, W.DeployID IS NOT NULL AS 'Wet'
                               FROM RediscretizedTrack T
+                                LEFT JOIN WetDry W
+                                  ON T.DeployID = W.DeployID 
+                                    AND T.UTC < W.End
+                                    AND T.UTC + 120 >= W.Begin
                               WHERE T.DeployID = ?
-                              AND T.TripID = ?",
+                                AND T.TripID = ?
+                              GROUP BY T.DeployID, T.TripID, T.UTC",
                               dplyr::select(trip, DeployID, TripID))
   
   x0 <- mean(track$Longitude)
@@ -189,7 +201,11 @@ FPT_TRACKS <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do
   trackxy %>% 
     mutate(fpt = fpt(tracklt, radii = trip$ARS_radii, units = 'seconds')[[1]]$r1,
            radius = trip$ARS_radii,
+           ars_zone = percent_rank(fpt) >= .95,
+           species = trip$Species,
            DTRid = paste(DeployID, TripID, radius, sep = "_"))
-}
+} %>%
+  left_join(scales_per_trip, by = c('DeployID', 'TripID')) %>%
+  dplyr::select(-d:-step, -Nscales)
 
 write.csv(FPT_TRACKS, 'Hawaii_data/Lehua/ars/fpttracks.csv', row.names = FALSE, na = "")
