@@ -38,39 +38,43 @@ smoother <- function(vec, fil) {
   convolve(vec2, fil2, type = 'filter')
 }
 
+get.track <- function(DeployID, TripID) {
+  track <- dbGetPreparedQuery(MHIdb,
+                              "SELECT *
+                              FROM RediscretizedTrack T
+                              WHERE T.DeployID = ?
+                              AND T.TripID = ?",
+                              dplyr::select(trip, DeployID, TripID))
+  
+  x0 <- mean(track$Longitude)
+  y0 <- mean(track$Latitude)
+  origin = c(x0, y0)
+  
+  mutate(track,
+         UTC = POSIXct.from.db(UTC),
+         d = distGeo(origin, cbind(Longitude, Latitude)),
+         b = bearing(cbind(Longitude, Latitude), origin),
+         x = d * -sin(b * pi / 180),
+         y = d * -cos(b * pi / 180),
+         step = sqrt((lead(x) - x)^2 + (lead(y) - y)^2),
+         SunAltitude = sunAngle(UTC, Longitude, Latitude)$altitude) %>%
+    filter(SunAltitude > 0) %>%
+    mutate(UTC2 = first(UTC) + seq_along(UTC)) 
+  # Times no longer accurate, but they are sequential. 
+  # Necessary for excluding night periods from fpt analysis
+}
+
 ars_scale_file <- 'Hawaii_data/Lehua/ars/scales.csv'
 ars_scales <- if(file.exists(ars_scale_file)) {
   read.csv(ars_scale_file)
 } else {
   manual_results <- foreach(trip = iter(trips, by = 'row'), i = 1:ntrips) %do% {
-    track <- dbGetPreparedQuery(MHIdb,
-                                "SELECT *
-                                FROM RediscretizedTrack T
-                                WHERE T.DeployID = ?
-                                AND T.TripID = ?",
-                                dplyr::select(trip, DeployID, TripID))
-    
-    x0 <- mean(track$Longitude)
-    y0 <- mean(track$Latitude)
-    origin = c(x0, y0)
-    
-    trackxy <- mutate(track,
-                      UTC = POSIXct.from.db(UTC),
-                      d = distGeo(origin, cbind(Longitude, Latitude)),
-                      b = bearing(cbind(Longitude, Latitude), origin),
-                      x = d * -sin(b * pi / 180),
-                      y = d * -cos(b * pi / 180),
-                      step = sqrt((lead(x) - x)^2 + (lead(y) - y)^2),
-                      SunAltitude = sunAngle(UTC, Longitude, Latitude)$altitude) %>%
-      filter(SunAltitude > 0) %>%
-      mutate(UTC2 = first(UTC) + seq_along(UTC)) 
-    # Times no longer accurate, but they are sequential. 
-    # Necessary for excluding night periods from fpt analysis
+    trackxy <- get.track(trip$DeployID, trip$TripID)
     
     tracklt <- with(trackxy, as.ltraj(cbind(x, y), 
                                       date = UTC, 
                                       id = paste(trip$DeployID, trip$TripID, sep = '_')))
-    fptresults <- fpt(tracklt, radii = seq(from = 1e3, to = 500e3, by = .5e3), units = 'seconds')
+    fptresults <- fpt(tracklt, radii = seq(from = .5e3, to = 500e3, by = .25e3), units = 'seconds')
     
     rv <- data.frame(radius = attr(fptresults, 'radii'),
                      varlog = apply(fptresults[[1]], 2, function(f) var(log(f), na.rm = TRUE))) %>%
@@ -99,7 +103,7 @@ ars_scales <- if(file.exists(ars_scale_file)) {
                  ARS_radii = if(length(trip$ARS_radii) == 0) NA else trip$ARS_radii)
     }) %>%
     rbindlist
-  write.csv(ars_scales_manual, 'Hawaii_data/Lehua/ars/scales.csv', row.names = FALSE)
+  write.csv(manual_results, 'Hawaii_data/Lehua/ars/scales.csv', row.names = FALSE)
   manual_results
 }
 
@@ -127,29 +131,7 @@ species_scales <- ars_scales %>%
 ars_scales <- merge(ars_scales, dplyr::select(species_scales, Species, median_radius), by = 'Species')
 
 ARS_zones <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do% {
-  track <- dbGetPreparedQuery(MHIdb,
-                              "SELECT *
-                              FROM RediscretizedTrack T
-                              WHERE T.DeployID = ?
-                              AND T.TripID = ?",
-                              dplyr::select(trip, DeployID, TripID))
-  
-  x0 <- mean(track$Longitude)
-  y0 <- mean(track$Latitude)
-  origin = c(x0, y0)
-  
-  trackxy <- mutate(track,
-                    UTC = POSIXct.from.db(UTC),
-                    d = distGeo(origin, cbind(Longitude, Latitude)),
-                    b = bearing(cbind(Longitude, Latitude), origin),
-                    x = d * -sin(b * pi / 180),
-                    y = d * -cos(b * pi / 180),
-                    step = sqrt((lead(x) - x)^2 + (lead(y) - y)^2),
-                    SunAltitude = sunAngle(UTC, Longitude, Latitude)$altitude) %>%
-    filter(SunAltitude > 0) %>%
-    mutate(UTC2 = first(UTC) + seq_along(UTC)) 
-  # Times no longer accurate, but they are sequential. 
-  # Necessary for excluding night periods from fpt analysis
+  trackxy <- get.track(trip$DeployID, trip$TripID)
   
   tracklt <- with(trackxy, as.ltraj(cbind(x, y), 
                                     date = UTC2, 
@@ -169,34 +151,7 @@ ARS_zones <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do%
 write.csv(ARS_zones, 'Hawaii_data/Lehua/ars/zones.csv', row.names = FALSE)
 
 FPT_TRACKS <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do% {
-  track <- dbGetPreparedQuery(MHIdb,
-                              "SELECT T.*, W.DeployID IS NOT NULL AS 'Wet'
-                              FROM RediscretizedTrack T
-                                LEFT JOIN WetDry W
-                                  ON T.DeployID = W.DeployID 
-                                    AND T.UTC < W.End
-                                    AND T.UTC + 120 >= W.Begin
-                              WHERE T.DeployID = ?
-                                AND T.TripID = ?
-                              GROUP BY T.DeployID, T.TripID, T.UTC",
-                              dplyr::select(trip, DeployID, TripID))
-  
-  x0 <- mean(track$Longitude)
-  y0 <- mean(track$Latitude)
-  origin = c(x0, y0)
-  
-  trackxy <- mutate(track,
-                    UTC = POSIXct.from.db(UTC),
-                    d = distGeo(origin, cbind(Longitude, Latitude)),
-                    b = bearing(cbind(Longitude, Latitude), origin),
-                    x = d * -sin(b * pi / 180),
-                    y = d * -cos(b * pi / 180),
-                    step = sqrt((lead(x) - x)^2 + (lead(y) - y)^2),
-                    SunAltitude = sunAngle(UTC, Longitude, Latitude)$altitude) %>%
-    filter(SunAltitude > 0) %>%
-    mutate(UTC2 = first(UTC) + seq_along(UTC)) 
-  # Times no longer accurate, but they are sequential. 
-  # Necessary for excluding night periods from fpt analysis
+  trackxy <- get.track(trip$DeployID, trip$TripID)
   
   tracklt <- with(trackxy, as.ltraj(cbind(x, y), 
                                     date = UTC, 
