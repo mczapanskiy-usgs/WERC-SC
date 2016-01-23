@@ -43,7 +43,7 @@ get.track <- function(DeployID, TripID) {
                               "SELECT *
                               FROM RediscretizedTrack T
                               WHERE T.DeployID = ?
-                              AND T.TripID = ?",
+                                AND T.TripID = ?",
                               dplyr::select(trip, DeployID, TripID))
   
   x0 <- mean(track$Longitude)
@@ -150,21 +150,37 @@ ARS_zones <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do%
 }
 write.csv(ARS_zones, 'Hawaii_data/Lehua/ars/zones.csv', row.names = FALSE)
 
-FPT_TRACKS <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do% {
-  trackxy <- get.track(trip$DeployID, trip$TripID)
+ARS_scale_freq <- ars_scales %>% 
+  group_by(Species, DeployID, TripID) %>% 
+  summarize(Nscales = n_distinct(ARS_radii, na_rm = TRUE)) %>% 
+  ungroup %>% 
+  group_by(Species, Nscales) %>% 
+  summarize(Ntrips = n()) %>% 
+  group_by(Species) %>% 
+  mutate(Ftrips = Ntrips / sum(Ntrips)) %>%
+  ungroup %>%
+  arrange(Species, Nscales)
+
+ARS_scale_freq %>%
+  ggplot(aes(Nscales, 
+             Ftrips, 
+             fill = Species)) + 
+  geom_bar(stat='identity', 
+           position = position_dodge())
+
+FPT_TRACKS <- foreach(trip = iter(trips, by = 'row'), .combine = rbind) %do% {
+  trackxy <- get.track(trip$DeployID, trip$TripID) %>%
+    merge(trip) %>%
+    merge(dplyr::select(species_scales, Species, radius = median_radius), by = 'Species')
   
   tracklt <- with(trackxy, as.ltraj(cbind(x, y), 
                                     date = UTC, 
-                                    id = paste(trip$DeployID, trip$TripID, sep = '_')))
+                                    id = sprintf('%04d%02d', DeployID, TripID)))
   
   trackxy %>% 
-    mutate(fpt = fpt(tracklt, radii = trip$median_radius, units = 'seconds')[[1]]$r1,
-           radius = trip$median_radius,
-           ars_zone = percent_rank(fpt) >= .95,
-           species = trip$Species,
-           DTRid = paste(DeployID, TripID, radius, sep = "_"))
-} %>%
-  left_join(scales_per_trip, by = c('DeployID', 'TripID')) %>%
-  dplyr::select(-d:-step, -Nscales)
+    mutate(fpt = fpt(tracklt, radii = radius, units = 'seconds')[[1]]$r1,
+           ars_zone = percent_rank(fpt) >= .75,
+           DTid = paste(DeployID, TripID, sep = "_"))
+}
 
 write.csv(FPT_TRACKS, 'Hawaii_data/Lehua/ars/fpttracks.csv', row.names = FALSE, na = "")
