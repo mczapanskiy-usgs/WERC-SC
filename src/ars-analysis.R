@@ -175,12 +175,21 @@ FPT_TRACKS <- foreach(trip = iter(trips, by = 'row'), .combine = rbind) %do% {
   
   tracklt <- with(trackxy, as.ltraj(cbind(x, y), 
                                     date = UTC, 
-                                    id = sprintf('%04d%02d', DeployID, TripID)))
+                                    id = sprintf('%40d%20d', DeployID, TripID)))
   
   trackxy %>% 
     mutate(fpt = fpt(tracklt, radii = radius, units = 'seconds')[[1]]$r1,
-           ars_zone = percent_rank(fpt) >= .75,
-           DTid = paste(DeployID, TripID, sep = "_"))
+           ars_zone = percent_rank(fpt) >= .75)
 }
+
+DTid <- FPT_TRACKS %>%
+  group_by(DeployID,
+           TripID) %>%
+  summarize %>%
+  ungroup %>%
+  mutate(DTid = row_number())
+
+FPT_TRACKS <-
+  merge(FPT_TRACKS, DTid)
 
 write.csv(FPT_TRACKS, 'Hawaii_data/Lehua/ars/fpttracks.csv', row.names = FALSE, na = "")
