@@ -8,7 +8,7 @@ library(adehabitatLT)
 # Read metadata CSV file
 OriginalMetadata <- read.csv('trackcode/gps/metadata_all_GPS.csv', stringsAsFactors = FALSE) %>%
   mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M') %>% as.numeric,
-         GPS_programmed_start_datetime_local2 = mapply(FUN = as.POSIXct, GPS_programmed_start_datetime_local, tz = paste0('Etc/GMT', UTC_LocalTime_offset_hours), format = '%m/%d/%Y %H:%M') %>%
+         GPS_programmed_start_datetime_local2 = mapply(FUN = as.POSIXct, GPS_programmed_start_datetime_local, tz = ifelse(UTC_LocalTime_offset_hours == -10, 'US/Hawaii', 'Chile/Continental'), format = '%m/%d/%Y %H:%M') %>%
            as.POSIXct(origin = '1970-01-01 00:00.00 UTC', tz = 'UTC') %>% as.numeric)
 
 # Reformat metadata to one row per deployment
@@ -59,7 +59,7 @@ TDRSettings <- foreach(deployid = DeploymentMetadataMinusTDRSettings$DeployID, t
     unlist %>% 
     `[`(1:2) %>%
     paste(collapse = ' ') %>%
-    as.POSIXct(format = '%d/%m/%y %H:%M:%S', tz = 'Etc/GMT-10')
+    as.POSIXct(format = '%d/%m/%y %H:%M:%S', tz = 'US/Hawaii')
   
   fastlog.rate <- cefas_contents %>%
     grep(pattern = 'Fast rate [0-9\\.]+', x = ., value = TRUE) %>%
@@ -171,15 +171,15 @@ WetDry <- foreach(DeployID = DeploymentMetadata$DeployID,
                         '1_CEFAS_output',
                         sprintf('%s.CSV', TDRfile))) %>%
       grep(pattern = wetdrypattern, x = ., value = TRUE) %>%
-      (function(wetdrylines) {
-        strsplit(wetdrylines, '[[:space:]]{2,}') %>%
-          unlist %>%
-          matrix(nrow = length(wetdrylines), ncol = 2, byrow = TRUE) %>%
-          data.frame %>%
-          transmute(DeployID = DeployID,
-                    Begin = as.POSIXct(X1, format = '%d/%m/%y %H:%M:%OS', tz = 'UTC') + .05, 
-                    End = as.POSIXct(X2, format = '%d/%m/%y %H:%M:%OS', tz = 'UTC') + .05)
-      })
+      strsplit('[[:space:]]{2,}') %>%
+      unlist %>%
+      matrix(ncol = 2,
+             byrow = TRUE,
+             dimnames = list(NULL, c('Begin', 'End'))) %>%
+      data.frame %>%
+      transmute(DeployID,
+                Begin = as.POSIXct(Begin, format = '%d/%m/%y %H:%M:%OS', tz = 'US/Hawaii') %>% as.numeric + .05,
+                End = as.POSIXct(End, format = '%d/%m/%y %H:%M:%OS', tz = 'US/Hawaii') %>% as.numeric + .05)
   } else if(TDRwd == FALSE && file.exists(file.path('dive_identification',
                                                     '2_tdr_data',
                                                     sprintf('%s.CSV', TDRfile)))) {
@@ -193,8 +193,8 @@ WetDry <- foreach(DeployID = DeploymentMetadata$DeployID,
                 End = max(UTC)) %>%
       ungroup %>%
       transmute(DeployID = DeployID,
-                Begin,
-                End)
+                Begin = as.numeric(Begin),
+                End = as.numeric(End))
   } else {
     NULL
   }
