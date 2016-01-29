@@ -36,7 +36,7 @@ read.csv('~/WERC-SC/HALE/catch_duplicateID_withtraploc.csv',
                        grepl("didn't rebait", 
                              Comments, 
                              ignore.case = TRUE), 
-         BaitPresent = !(BaitStatus == 'N' & NotRebaited)) %>% 
+         BaitPresent = !(BaitStatus %in% c('N', 'NR', 'NI') & NotRebaited)) %>% 
   filter(BaitPresent) %>% 
   
   # count check interval days, flag intervals >14 days
