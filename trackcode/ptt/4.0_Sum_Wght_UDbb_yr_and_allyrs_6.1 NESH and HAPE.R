@@ -34,6 +34,10 @@ rm(list=ls())
 
 library(adehabitat)
 library(SDMTools)
+library(rgdal)
+library(sp)
+library(raster)
+library(SDMTools)
 
 #### select species
 species="HAPE"
@@ -55,8 +59,37 @@ dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 #### load clipperPolyLIst and select clipper file of interest
 clipPolyList<-read.csv (paste(dir.in.poly,"/clipPolyList.csv", sep=""), header=T, sep=",", strip.white=T)
 print(clipPolyList) # show a list of the clipper files
-rno<-22 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
+rno<-14 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
+clipper<-as.character(clipPolyList$clipFileName[rno])
 clipperName<-as.character(clipPolyList$name[rno])
+
+# determine if bounding polygon breaks tracks into secondary segments (due to birds that leave polygon for time >t as defined in previous code break by time after point in Polygon)
+id_2<-clipPolyList$id_2[rno]
+
+# read in polygon, set to projection, shapefiles should all come in as WGS84
+clipper <- readOGR(dir.in.poly,clipper) # clipper comes in as unprojected WGS84
+
+################# check this next string as you may not need to run!!!!!!
+# clipper@proj4string <- CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+# plot(clipper, axes=T)
+
+# if polygon multipart, select polygon
+if (clipPolyList$mult_polygons[rno]==1) {
+  clipper<-subset(clipper,(clipper@data[,grep("*NAME",colnames(clipper@data))])==as.character(clipPolyList$poly_want[rno]))
+} else {
+  clipper@data$NAME<-(as.character(clipPolyList$name[rno]))
+}
+# plot(clipper, axes=T)
+
+# read in projection best for selected polygon (contained in table clipPolyList)
+projWant<-as.character(clipPolyList$Proj4.specs[rno])
+# for USGS Albers Equal Area projWant<-"+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23.0 +lon_0=-96.0 +x_0=0.0 +y_0=0.0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "
+# for CCS LME projWant<-"+proj=aea +lat_1=30 +lat_2=50 +lat_0=40 +lon_0=-125 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+# we're using ccs_lme projection
+
+# transform spatial polygons to projection appropriate for region in question (California Current in this case)
+clipper_proj<-spTransform(clipper, CRS(paste("+",projWant,sep="")))
+# plot(clipper_proj, axes=T)
 
 #### read in metadata,select metadata based on species
 meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
@@ -146,10 +179,11 @@ for (grp.id in 1:length(grp.ids)) {
     }
   
 ## sum by grouping variable weight by:
-  # a) number of days tracked 
-print(paste("grouping variable = ", grping.var,sep=""))
+  # a) number of days tracked
+  # multiply new ud by (# of decimal days of each track/sum decimal days all tracks for that year)
   
-# multiply new ud by (# of decimal days of each track/sum decimal days all tracks for that year)
+  print(paste("grouping variable = ", grping.var,sep=""))
+  
   # initialize rasters
   ud.grp.id<-ud.track[[1]]*0  
   noindiv.grp.id<-ud.track[[1]]*0
@@ -164,44 +198,33 @@ print(paste("grouping variable = ", grping.var,sep=""))
     noindiv.grp.id<-noindiv.grp.id+indiv  
   }
 
-  ud.track.nowght<-ud.track
-  for (l in 1:length(ud.track.nowght)) {
-    # calculate ud weighted by track.days, weigh each track it's proportion of total hours tracked within the clipperName (Freiberg 20XX paper)
-    ud.track.nowght[[l]]<-ud.track[[l]]*noindiv.grp.id
-  }
-  
-  ud.track.nowght.all<-Reduce("+",ud.track.nowght)  
-  
-  plot(ud.track.nowght.all)
-  
-  ud.grp.ids[[grp.id]]<-ud.grp.id
-#   max(udall)
-#   max(indiv)
-#   max(indiv.sum)
+# plot(ud.grp.id)
+# plot(noindiv.grp.id)
+# downweight summed raster by number of individuals in each cell
+  sum.all.tracks.1n<-ud.grp.id/(1/noindiv.grp.id)
 
-    #   # drop this section
-    #    downweight by number of individuals tracked in each cell
-    #    normalize udall: divide by max cell value, and store in list  
-    #    udyear.dur.norm[[yr]]<-(udall/max(udall))
-  
-  # save sum individuals per cell
-  noindiv.grp.ids[[grp.id]]<-noindiv.grp.id
-  
-    #   # drop
-    #    create matrix with downweighting variable  (1/n)
-    #    year.indiv.wght <- indiv.sum
-    #    year.indiv.wght[year.indiv.wght>0] <- 1/year.indiv.wght[year.indiv.wght>0]
-  
-    #  # drop
-    #   # create new index by dividing the summed ud estimates by the number of individuals
-    #   udyear.dur.norm.ind.wght[[yr]]<-udyear.dur.norm[[yr]]
-    #   udyear.dur.norm.ind.wght[[yr]] <-  (udyear.dur.norm.ind.wght[[yr]]/year.indiv.wght)/max(udyear.dur.norm.ind.wght[[yr]])
-    #   udyear.dur.norm.ind.wght[[yr]][is.na(udyear.dur.norm.ind.wght[[yr]]) == T] <- 0
-    #   # normalize udyear.dur.norm.ind.wght[[yr]] to 1 by dividing by number of tracked individuals
-    #   udyear.dur.norm.ind.wght[[yr]]<-udyear.dur.norm.ind.wght[[yr]]/max(udyear.dur.norm.ind.wght[[yr]])
-  
-# now have lists with rasters for year.indiv.wght, year.indiv, udyear.dur.norm.ind.wght
 
+# ## to visualize with mask convert to raster
+# ## convert asc to  'rasters' 
+#   sum.grp.tracks.rast <- raster.from.asc(sum.all.tracks.1n, projs = CRS(paste("+",projWant,sep="")))
+#   plot(sum.grp.tracks.rast)
+#   
+#   noindiv.grp.id.rast <- raster.from.asc(noindiv.grp.id, projs = CRS(paste("+",projWant,sep="")))
+#   plot(sum.grp.tracks.rast)
+#   
+# # mask the sum.all.tracks with the clipping polygon
+#   sum.grp.tracks.rast.masked<-mask(sum.grp.tracks.rast, clipper_proj)
+#   
+# # mask the number of individuals with the clipping polygon
+#   noindiv.grp.id.rast.masked<-mask(noindiv.grp.id.rast, clipper_proj)
+#   
+# #   plot(sum.grp.tracks.rast.masked, axes=T)
+# #   plot(clipper_proj, add=T)
+# #   plot(noindiv.grp.id.rast.masked)
+
+  
+
+  
       # export ASCII files
       #           export.asc(udyear.dur.norm[[yr]], paste("D:/RWH/CA Atlas/",species,"/4_BB/",year.id[yr],"/",species,"_",clipperName,"_",contour,"_",year.id[yr],"_Summed_UDBB", sep=""))
       #           export.asc(year.indiv[[yr]], paste("D:/RWH/CA Atlas/",species,"/4_BB/",year.id[yr],"/",species,"_",clipperName,"_",contour,"_",year.id[yr],"_No_individuals", sep=""))
@@ -218,9 +241,12 @@ print(paste("grouping variable = ", grping.var,sep=""))
   dir.create(file.path(paste(dir.out,species,"/5_Compiled/",clipperName,"/",sep=""),resolution),showWarnings=TRUE)
 
   # write.asc(udyear.dur.norm[[yr]], paste("D:/RWH/CA Atlas/",species,"/5_Compiled/",clipperName,"/",year.id[yr],"_sum", sep=""),gz=FALSE)
-    write.asc(noindiv.grp.ids[[grp.id]], paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",grp.ids[grp.id],"_",resolution,"_ni", sep=""),gz=FALSE)
-    write.asc(ud.grp.ids[[grp.id]], paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",grp.ids[grp.id],"_",resolution,"_bb", sep=""),gz=FALSE)
+    write.asc(noindiv.grp.id, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",grp.ids[grp.id],"_",resolution,"_ni", sep=""),gz=FALSE)
+    write.asc(sum.all.tracks.1n, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",grp.ids[grp.id],"_",resolution,"_bb", sep=""),gz=FALSE)
 
+#    writeRaster(sum.grp.tracks.rast, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",grp.ids[grp.id],"_",resolution,"_bb", sep=""), format="ascii", overwrite=TRUE)
+
+    
 # # export as .csv - for Jarod
 #     write.csv(udyear.dur.norm[[yr]], paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",year.id[yr],"_sum.csv", sep=""))
 #     write.csv(year.indiv[[yr]], paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",year.id[yr],"_ni.csv", sep=""))
@@ -231,57 +257,62 @@ print(paste("grouping variable = ", grping.var,sep=""))
   
   } # END grping.var loop
 
-# make summary table for all years
-summary.grp.ids.mat<-do.call(rbind, summary.grp.ids)
-grp.id.wants<-as.data.frame(table(summary.grp.ids.mat[,1]))
-      
-# initiate loop to sum all years to create raster for 
-# 1. all years weighted by (number of individuals tracked for that year/total number individuals tracks for all years)
-# 2. number of birds per cell for all years
 
-# grp.id <-5
-for (grp.id in 1:length(grp.ids)) {
-  
-  
-# allyrs.dur.notracks.wght=ud.years[[yr]] * (# individuals tracked for year i/sum # individuals tracked for all years)
-  
-if (exists("allgrps.dur.notracks.wght")) {
-  allgrps.dur.notracks.wght<-allgrps.dur.notracks.wght + (ud.grp.ids[[grp.id]]*(grp.id.wants[grp.id,2]/sum(grp.id.wants[,2])))
-  allgrps.indiv<-allgrps.indiv + noindiv.grp.ids[[grp.id]]  
-} else {
-  allgrps.dur.notracks.wght<-(ud.grp.ids[[grp.id]]*(grp.id.wants[grp.id,2]/sum(grp.id.wants[,2])))
-  allgrps.indiv<-noindiv.grp.ids[[grp.id]] 
-} 
-}
 
-    # drop    
-    # #normalize to one
-    # allyrs.ud.dur.norm.ind.wght.tracks.wght<-allyrs.ud.dur.norm.ind.wght.tracks.wght/max(allyrs.ud.dur.norm.ind.wght.tracks.wght)
-# examine distribution of contours
-hist(log(allgrps.dur.notracks.wght),100)
-hist((allgrps.dur.notracks.wght),1000)
-hist(log(allgrps.indiv),100)
-hist((allgrps.indiv),1000)
 
-# export summary table
-if (length(as.numeric(grp.ids))>1) {
-  write.table(as.data.frame(summary.grp.ids.mat), paste(dir.out,species,"/4_BB_out/",species,"_",clipperName,"_",resolution,"_",min(grp.ids),"_",max(grp.ids),"_tracksummary.csv", sep=""), sep=",", quote=FALSE,col.names=TRUE, row.names=FALSE,na="")
-} else {
-  write.table(as.data.frame(summary.grp.ids.mat), paste(dir.out,species,"/4_BB_out/",species,"_",clipperName,"_",resolution,"_",(grp.ids),"_tracksummary.csv", sep=""), sep=",", quote=FALSE,col.names=TRUE, row.names=FALSE,na="")
-}
-
-# export files for all tracks weighted by no ind tracked/year
-
-# export.asc(ud.sum, paste("D:/RWH/CA Atlas/",species,"/4_BB/",species,"_",clipperName,"_",min(year.id),"_",max(year.id),"_all_Summed_UDBB", sep=""))
-#     export.asc(allyrs.indiv, paste("D:/RWH/CA Atlas/",species,"/4_BB/",species,"_",clipperName,"_",min(year.id),"_",max(year.id),"_all_No_individuals", sep=""))
-#     export.asc(allyrs.ud.dur.norm.ind.wght.tracks.wght, paste("D:/RWH/CA Atlas/",species,"/4_BB/",species,"_",clipperName,"_",min(year.id),"_",max(year.id),"_all_Downweighted_UDBB_index", sep=""))
-
-# export as .acs (ASCII = although Arc does not recognize header info), used to import into arc
-write.asc(allgrps.indiv, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",resolution,"_all_ni", sep=""),gz=FALSE)
-write.asc(allgrps.dur.notracks.wght, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",resolution,"_all_bb", sep=""),gz=FALSE)
-
-# # export as .csv - for Jarod
-# write.table(allyrs.indiv, paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",species,"_alni.csv", sep=""))
-# write.table(allyrs.ud.dur.norm.ind.wght.tracks.wght, paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",species,"_aldw.csv", sep=""))
-
-# END
+# 
+# 
+# # make summary table for all years
+# summary.grp.ids.mat<-do.call(rbind, summary.grp.ids)
+# grp.id.wants<-as.data.frame(table(summary.grp.ids.mat[,1]))
+#       
+# # initiate loop to sum all years to create raster for 
+# # 1. all years weighted by (number of individuals tracked for that year/total number individuals tracks for all years)
+# # 2. number of birds per cell for all years
+# 
+# # grp.id <-5
+# for (grp.id in 1:length(grp.ids)) {
+#   
+#   
+# # allyrs.dur.notracks.wght=ud.years[[yr]] * (# individuals tracked for year i/sum # individuals tracked for all years)
+#   
+# if (exists("allgrps.dur.notracks.wght")) {
+#   allgrps.dur.notracks.wght<-allgrps.dur.notracks.wght + (ud.grp.ids[[grp.id]]*(grp.id.wants[grp.id,2]/sum(grp.id.wants[,2])))
+#   allgrps.indiv<-allgrps.indiv + noindiv.grp.ids[[grp.id]]  
+# } else {
+#   allgrps.dur.notracks.wght<-(ud.grp.ids[[grp.id]]*(grp.id.wants[grp.id,2]/sum(grp.id.wants[,2])))
+#   allgrps.indiv<-noindiv.grp.ids[[grp.id]] 
+# } 
+# }
+# 
+#     # drop    
+#     # #normalize to one
+#     # allyrs.ud.dur.norm.ind.wght.tracks.wght<-allyrs.ud.dur.norm.ind.wght.tracks.wght/max(allyrs.ud.dur.norm.ind.wght.tracks.wght)
+# # examine distribution of contours
+# hist(log(allgrps.dur.notracks.wght),100)
+# hist((allgrps.dur.notracks.wght),1000)
+# hist(log(allgrps.indiv),100)
+# hist((allgrps.indiv),1000)
+# 
+# # export summary table
+# if (length(as.numeric(grp.ids))>1) {
+#   write.table(as.data.frame(summary.grp.ids.mat), paste(dir.out,species,"/4_BB_out/",species,"_",clipperName,"_",resolution,"_",min(grp.ids),"_",max(grp.ids),"_tracksummary.csv", sep=""), sep=",", quote=FALSE,col.names=TRUE, row.names=FALSE,na="")
+# } else {
+#   write.table(as.data.frame(summary.grp.ids.mat), paste(dir.out,species,"/4_BB_out/",species,"_",clipperName,"_",resolution,"_",(grp.ids),"_tracksummary.csv", sep=""), sep=",", quote=FALSE,col.names=TRUE, row.names=FALSE,na="")
+# }
+# 
+# # export files for all tracks weighted by no ind tracked/year
+# 
+# # export.asc(ud.sum, paste("D:/RWH/CA Atlas/",species,"/4_BB/",species,"_",clipperName,"_",min(year.id),"_",max(year.id),"_all_Summed_UDBB", sep=""))
+# #     export.asc(allyrs.indiv, paste("D:/RWH/CA Atlas/",species,"/4_BB/",species,"_",clipperName,"_",min(year.id),"_",max(year.id),"_all_No_individuals", sep=""))
+# #     export.asc(allyrs.ud.dur.norm.ind.wght.tracks.wght, paste("D:/RWH/CA Atlas/",species,"/4_BB/",species,"_",clipperName,"_",min(year.id),"_",max(year.id),"_all_Downweighted_UDBB_index", sep=""))
+# 
+# # export as .acs (ASCII = although Arc does not recognize header info), used to import into arc
+# write.asc(allgrps.indiv, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",resolution,"_all_ni", sep=""),gz=FALSE)
+# write.asc(allgrps.dur.notracks.wght, paste(dir.out,species,"/5_Compiled/",clipperName,"/",resolution,"/",species,"_",resolution,"_all_bb", sep=""),gz=FALSE)
+# 
+# # # export as .csv - for Jarod
+# # write.table(allyrs.indiv, paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",species,"_alni.csv", sep=""))
+# # write.table(allyrs.ud.dur.norm.ind.wght.tracks.wght, paste("D:/RWH/CA Atlas/",species,"/4_BB/Iterate/",clipperName,"/",species,"_aldw.csv", sep=""))
+# 
+# # END

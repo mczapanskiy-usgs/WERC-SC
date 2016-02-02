@@ -133,7 +133,7 @@ print(clipPolyList) # show a list of the clipper files
 
 #### select clipperfile
 #### ui set rno for clipPolyList
-rno<-22 # row number of file list
+rno<-14 # row number of file list
 clipper<-as.character(clipPolyList$clipFileName[rno])
 clipperName<-as.character(clipPolyList$name[rno])
 
