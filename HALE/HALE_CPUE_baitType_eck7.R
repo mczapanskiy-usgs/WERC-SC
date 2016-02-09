@@ -10,17 +10,19 @@ read.csv('~/WERC-SC/HALE/catch_traploc_weekChecks.csv',
 
   # remove "not rebaited" data (traps where BaitStatus = N and Comments said not rebaited)
   mutate(baitType = derivedFactor(
-         "cannedCat+cannedDog(+other)" = grepl("^CD*", BaitPrev, ignore.case = TRUE),
-         "cannedCat(+other)"= grepl("^C*", BaitPrev, ignore.case = TRUE),
-         "dryDog(+other)" = grepl("^DO*", BaitPrev, ignore.case = TRUE),
-         "cannedDog(+other)" = grepl("^D*", BaitPrev, ignore.case = TRUE),
          "Lure" = grepl("lure", BaitPrev, ignore.case = TRUE),
          "None" = grepl("none", BaitPrev, ignore.case = TRUE),
-         "Not recorded" = (grepl("NR" , BaitPrev, ignore.case = TRUE)),
+         "Not recorded" = grepl("NR" , BaitPrev, ignore.case = TRUE),
+         "cannedCat+cannedDog" = grepl("^CD$", BaitPrev, ignore.case = TRUE),
+         "cannedCat+cannedDog+dryDog+oil" = grepl("CDDO$", BaitPrev, ignore.case = TRUE),
+         "cannedCat+cannedDog+other" = grepl("CD", BaitPrev, ignore.case = TRUE),
+         "cannedCat"= grepl("^C$", BaitPrev, ignore.case = TRUE),
+         "cannedDog" = grepl("^D$", BaitPrev, ignore.case = TRUE),
+         "dryDog+oil(+other)" = grepl("DO+", BaitPrev, ignore.case = TRUE),
+         "cannedCat+other"= grepl("^C+", BaitPrev, ignore.case = TRUE),
+         "cannedDog+other" = grepl("^D+", BaitPrev, ignore.case = TRUE),
   .method = "first",
-  .default = " ")) -> catch_traploc_weekChecks_baitType
+  .default = " ")) -> catch_traploc_weeks_baitType
 
-write.csv(catch_traploc_weekChecks_baitType, file = '~/WERC-SC/HALE/catch_traploc_weekChecks.csv',
+write.csv(catch_traploc_weeks_baitType, file = '~/WERC-SC/HALE/catch_traploc_weeks_baitTypes.csv',
           row.names = FALSE)  
-
-  
