@@ -3,13 +3,24 @@
 
 library("data.table", lib.loc="~/R/win-library/3.2")
 library("dplyr", lib.loc="~/R/win-library/3.2")
+library(mosaic)
 
-# remove "not rebaited" data (traps where BaitStatus = N and Comments said not rebaited)
-mutate(BaitType = grepl('', 
-                           BaitPrev, 
-                           ignore.case = TRUE) | 
-                  grepl("", 
-                          BaitPrev, 
-                          ignore.case = TRUE)) %>% 
+read.csv('~/WERC-SC/HALE/catch_traploc_weekChecks.csv',
+         stringsAsFactors = FALSE) %>%
+
+  # remove "not rebaited" data (traps where BaitStatus = N and Comments said not rebaited)
+  mutate(baitType = derivedFactor(
+         "cannedCat+cannedDog(+other)" = grepl("^CD*", BaitPrev, ignore.case = TRUE),
+         "cannedCat(+other)"= grepl("^C*", BaitPrev, ignore.case = TRUE),
+         "dryDog(+other)" = grepl("^DO*", BaitPrev, ignore.case = TRUE),
+         "cannedDog(+other)" = grepl("^D*", BaitPrev, ignore.case = TRUE),
+         "Lure" = grepl("lure", BaitPrev, ignore.case = TRUE),
+         "None" = grepl("none", BaitPrev, ignore.case = TRUE),
+         "Not recorded" = (grepl("NR" , BaitPrev, ignore.case = TRUE)),
+  .method = "first",
+  .default = " ")) -> catch_traploc_weekChecks_baitType
+
+write.csv(catch_traploc_weekChecks_baitType, file = '~/WERC-SC/HALE/catch_traploc_weekChecks.csv',
+          row.names = FALSE)  
 
   
