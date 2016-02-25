@@ -39,12 +39,23 @@ smoother <- function(vec, fil) {
 }
 
 get.track <- function(DeployID, TripID) {
-  track <- dbGetPreparedQuery(MHIdb,
-                              "SELECT *
+  track <- dbGetQuery(MHIdb,
+                      sprintf("SELECT T.*, BM.Species, W.DeployID IS NOT NULL AS 'Wet', COUNT(D.DiveID) AS 'Dives'
                               FROM RediscretizedTrack T
-                              WHERE T.DeployID = ?
-                                AND T.TripID = ?",
-                              dplyr::select(trip, DeployID, TripID))
+                              JOIN BirdMetadata BM
+                              ON T.DeployID = BM.DeployID
+                              LEFT JOIN WetDry W
+                              ON T.DeployID = W.DeployID
+                              AND W.End > T.UTC
+                              AND W.Begin < T.UTC + 120
+                              LEFT JOIN Dive D
+                              ON T.DeployID = D.DeployID
+                              AND D.End > T.UTC
+                              AND D.Begin < T.UTC + 120
+                              WHERE T.DeployID = %d
+                              AND T.TripID = %d
+                              GROUP BY T.DeployID, T.TripID, T.UTC",
+                              DeployID, TripID))
   
   x0 <- mean(track$Longitude)
   y0 <- mean(track$Latitude)
@@ -130,26 +141,6 @@ species_scales <- ars_scales %>%
 
 ars_scales <- merge(ars_scales, dplyr::select(species_scales, Species, median_radius), by = 'Species')
 
-ARS_zones <- foreach(trip = iter(ars_scales, by = 'row'), .combine = rbind) %do% {
-  trackxy <- get.track(trip$DeployID, trip$TripID)
-  
-  tracklt <- with(trackxy, as.ltraj(cbind(x, y), 
-                                    date = UTC2, 
-                                    id = paste(trip$DeployID, trip$TripID, sep = '_')))
-  
-  trackxy %>% 
-    merge(species_scales)
-    mutate(fpt = fpt(tracklt, radii = trip$median_radius, units = 'seconds')[[1]]$r1) %>%
-    filter(percent_rank(fpt) >= .95) %>%
-    transmute(DeployID,
-              TripID,
-              Longitude,
-              Latitude,
-              FPT = fpt,
-              Radius = trip$median_radius)
-}
-write.csv(ARS_zones, 'Hawaii_data/Lehua/ars/zones.csv', row.names = FALSE)
-
 ARS_scale_freq <- ars_scales %>% 
   group_by(Species, DeployID, TripID) %>% 
   summarize(Nscales = n_distinct(ARS_radii, na_rm = TRUE)) %>% 
@@ -161,16 +152,15 @@ ARS_scale_freq <- ars_scales %>%
   ungroup %>%
   arrange(Species, Nscales)
 
-ARS_scale_freq %>%
+ARS_scale_freq_plot <- ARS_scale_freq %>%
   ggplot(aes(Nscales, 
              Ftrips, 
              fill = Species)) + 
   geom_bar(stat='identity', 
            position = position_dodge())
 
-FPT_TRACKS <- foreach(trip = iter(trips, by = 'row'), .combine = rbind) %do% {
+Annotated_Tracks <- foreach(trip = iter(trips, by = 'row'), .combine = rbind) %do% {
   trackxy <- get.track(trip$DeployID, trip$TripID) %>%
-    merge(trip) %>%
     merge(dplyr::select(species_scales, Species, radius = median_radius), by = 'Species')
   
   tracklt <- with(trackxy, as.ltraj(cbind(x, y), 
@@ -179,17 +169,17 @@ FPT_TRACKS <- foreach(trip = iter(trips, by = 'row'), .combine = rbind) %do% {
   
   trackxy %>% 
     mutate(fpt = fpt(tracklt, radii = radius, units = 'seconds')[[1]]$r1,
-           ars_zone = percent_rank(fpt) >= .75)
+           ars = percent_rank(fpt) >= .75)
 }
 
-DTid <- FPT_TRACKS %>%
+DTid <- Annotated_Tracks %>%
   group_by(DeployID,
            TripID) %>%
   summarize %>%
   ungroup %>%
   mutate(DTid = row_number())
 
-FPT_TRACKS <-
-  merge(FPT_TRACKS, DTid)
+Annotated_Tracks <- merge(Annotated_Tracks, DTid)
 
-write.csv(FPT_TRACKS, 'Hawaii_data/Lehua/ars/fpttracks.csv', row.names = FALSE, na = "")
+write.csv(Annotated_Tracks, 'Hawaii_data/Lehua/annotated_tracks.csv', row.names = FALSE, na = "")
+

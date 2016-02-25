@@ -37,12 +37,21 @@ ggplot(divesBySpecies,
 
 ggplot(divesBySpecies,
        aes(x = Species,
-           y = MaxDepth)) +
+           y = MaxDepth,
+           fill = Species)) +
   geom_boxplot() +
   ggtitle('Distribution of dive depth') +
   scale_y_continuous(limits = c(.5, 4)) +
   annotate('text', x = .75, y = 3.75, label = '+3 deeper dives') +
-  ylab('Dive depth (m)')
+  ylab('Dive depth (m)') +
+  theme_gray(base_size = 24) +
+  theme(plot.background = element_rect(color = '#000000')) + 
+  guides(fill = FALSE)
+
+ggsave(filename = '~/My Pictures/MHI/plots/divedist.png',
+       width = 9.1,
+       height = 4.9,
+       units = 'in')
 
 # WE FIND:
 # BRBOs appear to dive deeper than RFBOs
@@ -198,16 +207,28 @@ ggplot(divesByTrack,
   geom_density(alpha = .25) +
   annotate('rect', xmin = -6, xmax = 0, ymin = 0, ymax = .0175, alpha = .2) +
   xlab('Angle of sun over horizon (degrees)\n(Shaded region indicates twilight)') +
-  ggtitle('Dive distribution by time of day')
+  ggtitle('Dive distribution by time of day') +
+  theme_gray(base_size = 24) +
+  theme(plot.background = element_rect(color = '#000000'))
+
+ggsave(filename = '~/My Pictures/MHI/plots/divetemporaldist.png',
+       width = 9.1,
+       height = 4.9,
+       units = 'in')
 
 ggplot(divesByTrack,
        aes(y = SunAltitude,
-           x = Species)) +
+           x = Species,
+           fill = Species)) +
   geom_boxplot() +
   ylim(-10, 90) +
-  xlab('Angle of sun over horizon (degrees)\n(Shaded region indicates twilight)') +
+  xlab('Species\n(Shaded region indicates twilight)')+
+  ylab('Angle of sun over horizon (degrees)') +
   annotate('rect', xmin = .5, xmax = 2.5, ymin = -6, ymax = 0, alpha = .2) +
-  ggtitle('Dive distribution by time of day')
+  ggtitle('Dive distribution by time of day') +
+  theme_gray(base_size = 24) +
+  theme(plot.background = element_rect(color = '#000000')) + 
+  guides(fill = FALSE)
 
 # WE FIND:
 # No apparent difference in dive timing between species
@@ -231,17 +252,29 @@ diveDistanceFromColony <- divesByTrack %>%
 
 ggplot(divesByTrack,
        aes(y = ColonyDistance,
-           x = Species)) +
+           x = Species,
+           fill = Species)) +
   geom_boxplot() +
-  ggtitle('Distribution of dives by distance from colony')
-ggplot(divesByTrack,
-       aes(x = Longitude,
-           y = Latitude)) +
-  geom_hex(stat = function(x) x^2) +
-  annotate('point', x = -160.0975, y = 22.02, color = 'red', size = 10) +
-  xlab('Longitude\n(Red dot indicates Lehua') +
-  facet_grid(. ~ Species) +
-  ggtitle('Spatial distribution of dives')
+  ylab('Distance from colony (m)') +
+  scale_y_continuous(labels = function(breaks) format(breaks, scientific = FALSE)) +
+  ggtitle('Distribution of dives by distance from colony') +
+  theme_gray(base_size = 24) +
+  theme(plot.background = element_rect(color = '#000000')) +
+  guides(fill = FALSE)
+
+ggsave(filename = '~/My Pictures/MHI/plots/colonydistancedist.png',
+       width = 9.1,
+       height = 4.9,
+       units = 'in')
+
+# ggplot(divesByTrack,
+#        aes(x = Longitude,
+#            y = Latitude)) +
+#   geom_hex(stat = function(x) x^2) +
+#   annotate('point', x = -160.0975, y = 22.02, color = 'red', size = 10) +
+#   xlab('Longitude\n(Red dot indicates Lehua') +
+#   facet_grid(. ~ Species) +
+#   ggtitle('Spatial distribution of dives')
 
 ## Repeat analysis with sex as a variable
 # Summarize dives by species and sex
@@ -263,7 +296,15 @@ ggplot(divesBySpecies %>% filter(Sex != 'U'),
   geom_boxplot() +
   ggtitle('Distribution of dive depth') +
   scale_y_continuous(limits = c(.5, 4)) +
-  ylab('Dive depth (m)')
+  ylab('Dive depth (m)') +
+  theme_gray(base_size = 20) +
+  theme(plot.background = element_rect(color = '#000000'))
+
+
+ggsave(filename = '~/My Pictures/MHI/plots/divedistsex.png',
+       width = 5.1,
+       height = 4.9,
+       units = 'in')
 
 ggplot(divesBySpecies %>% filter(Species == 'BRBO'),
        aes(x = MaxDepth,
@@ -338,12 +379,22 @@ t.test(log(InterDivePeriod) ~ Sex, divesByTrip %>% filter(Species == 'RFBO', Sex
 
 # Do males venture farther from the colony?
 ggplot(divesByTrack %>% filter(Sex != 'U'),
-       aes(y = ColonyDistance,
+       aes(y = ColonyDistance / 1000,
            x = Species,
            fill = Sex)) +
   geom_boxplot() +
-  ylab('Distance from colony (m)') +
-  ggtitle('Distribution of dives by distance from colony')
+  ylab('Distance from colony (km)') +
+  ylim(0, 250) +
+  ggtitle('Distribution of dives by distance from colony') +
+  theme_gray(base_size = 20) +
+  theme(plot.background = element_rect(color = '#000000'))
+
+
+ggsave(filename = '~/My Pictures/MHI/plots/colonydistsex.png',
+       width = 9.1,
+       height = 4.9,
+       units = 'in')
+  
 t.test(ColonyDistance ~ Sex, divesByTrack %>% filter(Species == 'BRBO', Sex != 'U'))
 t.test(ColonyDistance ~ Sex, divesByTrack %>% filter(Species == 'RFBO', Sex != 'U'))
 
