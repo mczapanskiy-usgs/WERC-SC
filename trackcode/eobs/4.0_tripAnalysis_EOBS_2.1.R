@@ -11,11 +11,12 @@
 rm(list=ls())
 
 library(sp)
-library(plyr)
+library(dplyr)
 library(proj4)
 library(ggplot2)
 library(rgdal)
 library(geosphere)
+library (oce)
 
 library(data.table)
 
@@ -72,7 +73,7 @@ trip.info$unique_trip<-as.numeric(trip.info$Deploy_ID+(trip.info$trip_no*.01))
 # get broken track data
 tracks<-read.table (paste(dir.in,species,'_',rad,'_trips_annotated.csv',sep = ""),header=T, sep=",", strip.white=T)
 # subset track data
-tracks<-tracks[tracks$species==species,]
+# tracks<-tracks[tracks$species==species,]
 
 tracks <- transform(tracks, UTC = as.POSIXct(UTC, tz = "GMT", format = "%Y-%m-%d %H:%M:%S"))
 
@@ -81,7 +82,10 @@ tracks_filt<-read.table (paste(dir.in,'All_Species_EOBS_allTracks.csv',sep = "")
 # subset track data
 tracks_filt<-transform(tracks_filt[tracks_filt$species==species,], UTC = as.POSIXct(UTC, tz = "GMT", format = "%Y-%m-%d %H:%M:%S"))
 
-tracks<- merge(tracks, tracks_filt, all.x=TRUE)[,c(1:10,12,14,21,22)]
+tracks<- merge(tracks, tracks_filt, all.x=TRUE)[,c(1:11,12,14,16,22,23)]
+
+tracks$unique_trip<-as.numeric(tracks$Deploy_ID+(tracks$trip_no*.01))
+
 
 #2*sd(tracks_filt$speed.pckTrip.SPD,na.rm=TRUE)
 # convert to km/hr = ((60*60)/1000)
@@ -108,7 +112,7 @@ dir.in.poly <- "/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.
     
   # read in list of potential clipper files
   clipPolyList<-read.csv (paste(dir.in.poly,"clipPolyList.csv", sep=""), header=T, sep=",", strip.white=T)
-  print(clipPolyList) # show a list of the clipper files
+#  print(clipPolyList) # show a list of the clipper files
   
   #### select clipperfile
   #### ui
@@ -135,7 +139,7 @@ dir.in.poly <- "/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.
   
   ## get transformed tracks for to calc speed and distance calculations
   tracks_trans<-as.data.frame(track.sp_trans@coords)
-  tracks_trans<-rename(tracks_trans, c("longitude360"="longitude_trans", "latitude"="latitude_trans"))
+  tracks_trans<-rename(tracks_trans, longitude_trans=longitude360, latitude_trans=latitude)
   
   tracks<-cbind(tracks, tracks_trans)
   
@@ -147,7 +151,7 @@ dir.in.poly <- "/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.
   tracks["unique_trip"] <- 0
   tracks$unique_trip<-as.numeric(tracks$Deploy_ID+(tracks$trip_no*.01))
   
-  tracks_comp <- tracks[which(tracks$trip_comp==1 & tracks$trip_no>0),]
+  #tracks_comp <- tracks[which(tracks$trip_comp==1 & tracks$trip_no>0),]
   
   # head(tracks_comp)
   
@@ -155,9 +159,12 @@ dir.in.poly <- "/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.
   # head(xy)
 
 # fix any duplicate dates by adding 1 second to 2nd duplicate time value (these were possible creating by rounding datetime to seconds along the line...)
-tracks$UTCc<-as.character(tracks$UTC)
+# tracks$UTCc<-as.character(tracks$UTC)
+# 
+# trip.date<- paste(tracks$unique_trip,tracks$UTCc,sep="_")
 
-trip.date<- paste(tracks$unique_trip,tracks$UTCc,sep="_")
+trip.date<- paste(tracks$unique_trip,as.character(tracks$UTC),sep="_")
+
 
 tracks$UTC[tracks$UTCc %in% as.character(tracks$UTCc[duplicated(trip.date)==1])][1:length(tracks$UTC[tracks$UTCc %in% as.character(tracks$UTCc[duplicated(trip.date)==1])]) %% 2 == 0] = (tracks$UTC[tracks$UTCc %in% as.character(tracks$UTCc[duplicated(trip.date)==1])][1:length(tracks$UTC[tracks$UTCc %in% as.character(tracks$UTCc[duplicated(trip.date)==1])]) %% 2 == 0]+1)
 
@@ -176,8 +183,8 @@ tracks$UTC[tracks$UTCc %in% as.character(tracks$UTCc[duplicated(trip.date)==1])]
 # tail(lvect)
 
 # create track object for AdehabitatLT
-  
-  trackObjs<-as.ltraj(tracks[c("longitude_trans","latitude_trans")], tracks$UTC, id=tracks$unique_trip, burst = as.character(tracks$unique_trip), typeII = TRUE, infolocs =data.frame(tracks$height.above.ellipsoid,tracks$trip_no,tracks$tripStComp,tracks$duration.hrs,tracks$tripEndComp,tracks$trip_comp))
+
+trackObjs<-as.ltraj(tracks[c("longitude_trans","latitude_trans")], tracks$UTC, id=tracks$unique_trip, burst = as.character(tracks$unique_trip), typeII = TRUE, infolocs =data.frame(tracks$height.above.ellipsoid,tracks$temperature,tracks$trip_no,tracks$tripStComp,tracks$tripEndComp,tracks$trip_comp,tracks$duration.hrs,tracks$Site))
 
 #   #### temp
 #   trip.info <- data.frame(read.csv(paste("/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.11.2015/Tracking_Data/EOBS/",species,"/3_trips/",species,"_",rad,"_","tripInfo.csv",sep="")))
@@ -201,26 +208,56 @@ unique_trip <- unique(tracks$unique_trip)
 
     # get speed between locations and distance to colony
     DT$vel<-NA
-    DT$dist2col<-NA
+    DT$dist2col<-
+    DT$diel.naut<-NA
+    
     # i=1
     for (i in 1:length(unique(DT$burst))) {
       DTsub<-DT[DT$burst==unique_trip[i],]
       
+      DTsub[,c(dy,dy,dist,dt,abs.angle,rel.angle)]
+      
       # get velocity for between each location    
-      DTsub$vel<-DTsub$dist/DTsub$dt
+      # DTsub$vel<-DTsub$dist/DTsub$dt
       
       # get dist to col
       # get colony locs and project
       Deploy_ID.want<-unique(as.integer(as.character(DTsub$id)))
-      col.loc<-cbind(meta$Col_Long_DD[meta$Deploy_ID==Deploy_ID.want],meta$Col_Lat_DD[meta$Deploy_ID==Deploy_ID.want])
-
+      col.loc.sp<-SpatialPointsDataFrame(coords = cbind(meta$Col_Long_DD[meta$Deploy_ID==Deploy_ID.want],meta$Col_Lat_DD[meta$Deploy_ID==Deploy_ID.want]),data=as.data.frame(1))
+      col.loc.sp@proj4string <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+      # col.loc.sp_trans<-spTransform(col.loc.sp, CRS(paste("+",projWant,sep='')))
+      
+      DTsub.sp<-SpatialPointsDataFrame(coords = cbind(DTsub$longitude,DTsub$latitude),data=as.data.frame(cbind(DTsub$longitude,DTsub$latitude)))
+      DTsub.sp@proj4string <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+      # DTsub.sp_trans<-spTransform(DTsub.sp, CRS(paste("+",projWant,sep='')))
+      
       #### calculate distance to colony (uses wgs84 ellipsoid) package geosphere
-      DTsub$dist2col<-distGeo(cbind(DTsub$longitude,DTsub$latitude), col.loc)
-      # (this uses the default ellipsoid a=6378137, f=1/298.257223563)
-
+      DTsub$dist2col<-distGeo(DTsub.sp, col.loc.sp) # (this uses the default ellipsoid a=6378137, f=1/298.257223563)
+      # DTsub$dist2col<-distVincentyEllipsoid(DTsub.sp, col.loc.sp, a=6378137, b=6356752.3142, f=1/298.257223563)
+      
+      # get velocity for between each location    
+      DTsub$vel<-DTsub$dist/DTsub$dt
+      
       DT$vel[DT$burst==unique_trip[i]]<-DTsub$vel
       DT$dist2col[DT$burst==unique_trip[i]]<-DTsub$dist2col
+      
+      # Nautical dawn/dusk
+      # library (oce)
+      utc<-as.POSIXct(format(DTsub$date), tz="UTC")
+      lat<-DTsub.sp@coords[,1]
+      lon<-DTsub.sp@coords[,2]
+      
+      # diel function (Max Czapazanskiy, Jan 12, 2016)
+      calc.diel.naut <- function(utc, lat, lon) {
+        sunElevationNow <- sunAngle(utc, lat, lon)$altitude
+        sunElevation1hr <- sunAngle(utc + 3600, lat, lon)$altitude
+        ifelse(sunElevationNow <= 0 & sunElevationNow > -12, # -12 = nautical twilight, -6 = civil twilight
+               ifelse(sunElevationNow < sunElevation1hr, 'dawn.naut', 'dusk.naut'),
+               ifelse(sunElevationNow > 0, 'day', 'night'))
       }
+      #DTsub <- mutate(DTsub, diel.naut = calc.diel.naut(utc, lat, lon))
+      DT$diel.naut[DT$burst==unique_trip[i]]<-calc.diel.naut(utc, lat, lon)
+    }
     
 #########    uncomment to export annotated trips
 #     #### export example annotated trip
@@ -253,15 +290,73 @@ unique_trip <- unique(tracks$unique_trip)
     agg<-unique(agg1)
     agg<-cbind(agg,relocs)
     agg<-merge(agg, meta, all.x=TRUE,all.y=TRUE)
-    sub.for.merge<-unique(tracks[,c("unique_trip","tripStComp","tripEndComp")])
+    sub.for.merge<-unique(tracks[,c("trip_no","unique_trip","tripStComp","tripEndComp")])
     sub.for.merge$unique_trip<-as.factor(sub.for.merge$unique_trip)
     out<-merge(agg,sub.for.merge,by.x="id",by.y="unique_trip",all.x=TRUE,all.y=FALSE)
-    out$id<-as.numeric(as.character(out$id), digits=2)
+    out$burst<-as.numeric(as.character(out$id), digits=2)
     out<-out[order(out$id),]
 
+    sum.trackObjs<-summary(trackObjs)
+    sum.trackObjs<-sum.trackObjs[order(sum.trackObjs$id),]
+    sum.trackObjs <- sum.trackObjs[,c('id','nb.reloc','date.begin','date.end')]
+    
+    out<-merge(out,sum.trackObjs,by.x="id",by.y="id",all.x=TRUE,all.y=FALSE)
+    
+    out[out==-Inf]="NA"
 
-write.table(out, paste(dir.out,species,"_rad_",rad,"_","trip_summarys.csv",sep = ""),sep=",",quote=TRUE,col.names=TRUE,row.names=FALSE)
-  
+write.table(DT,paste(dir.out,species,"_rad_",rad,"_","locs.behav.annotation.csv",sep = ""),sep=",",quote=TRUE,col.names=TRUE,row.names=FALSE)
+
+write.table(out,paste(dir.out,species,"_rad_",rad,"_","trip_summarys.csv",sep = ""),sep=",",quote=TRUE,col.names=TRUE,row.names=FALSE)
+
+
+##############################################################################################################
+##############################################################################################################
+# Rediscretize if needed
+DT<-as.data.frame(DT)
+
+# convert tracks into a spatial data frame
+DT.sp <- SpatialPointsDataFrame(coords = DT[c("longitude360","latitude")], data = DT)
+# define projection, use the WGS84 projection that Argos Data is delivered in
+DT.sp@proj4string <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+# plot(DT.sp, pch=3,cex=.01)
+
+DT.sp_trans<-spTransform(DT.sp, CRS(paste("+",projWant,sep='')))
+######
+# plot(DT.sp_trans, pch=3,cex=.01) # plot transforms
+# plot(DT$longitude360,DT$latitude, pch=3,cex=.01) # plot untransformed
+
+## compare the coords
+# cbind(track.sp_trans@coords,tracks_all[c("Longitude","Latitude")])
+
+## get transformed tracks for to calc speed and distance calculations
+DT.sp_trans<-as.data.frame(DT.sp_trans@coords)
+DT.sp_trans<-rename(DT.sp_trans, longitude_trans=longitude360, latitude_trans=latitude)
+
+DT<-cbind(DT, DT.sp_trans)
+
+trackObjs<-as.ltraj(DT[c("longitude_trans","latitude_trans")], DT$date, id=DT$id, burst = DT$id, typeII = TRUE, infolocs =data.frame(DT$tracks.height.above.ellipsoid,DT$tracks.temperature,DT$tracks.trip_no,DT$tracks.tripStComp,DT$tracks.tripEndComp,DT$tracks.trip_comp,DT$tracks.duration.hrs,DT$tracks.Site,DT$Deploy_ID,DT$longitude360,DT$longitude,DT$latitude))
+
+# Rediscretize to x seconds
+seconds<-20*60
+Redis<-redisltraj(trackObjs, seconds, burst = burst, samplex0 = FALSE, addbit = FALSE,
+           nnew = 10, type = "time")
+
+Redis<-cbind(data.table(ld(Redis)))
+Redis<- as.data.frame(Redis[order(as.numeric(as.character(Redis$burst)),Redis$date),])
+Redis$id<-as.character(Redis$burst)
+out$Deploy_ID<-as.character(out$Deploy_ID)
+out$Site<-as.character(out$Site)
+outwant<-out[,c("id","Site","Deploy_ID")]
+Redis<- merge(Redis,outwant,by='id')
+
+write.table(Redis,paste(dir.out,species,"_rad_",rad,"_","Redis_",seconds,"_sec.csv",sep = ""),sep=",",quote=TRUE,col.names=TRUE,row.names=FALSE)
+
+
+
+
+
+
+##### plotting untested as of 2.5.2016
 
 # some plotting
 library(ggplot2)
@@ -270,7 +365,7 @@ library(gridExtra)
 
 #### plot 1
 legend_title <- "Median Velocity by Sex"
-p <- ggplot(out, aes(x=max_dist2col))
+p <- ggplot(out, aes(x=med_vel))
 p <- p + geom_density(aes(fill=factor(Sex)), alpha=.4)
 p + scale_fill_manual(legend_title,values = c("pink","blue"))
 

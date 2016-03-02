@@ -73,6 +73,7 @@ timeStLim<-60*p$timeStLim.min # p$timeStLim.min = time in minutes allowed to des
 timeEndLim<-60*p$timeEndLim.min # p$timeEndLim.min = time in minutes allowed to designate a end as complete if the tag ends logging when at sea
   #NOTE THIS NUMBER IS SENSITIVE AT LARGE VALUES IF BIRD IS TRAVELING ABNORMALLY SLOW DURING LAST LOCATIONS
 minTripDur<-60*60*p$minTripDur.h # min trip duration in seconds (sec,min,hr)
+# get velocity to be used for estimating departure and arrival
 gps_vmax<-p$gps_vmax
 ##########
 
@@ -103,7 +104,6 @@ tracks_all<-read.table (paste(dir.in,"GPS/All_tracks/","All_Species_GPS_allTrack
   # i<-1
   # j<-25
   for (j in 1:length(metaWants$GPS_Track_File)) {
-    
     file.idWant<-metaWants$GPS_Track_File[j]
     Deploy_ID<-metaWants$Deploy_ID[j]
     metaTrack<-metaWants[j,]
@@ -494,6 +494,7 @@ for (i in 1:length(Deploy_IDs)) {
   } # end length(Deploy_ID) 
   
 ############
+
 
 tripInfoSort_checked$duration.hrs<-(tripInfoSort_checked$tripEnd-tripInfoSort_checked$tripSt)/60
 write.table(tripInfoSort_checked, paste(dir.out,"3_trips/",species,"_",radCol,"_tripInfo.csv",sep = ""),sep=",",quote=FALSE,col.names=TRUE,row.names=FALSE)
