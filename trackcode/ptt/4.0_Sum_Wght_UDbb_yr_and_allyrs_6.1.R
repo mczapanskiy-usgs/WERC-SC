@@ -34,9 +34,10 @@ rm(list=ls())
 
 library(adehabitat)
 library(SDMTools)
+library(dplyr)
 
 #### select species
-species="COMU"
+species="SOSH"
 
 #### select resolution and contour (normal export at "99.999" to include all bb data)
 resolution="3km" # cell size in km
@@ -46,16 +47,17 @@ contour <- 99.999
 id.out = c("99999")    # = c("68019a","68022a3")     #to exclude birds or segments "99999" excludes none
 
 ####
-dir.in <- "D:/Share_Data/Tracking_Data/PTT/"
-dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
-dir.in.poly <- "D:/Share_Data/Clip Polygons" # Directory of list of clipping polygons
+dir.in <- "/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.11.2015/Tracking_Data/PTT/"
+dir.out <- "/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.11.2015/Tracking_Data/PTT/"
+dir.in.poly <- "/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.11.2015/Clip Polygons" # Directory of list of clipping polygons
+
 dir.in.asc <-  (paste(dir.in,species,"/4_BB_out/", sep="")) # dir.in directory containing BB.asc files
-dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
+dir.in.meta <- "/Users/henry/Documents/Work/Projects/USGS/USGS 08.10.15/Share 8.11.2015/GitHub/WERC-SC/trackcode/ptt/"
 
 #### load clipperPolyLIst and select clipper file of interest
 clipPolyList<-read.csv (paste(dir.in.poly,"/clipPolyList.csv", sep=""), header=T, sep=",", strip.white=T)
 print(clipPolyList) # show a list of the clipper files
-rno<-19 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
+rno<-3 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
 clipperName<-as.character(clipPolyList$name[rno])
 
 #### read in metadata,select metadata based on species
@@ -91,7 +93,7 @@ noindiv.grp.ids <- vector ("list", length(grp.ids))
 summary.grp.ids <- vector ("list", length(grp.ids))
 
 #### loop through groups
-# grp.id <-2
+# grp.id <-1
 for (grp.id in 1:length(grp.ids)) {
   
   tracksums.want<-tracksums[which(tracksums$grp==grp.ids[grp.id]),]
@@ -108,7 +110,7 @@ for (grp.id in 1:length(grp.ids)) {
 
   # sum up segments for each track
   # run through track.freq table summing segments >1
-  # j=4
+  # j=5
   for (j in 1:length(track.freq$Var1)) {
     if (track.freq$Freq[j]==1) {
       # operation for only one segment in polygon (track.freq$Freq[j]==1) == TRUE
@@ -143,14 +145,14 @@ for (grp.id in 1:length(grp.ids)) {
 
 ## sum by grouping variable weight by:
   # a) number of days tracked 
-print(paste("grouping variable = ", grping.var,sep=""))
+print(paste("grouping variable =", grping.var,grp.ids[grp.id],sep=" "))
   
 # multiply new ud by (# of decimal days of each track/sum decimal days all tracks for that year)
   # initialize rasters
   ud.grp.id<-ud.track[[1]]*0  
   noindiv.grp.id<-ud.track[[1]]*0
   # run through all rasters to sum by grouping variable
-  # l=2
+  # l=1
   for (l in 1:length(ud.track)) {
     # calculate ud weighted by track.days, weigh each track it's proportion of total hours tracked within the clipperName (Freiberg 20XX paper)
     ud.grp.id<-ud.grp.id + (ud.track[[l]])*(track.days[[l]]/sum(unlist(track.days)))
@@ -219,6 +221,8 @@ print(paste("grouping variable = ", grping.var,sep=""))
 
 # make summary table for all years
 summary.grp.ids.mat<-do.call(rbind, summary.grp.ids)
+summary.grp.ids.mat<-rename(summary.grp.ids.mat,Deploy_ID=Var1)
+
 grp.id.wants<-as.data.frame(table(summary.grp.ids.mat[,1]))
       
 # initiate loop to sum all years to create raster for 
