@@ -21,16 +21,22 @@ read.csv('~/WERC-SC/HALE/trap_metadata.csv',
   setkeyv(c('Trapline', 'TrapNum', 'StartDate', 'EndDate')) -> trap_metadata ## created datatable of columns selected above, ordered by these variables
 
 # load catch data: 
-# remove duplicates, create duplicate for "join" command
+# combine original data with revised duplicate data
+read.csv('~/WERC-SC/HALE/catch_addDuplicates2.csv',
+         stringsAsFactors = FALSE) -> catch_addDuplicates
 read.csv('~/WERC-SC/HALE/catch_duplicateID2.csv',
-         stringsAsFactors = FALSE) %>% # 293714 obs.
+         stringsAsFactors = FALSE) -> catch_duplicateID2
+rbind(catch_addDuplicates, catch_duplicateID2) -> catch_duplicateID3 # 296446
+  
+# remove duplicates, create duplicate for "join" command
+catch_duplicateID3 %>%
   data.table %>%
   filter(!is.na(TrapNum),  # remove entries w/o trap number (shouldn't be any left though)
          duplicate %in% 0:1) %>% # select duplicate codes 0 & 1 (leave out unresolved duplicates)
   mutate(date = as.Date(as.character(dateStr), format = '%Y%m%d'),
          Dummy = date) %>%
   setkeyv(c('Trapline', 'TrapNum', 'date', 'Dummy')) -> trap_catches
-group_by(trap_catches, Trapline, TrapNum, date) %>% summarize(N = n()) %>% ungroup %>% arrange(-N) %>% nrow # 290,614 obs, which makes sense because there are 3100 duplicate IDs that are not 0 or 1
+group_by(trap_catches, Trapline, TrapNum, date) %>% summarize(N = n()) %>% ungroup %>% arrange(-N) %>% nrow # 291,995 obs, 4,451 duplicates removed (290,614 obs, which makes sense because there are 3100 duplicate IDs that are not 0 or 1)
 
 # merge Catches without corresponding trap location
 trap_catches %>%

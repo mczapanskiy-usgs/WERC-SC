@@ -3,7 +3,7 @@
 setwd("~/WERC-SC/HALE") ## setwd("~/PredControl/analysis")
 
 ## import .csv data
-traps <- read.csv("traps2014.csv")   ##("Traps_AllYears.csv")  _2000-2013
+traps <- read.csv("traps_addDuplicates.csv")   ##("Traps_AllYears.csv")  _2000-2013
 ## traps$trapID <- ([,c(Year, Month, Day, "_", Trapline, TrapNum)])
 
 ## make all catchID values 2-digits (month, day, and trap number)
@@ -25,7 +25,8 @@ traps$date <- as.Date(traps$dateStr, format="%Y%m%d")
 traps$trap <- paste(traps$Trapline,traps$TrapNum, sep = "")  ## combine the trap line and trap number, trap type is not consistent within this value
 traps$catchID <- paste(traps$dateStr,traps$trap, sep = "_")  ## unique trapID based on the date the trap was set and the location
 
-write.table(traps, file = "catch2014.csv", sep=",")
+write.table(traps, file = "catch_addDuplicates.csv", sep=",",
+            row.names = FALSE)
 
 ### clean up data
 ## test for duplicates in catchID

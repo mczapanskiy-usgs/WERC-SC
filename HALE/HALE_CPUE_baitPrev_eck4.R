@@ -4,7 +4,7 @@
 library("data.table", lib.loc="~/R/win-library/3.2")
 library("dplyr", lib.loc="~/R/win-library/3.2")
 
-read.csv('~/WERC-SC/HALE/catch_duplicateID.csv',
+read.csv('~/WERC-SC/HALE/catch_addDuplicates.csv',  ##catch_duplicateID.csv',
          stringsAsFactors = FALSE) %>%
   data.table %>%  # can use column names as variables directly (no $ needed)
   filter(!is.na(TrapNum)) %>% # remove all rows that don't have a trap number (28 entires)
@@ -15,6 +15,6 @@ read.csv('~/WERC-SC/HALE/catch_duplicateID.csv',
   mutate(BaitPrevOld = BaitPrev, 
          BaitPrev = as.character(ifelse(BaitPrevOld != '', BaitPrevOld, lag(BaitSet)))) %>% ## recreated BaitPrev to include all values and renamed BaitPrevOld
   ungroup %>%
-  write.csv('~/WERC-SC/HALE/catch_duplicateID2.csv',
+  write.csv('~/WERC-SC/HALE/catch_addDuplicates2.csv',  ##catch_duplicateID2.csv',
             row.names = FALSE)
 # incorporate BaitPrev2 into catch_duplicateID.csv
