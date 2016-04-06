@@ -37,7 +37,6 @@ library(ade4)
 library(stringr)
 library(maptools)
 
-
 #### select species
 species="BFAL"
 
@@ -204,7 +203,7 @@ unique_trip <- unique(tracks$unique_trip)
     DT$longitude<-tracks$longitude
     DT$longitude360<-tracks$longitude360
     DT$temperature<-as.numeric(tracks$temperature)
-    relocs<-as.vector(summary(trackObjs)[,3])
+    #relocs<-as.numeric(as.vector(summary(trackObjs)[,3]))
 
     # get speed between locations and distance to colony
     DT$vel<-NA
@@ -288,11 +287,13 @@ unique_trip <- unique(tracks$unique_trip)
       by = id])
     
     agg<-unique(agg1)
-    agg<-cbind(agg,relocs)
+    #agg<-cbind(agg,as.data.frame(relocs))
     agg<-merge(agg, meta, all.x=TRUE,all.y=TRUE)
     sub.for.merge<-unique(tracks[,c("trip_no","unique_trip","tripStComp","tripEndComp")])
-    sub.for.merge$unique_trip<-as.factor(sub.for.merge$unique_trip)
-    out<-merge(agg,sub.for.merge,by.x="id",by.y="unique_trip",all.x=TRUE,all.y=FALSE)
+    sub.for.merge$unique_trip<-as.character(sub.for.merge$unique_trip)
+    sub.for.merge$unique_trip = as.character(sub.for.merge$unique_trip)
+    agg$id = as.character(agg$id)
+    out<-merge(agg,sub.for.merge,by.x="id",by.y="unique_trip",all.x=TRUE,all.y=TRUE)
     out$burst<-as.numeric(as.character(out$id), digits=2)
     out<-out[order(out$id),]
 
