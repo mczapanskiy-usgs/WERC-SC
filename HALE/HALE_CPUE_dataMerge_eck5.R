@@ -20,16 +20,9 @@ read.csv('~/WERC-SC/HALE/trap_metadata.csv',
   data.table %>%
   setkeyv(c('Trapline', 'TrapNum', 'StartDate', 'EndDate')) -> trap_metadata ## created datatable of columns selected above, ordered by these variables
 
-# load catch data: 
-# combine original data with revised duplicate data
-read.csv('~/WERC-SC/HALE/catch_addDuplicates2.csv',
-         stringsAsFactors = FALSE) -> catch_addDuplicates
-read.csv('~/WERC-SC/HALE/catch_duplicateID2.csv',
-         stringsAsFactors = FALSE) -> catch_duplicateID2
-rbind(catch_addDuplicates, catch_duplicateID2) -> catch_duplicateID3 # 296446
-  
 # remove duplicates, create duplicate for "join" command
-catch_duplicateID3 %>%
+read.csv('~/WERC-SC/HALE/catch_duplicateID2.csv',
+         stringsAsFactors = FALSE) %>%
   data.table %>%
   filter(!is.na(TrapNum),  # remove entries w/o trap number (shouldn't be any left though)
          duplicate %in% 0:1) %>% # select duplicate codes 0 & 1 (leave out unresolved duplicates)
