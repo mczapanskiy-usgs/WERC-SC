@@ -2,10 +2,25 @@ library('dplyr')
 library('ggplot2')
 library('gridExtra')
 
+metadata <- read.csv('trackcode/gps/metadata_all_GPS.csv') %>%
+  filter(Species == 'WTSH') %>%
+  mutate(UTC = as.POSIXct(UTC, tz = 'UTC', format = '%m/%d/%Y %H:%M')) %>% 
+  group_by(DeployID = Deploy_ID,
+           FieldID,
+           Species,
+           Site = SubCol_Code) %>%
+  summarize(Deployed = min(UTC, na.rm = TRUE),
+            Recovered = max(UTC, na.rm = TRUE),
+            TDRFile = paste(TDR_File, collapse = ''),
+            ValidTDR = any(TDR_TagRecov %in% c(1, 3))) %>%
+  ungroup %>%
+  filter(ValidTDR) %>%
+  select(-ValidTDR)
+
 # Create list of all fastlogs
 get.fastlogs <- function(did) {
   tryCatch({
-    read.csv('dive_identification/TDRmetadata.csv') %>%
+    metadata %>%
       filter(DeployID == did) %>%
       (function(deployment) {
         file.path('dive_identification',
@@ -45,7 +60,7 @@ fastlog.summary <- function(deployid) {
 fastlogs <- if(exists('fastlogs')) { 
   fastlogs
 } else {
-  read.csv('dive_identification/TDRmetadata.csv') %>%
+  metadata %>%
     rowwise %>%
     do(fastlog.summary(.$DeployID)) %>%
     filter(N > 4,
@@ -83,7 +98,7 @@ plot.fastlog <- function(fl) {
     sprintf('dive_identification/7_calibration_plots/%s_%s_%i_%i(%i).png', fl$durationgroup, fl$magspeedgroup, did, eid, i) %>%
      png(width = 1800, height = 900, filename = .)
     
-    metadata <- read.csv('dive_identification/TDRmetadata.csv') %>%
+    metadata <- metadata %>%
       filter(DeployID == did)
     
     utc.breaks <- function(limits) {
