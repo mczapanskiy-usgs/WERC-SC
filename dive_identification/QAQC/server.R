@@ -53,7 +53,8 @@ shinyServer(function(input, output) {
     # Update dives
     dives <<- dives %>%
       filter(DeployID != deployid | DiveID != diveid) %>%
-      rbind(qaqc)
+      rbind(qaqc) %>%
+      arrange(DeployID, DiveID)
     
     # Re-write QAQC file
     write.csv(dives,
