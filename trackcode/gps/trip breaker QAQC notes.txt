@@ -11,12 +11,12 @@ individual tags/tracks
 
 Dos
 WTSH
--check and fix HAW WTSH depl/recov times based on scanned field notes from Jay
 
 Develop post trip breaking classification criteria
 -foraging trip
 -local ultra short trip
 -local loafing/near colony
+-large data gaps while at sea that preclude trip characterization (deploy id 276)
 
 
 Trip behavior states
@@ -26,3 +26,10 @@ Trip behavior states
 -bobbies roosting away from colony
 -combined behavior and diurnal state
 -short trip within t=t of release, observer effect
+
+
+Chick Dead Column
+
+
+EOBS
+Deploy_ID_28 = odd start time, correct deployment time?

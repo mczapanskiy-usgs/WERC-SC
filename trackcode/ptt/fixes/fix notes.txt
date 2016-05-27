@@ -1,4 +1,4 @@
-format(as.POSIXct(strptime (ptt$utc, "%m/%d/%Y %H:%M"), "GMT"), "%m_%Y")
+
 
 5/1/2011 3:38
 
@@ -9,3 +9,7 @@ utc	lat1	lon1
 ptt
 7/20/2015
 -fix the duplicate tag numbers for SOSH deploy id 89 and 90
+
+date formatting:
+format(as.POSIXct(strptime (ptt$utc, "%Y-%M-%D %H:%M:%S"), "GMT"), "%m_%Y")
+

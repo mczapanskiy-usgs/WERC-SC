@@ -32,11 +32,15 @@ plot<-TRUE
 ####  dir.in for .csv files
 dir.in <- "D:/Share_Data/Tracking_Data/GPS/"
 
+####  meta.in for .csv files
+meta.in <- "D:/Share_Data/GitHub/WERC-SC/trackcode/gps/"
+
+
 #### dir.out for .csv files
 dir.out <- "D:/Share_Data/Tracking_Data/GPS/"
 
 # open metadata file
-metadata<-read.table(paste(dir.in,"metadata_all_GPS_06.04.15_working.csv",sep=""),header=T, sep=",", strip.white=T)
+metadata<-read.table(paste(meta.in,"metadata_all_GPS.csv",sep=""),header=T, sep=",", strip.white=T)
 
 # # get species specific data
 # metadata<-subset(metadata,Species==species)

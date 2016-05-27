@@ -3,3 +3,6 @@
 .RData
 *.csv
 *.CSV
+~$*
+*.sqlite-journal
+*.sqlite

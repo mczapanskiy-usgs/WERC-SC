@@ -65,8 +65,11 @@ dir.in.poly <- "D:/Share_Data/Clip Polygons"
 #### dir.out
 dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 
+#### dir.in of metadata
+dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
+
 #### set species
-species="SOSH"
+species="COMU"
 
 #### set hrs for minimum gap in second (converted to sec with time gap used create new segment each time animal leaves and returns in to box)
 hrs<-60
@@ -78,12 +81,12 @@ print(clipPolyList) # show a list of the clipper files
 
 # select clipperfile
 ### uid
-rno<-5 # row number of file list
+rno<-19 # row number of file list
 clip.name<-(paste(as.character(clipPolyList$name[rno]),"Buffer",sep=""))
 print(clip.name)
 
 #### read in metadata
-meta<-read.table (paste(dir.in,"PTT_metadata_1.0_5.08.2015_working.csv",sep = ""),header=T, sep=",", strip.white=T)
+meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
 
 #### select metadata want
 meta<-meta[meta$species==species & meta$loc_data==1,]

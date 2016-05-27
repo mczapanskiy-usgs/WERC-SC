@@ -36,7 +36,7 @@ library(adehabitat)
 library(SDMTools)
 
 #### select species
-species="PFSH"
+species="COMU"
 
 #### select resolution and contour (normal export at "99.999" to include all bb data)
 resolution="3km" # cell size in km
@@ -50,15 +50,17 @@ dir.in <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.out <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.in.poly <- "D:/Share_Data/Clip Polygons" # Directory of list of clipping polygons
 dir.in.asc <-  (paste(dir.in,species,"/4_BB_out/", sep="")) # dir.in directory containing BB.asc files
+dir.in.meta <- "D:/Share_Data/GitHub/WERC-SC/trackcode/ptt/"
 
 #### load clipperPolyLIst and select clipper file of interest
 clipPolyList<-read.csv (paste(dir.in.poly,"/clipPolyList.csv", sep=""), header=T, sep=",", strip.white=T)
 print(clipPolyList) # show a list of the clipper files
-rno<-5 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
+rno<-19 # select clipperfile, row number of clipperPolyLIst list (selects data bounded by clipper)
 clipperName<-as.character(clipPolyList$name[rno])
 
 #### read in metadata,select metadata based on species
-meta<-read.table (paste(dir.in,"PTT_metadata_1.0_5.08.2015_working.csv",sep = ""),header=T, sep=",", strip.white=T)
+meta<-read.table (paste(dir.in.meta,"PTT_metadata_all.csv",sep = ""),header=T, sep=",", strip.white=T,na.strings = "")
+
 meta<-meta[meta$species==species & meta$loc_data==1,]
 
 #### desingated a grouping variable, this can be any variable in your metadata (e.i. year, site~year, site~sex~year)

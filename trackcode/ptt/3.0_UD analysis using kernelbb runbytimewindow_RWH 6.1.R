@@ -58,6 +58,10 @@ library(SDMTools)
 
 library(adehabitat)
 
+# 8.6.2015
+library(data.table)
+
+
 ## enter years here
 ## 
 #   year <- c(2008)			
@@ -84,7 +88,7 @@ dir.in.params <- "D:/Share_Data/Tracking_Data/PTT/"
 dir.out.rast <- "D:/Share_Data/Tracking_Data/PTT/"
 
 # set species
-species="ZACA"
+species="SOSH"
 
 #### Get years from file names in the 3_Freitas_Shapes directory
 #year.site.id<-as.numeric(na.omit(list.files(paste("D:/RWH/CA Atlas/",species,"/3_Freitas_Shapes/",sep = ""), include.dirs = TRUE)))
@@ -122,10 +126,35 @@ ptt <- read.table (paste(dir.in,species,"/3_Clipped/tracksinpoly.csv",sep = ""),
 # head(ptt)
 
 # optional - flag ptt data for certain months and or years
-ptt$m_Y<-format(as.POSIXct(strptime (ptt$utc, "%m/%d/%Y %H:%M"), "GMT"), "%m-%Y")
-# month_Year wanted
-m_Y.wants<-as.character(rbind("04-2005","04-2007","05-2007","06-2007"))
+# for SOSH
+ptt$m<-as.numeric(format(as.POSIXct(strptime (ptt$utc, "%Y-%m-%d %H:%M:%S"), "GMT"), "%m"))
+ptt$y<-as.numeric(format(as.POSIXct(strptime (ptt$utc, "%Y-%m-%d %H:%M:%S"), "GMT"), "%Y"))
+
+# classify catagories 
+ptt <- data.table(ptt)
+ptt[m == c(6,7), group.var1 := "Jun_Jul"]
+ptt[m == c(9,10), group.var1 := "Sep_Oct"]
+ptt[m == c(6,7,8,9,10), group.var2 := "Jun_Oct"]
+ptt=as.data.frame(ptt)
+
+ptt$groupvar6.7.9.10<-paste(ptt$group.var1,ptt$y,sep="_")
+ptt$groupvar6.7.8.9.10<-paste(ptt$group.var2,ptt$y,sep="_")
+
+ptt1<-ptt[ptt$m==c(6,7,9,10),]
+ptt2<-ptt[ptt$m==c(6,7,8,9,10),]
+
+
+m_Y.wants<-as.character(rbind("Jun_Jul","Sep_Oct"))
 ptt$m_Y.wants<-(ptt$m_Y %in%m_Y.wants)
+
+
+# for ZACA
+# ptt$m_Y<-format(as.POSIXct(strptime (ptt$utc, "%m/%d/%Y %H:%M"), "GMT"), "%m-%Y")
+
+#label and filter for month_Year wanted
+# m_Y.wants<-as.character(rbind("04-2005","04-2007","05-2007","06-2007"))
+# ptt$m_Y.wants<-(ptt$m_Y %in%m_Y.wants)
+
 
 # subset tracking data bounded by dates
 ptt<-subset(ptt,ptt$m_Y.wants=="TRUE")
