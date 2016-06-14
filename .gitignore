@@ -6,5 +6,6 @@
 ~$*
 *.sqlite-journal
 *.sqlite
+schema.ini
 src/wetdry-analysis.R
 Hawaii_data/*
