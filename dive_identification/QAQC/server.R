@@ -6,7 +6,7 @@ metadata <- read.csv('www/WTSH_metadata.csv',
                      stringsAsFactors = FALSE)
 dives <- read.csv('www/WTSH_QAQC.csv')
 
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
   # focusDive is the dive currently being QAQC'd
   focusDive <- reactive({
     input$nextDive # establish dependency on nextDive button
@@ -44,11 +44,26 @@ shinyServer(function(input, output) {
     qaqc <- focusDive() %>%
       mutate(ValidDive = input$validDive,
              SurfCal = input$surfCal,
-             PlungeErr = input$plungeError,
+             PlungeErr = any(input$errors == 'plunge'),
+             SplitErr = any(input$errors == 'split'),
              Eyes = TRUE)
     
     deployid <- focusDive()$DeployID
     diveid <- focusDive()$DiveID
+    
+    # Reset inputs to default
+    updateRadioButtons(session, 
+                       'validDive', 
+                       selected = 1)
+#     updateRadioButtons(session, 
+#                        'validDive', 
+#                        selected = defaultInput$validDive)
+#     updateRadioButtons(session, 
+#                        'surfCal', 
+#                        selected = defaultInput$surfCal)
+#     updateCheckboxGroupInput(session, 
+#                              'errors', 
+#                              selected = defaultInput$errors)
 
     # Update dives
     dives <<- dives %>%

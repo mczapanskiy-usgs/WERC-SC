@@ -6,6 +6,7 @@ dir('dive_identification/5c_wtsh_dive_plots/') %>%
   mutate(ValidDive = NA,
          SurfCal = NA,
          PlungeErr = NA,
+         SplitErr = NA,
          Eyes = FALSE) %>%
   write.csv('dive_identification/QAQC/www/WTSH_QAQC.csv',
             row.names = FALSE)
