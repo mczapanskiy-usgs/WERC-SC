@@ -8,9 +8,9 @@ shinyUI(fluidPage(
     sidebarPanel(
       radioButtons('validDive',
                    'Valid dive?',
-                   choices = list('True' = 1,
-                                  'False' = 0,
-                                  'Unclear' = -1),
+                   choices = list('True' = 't',
+                                  'False' = 'f',
+                                  'Unclear' = 'u'),
                    selected = defaultInput$validDive),
       radioButtons('surfCal',
                   'Surface calibration:',

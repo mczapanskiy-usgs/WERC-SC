@@ -54,16 +54,13 @@ shinyServer(function(input, output, session) {
     # Reset inputs to default
     updateRadioButtons(session, 
                        'validDive', 
-                       selected = 1)
-#     updateRadioButtons(session, 
-#                        'validDive', 
-#                        selected = defaultInput$validDive)
-#     updateRadioButtons(session, 
-#                        'surfCal', 
-#                        selected = defaultInput$surfCal)
-#     updateCheckboxGroupInput(session, 
-#                              'errors', 
-#                              selected = defaultInput$errors)
+                       selected = defaultInput$validDive)
+    updateRadioButtons(session, 
+                       'surfCal', 
+                       selected = defaultInput$surfCal)
+    updateCheckboxGroupInput(session, 
+                             'errors', 
+                             selected = defaultInput$errors)
 
     # Update dives
     dives <<- dives %>%

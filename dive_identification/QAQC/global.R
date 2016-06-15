@@ -1,6 +1,6 @@
 # Default inputs
 defaultInput <- list(
-  validDive = 1,
-  surfCal = 'med',
-  errors = NULL)
+  validDive = 't',
+  surfCal = 'min',
+  errors = character(0))
   
