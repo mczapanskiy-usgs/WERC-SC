@@ -1,5 +1,3 @@
-library(shiny)
-
 shinyUI(fluidPage(
   
   # QAQC Options
@@ -35,7 +33,10 @@ shinyUI(fluidPage(
     
     # Dive plot
     mainPanel(
-      imageOutput('divePlot')
+      tabsetPanel(
+        tabPanel("Dive Plots", imageOutput('divePlot')),
+        tabPanel("Dive Table", DT::dataTableOutput('diveTable'))
+      )
     )
   )
 ))

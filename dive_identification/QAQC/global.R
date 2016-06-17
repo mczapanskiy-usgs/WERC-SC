@@ -1,3 +1,6 @@
+library(shiny)
+library(dplyr)
+
 # Default inputs
 defaultInput <- list(
   validDive = 't',

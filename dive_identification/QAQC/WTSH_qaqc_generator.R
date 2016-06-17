@@ -3,7 +3,8 @@ dir('dive_identification/5c_wtsh_dive_plots/') %>%
   strsplit('_') %>%
   lapply(function(x) { x <- as.numeric(x); data.frame(DeployID = x[1], EventID = x[2], DiveID = x[3]) }) %>%
   rbind_all %>%
-  mutate(ValidDive = NA,
+  mutate(Index = row_number(),
+         ValidDive = NA,
          SurfCal = NA,
          PlungeErr = NA,
          SplitErr = NA,
