@@ -26,6 +26,7 @@ shinyUI(fluidPage(
                    'Next'),
       h3('Details:'),
       p(textOutput('species')),
+      p(textOutput('threshold')),
       p(textOutput('site')),
       p(textOutput('nest')),
       p(textOutput('band')),

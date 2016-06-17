@@ -23,6 +23,7 @@ shinyServer(function(input, output, session) {
   
   # Description of diving bird
   output$species <- renderText({ focusMeta()$Species })
+  output$threshold <- renderText({ sprintf('Threshold %im', focusMeta()$threshold) })
   output$site <- renderText({ focusMeta()$Site })
   output$nest <- renderText({ paste('Nest', focusMeta()$NestNo) })
   output$band <- renderText({ paste('Band', focusMeta()$BandNo) })
