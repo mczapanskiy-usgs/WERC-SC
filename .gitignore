@@ -4,3 +4,4 @@
 ~$*
 *.sqlite-journal
 *.sqlite
+HALE/catch_duplicateID.RData
