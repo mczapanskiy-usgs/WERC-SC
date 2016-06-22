@@ -24,6 +24,7 @@ shinyUI(fluidPage(
                    'Next'),
       h3('Details:'),
       p(textOutput('species')),
+      p(textOutput('threshold')),
       p(textOutput('site')),
       p(textOutput('nest')),
       p(textOutput('band')),
@@ -31,11 +32,6 @@ shinyUI(fluidPage(
     ),
     
     # Dive plot
-    mainPanel(
-      tabsetPanel(
-        tabPanel("Dive Plots", imageOutput('divePlot')),
-        tabPanel("Dive Table", DT::dataTableOutput('diveTable'))
-      )
-    )
+    mainPanel(imageOutput('divePlot'))
   )
 ))
