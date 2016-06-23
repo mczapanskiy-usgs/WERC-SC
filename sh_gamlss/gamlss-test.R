@@ -5,56 +5,34 @@ library(dplyr)
 library(ggplot2)
 
 # Read data
-sh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv')
+sh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>%
+  select(SOSHcount, Binarea, Month, FCPI, Dist200, SSTmean) %>%
+  filter(Month > 2) %>% # exclude tiny January, February surveys
+  mutate(Month = factor(Month)) %>%
+  na.omit
+head(sh.data)
+summary(sh.data)
 
-# Use June 2011 as sample
-sh.sample <- sh.data %>%
-  filter(Year == 2011,
-         Month == 6) %>%
-  dplyr::select(SOSHcount, 
-                SOSH0610UD) %>%
-  mutate(SOSHcount = as.integer(SOSHcount),
-         SOSHpresent = SOSHcount > 0)
-summary(sh.sample)
+# Test model: SOSHcount as function of FCPI, Dist200, SSTmean (all three cubic splines) with Month as random variable 
+# and log(Binarea) as offset
+gamlssTest <- gamlss(SOSHcount ~ FCPI,
+#                        offset(log(Binarea)) + random(Month) + 
+#                        cs(FCPI) + cs(Dist200) + cs(SSTmean), 
+                     data = sh.data, 
+                     family = NBI)
 
-# Visualize presence as function of UD
-ggplot(sh.sample,
-       aes(x = SOSHpresent,
-           y = SOSH0610UD)) +
-  geom_violin() + 
-  geom_boxplot(width = 0.1)
+d <- data.frame(x <- runif(100)) %>%
+  mutate(y = sin(x * 2*pi) + runif(100))
+gamlssTest <- gamlss(y ~ cs(x), data = d)
+ggplot(mutate(d, y2 = predict(gamlssTest)),
+       aes(x, y)) +
+  geom_point() + 
+  geom_line(aes(x, y2, group = 1))
 
-plot(sh.sample$SOSHcount, sh.sample$SOSHcount)
-
-# Simple linear model
-sh.lm <- lm(SOSHcount ~ SOSH0610UD, data = sh.sample)
-plot(SOSHcount ~ SOSH0610UD, data = sh.sample)
-abline(sh.lm)
-summary(sh.lm)
-
-# Negative binomial model
-sh.nbm <- glm.nb(SOSHcount ~ SOSH0610UD, data = sh.sample)
-plot(SOSHcount ~ SOSH0610UD, data = sh.sample)
-abline(sh.nbm)
-summary(sh.nbm)
-
-# Zero-inflated negative binomial model
-sh.zinbm <- zeroinfl(SOSHcount ~ SOSH0610UD, data = sh.sample, dist = 'negbin', EM = TRUE)
-plot(SOSHcount ~ SOSH0610UD, data = sh.sample)
-abline(sh.zinbm)
-summary(sh.zinbm)
-
-# NB vs ZINB
-vuong(sh.nbm, sh.zinbm)
-
-all(sh.nbm$y == sh.zinbm$y)
-length(sh.nbm$y)
-length(sh.zinbm$y)
-data.frame(sh.nbm.y = sh.nbm$y,
-           sh.zinbm.y = sh.zinbm$y) %>%
-  mutate(row = row_number(),
-         diff = abs(sh.nbm.y - sh.zinbm.y)) %>%
-  group_by(diff > 0) %>%
-  summarize(n())
-
-sh.sample$SOSHcount %>% typeof
+d <- data.frame(x = runif(100)) %>%
+  mutate(y = rpois(100, x))
+gamlssTest <- gamlss(y ~ x, data = d, family = PO)
+ggplot(mutate(d, y2 = predict(gamlssTest)), 
+       aes(x, y)) +
+  geom_point() +
+  geom_line(aes(x, y2, group = 1))
