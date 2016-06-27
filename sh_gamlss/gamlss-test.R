@@ -1,26 +1,35 @@
 library(gamlss)
 library(dplyr)
-library(ggplot2)
 
 # Read data
-sh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>%
-  select(SOSHcount, Binarea, Month, FCPI, Dist200, SSTmean) %>%
+sosh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>%
+  dplyr::select(SOSHcount, Binarea, Month, FCPI, Dist200, SSTmean) %>%
   filter(Month > 2) %>% # exclude tiny January, February surveys
   mutate(Month = factor(Month)) %>%
   na.omit
-head(sh.data)
-summary(sh.data)
+head(sosh.data)
+summary(sosh.data)
 
-sh.data2 <- slice(sh.data, 1:100) %>%
-  select(SOSHcount, Dist200)
-gamlss(SOSHcount ~ Dist200, data = sh.data2, family = ZIP)
+pfsh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>%
+  dplyr::select(PFSHcount, Binarea, Month, FCPI, Dist200, SSTmean) %>%
+  filter(Month > 2) %>% # exclude tiny January, February surveys
+  mutate(Month = factor(Month)) %>%
+  na.omit
+head(pfsh.data)
+summary(pfsh.data)
+
+sosh.gamlss <- gamlss(SOSHcount ~ FCPI +
+                        offset(log(Binarea)) + random(Month) + 
+                        cs(FCPI) + cs(Dist200) + cs(SSTmean),
+                      data = sosh.data,
+                      family = NBI)
 
 # Test model: SOSHcount as function of FCPI, Dist200, SSTmean (all three cubic splines) with Month as random variable 
 # and log(Binarea) as offset
 gamlssTest <- gamlss(SOSHcount ~ FCPI,
 #                        offset(log(Binarea)) + random(Month) + 
 #                        cs(FCPI) + cs(Dist200) + cs(SSTmean), 
-                     data = sh.data, 
+                     data = sosh.data, 
                      family = NBI)
 
 rdist <- Vectorize(function(x) {
@@ -33,4 +42,4 @@ d <- data.frame(x = runif(100) * .5) %>%
 
 gamlssTest <- gamlss(y ~ x, data = d, family = PO)
 
-View(sh.data2)
+View(sosh.data2)
