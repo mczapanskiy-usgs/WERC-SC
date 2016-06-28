@@ -26,26 +26,41 @@ is.predEvent <- function(predCaught, birdCaught, otherCaught, trapStatus, baitSt
 # create predEvent column based on is.predEvent function
 catch <- mutate(catch, predEvent = is.predEvent(predCaught, birdCaught, otherCaught, TrapStatus, BaitStatus))
 
-# summary stats and graphs of predEvent data
+
+# save new catch data file with predEvents to GitHub file
+write.csv(catch, file = '~/WERC-SC/HALE/catch_traploc_weeks_baitTypes_edited_predEvent.csv',
+          row.names = FALSE) 
+
+
+### summary stats and graphs of predEvent data
+# different pred event counts
 catch_summary <-
   catch %>%
   group_by(predEvent) %>%
   summarize(name_count = n())
 catch_summary
 
+# histogram of pred events per trapline
 ggplot(catch, aes(predEvent)) +
   geom_bar() +
   labs(x = 'Predator event type', y = 'frequency') +
-  facet_wrap(~ Trapline, nrow = 3) +
+  facet_wrap(~ Trapline, nrow = 4) +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 
-ddply(catch, Trapline, summarize,
-      ntraps = length(unique(TrapNum)), 
-      cats = count(predEvent, "catCaught"))
+# count of predEvents per trapline per year
+traplineCount <- 
+  catch %>%
+  group_by(Trapline, Year, predEvent) %>%
+  tally
 
-# save new catch data file with predEvents to GitHub file
-write.csv(catch, file = '~/WERC-SC/HALE/catch_..._baitTypes_edited_predEvent.csv',
-          row.names = FALSE) 
+# plot of predEvents per trapline per year
+ggplot(traplineCount, aes(Year, n, color=predEvent)) +
+  geom_point() +
+  labs(x = 'Year', y = 'Frequency') +
+  facet_wrap(~ Trapline, nrow = 4) +
+  theme(axis.text.x = element_text(angle=60, hjust=1))
+
+
 
 
 # function that does a sequental test to classifly each row by event type
