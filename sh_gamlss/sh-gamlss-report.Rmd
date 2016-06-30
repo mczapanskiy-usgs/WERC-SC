@@ -1,0 +1,76 @@
+---
+title: "SOSH GAMLSS"
+author: "Max Czapanskiy"
+date: "June 29, 2016"
+output: html_document
+---
+
+Goal: demonstrate improved quality of seabird distribution models by incorporating individual tracking data
+Method: Locations from tracked sooty shearwaters have been aggregated into kernel density estimates. These utilization distributions will be used in conjunction with more commonly used variables to create distribution models. The model of choice is GAMLSS, for its ability to handle non-linear relationships and errors.
+
+Our progress so far.
+1. Load packages
+```{r, results = 'hide'}
+library(dplyr)
+library(gamlss)
+```
+
+2. Load data
+```{r}
+sosh.data <- read.csv('TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>%
+  dplyr::select(SOSHcount, Binarea, Month, FCPI, Dist200, SSTmean) %>%
+  filter(Month > 2) %>% # exclude tiny January, February surveys
+  mutate(SOSHcount = as.integer(SOSHcount),
+         Month = factor(Month)) %>%
+  na.omit
+head(sosh.data)
+summary(sosh.data)
+```
+
+3. Create models using canonical discrete distributions WITHOUT home range variable:
+```{r, cache = TRUE, results = 'hide'}
+# Create models using canonical discrete distributions.
+# SOSHcount as function of FCPI, Dist200, SSTmean (all three cubic splines) with Month as random variable 
+# and log(Binarea) as offset
+discrete.dist <- c('PO', 'NBI', 'NBII', 'DEL', 'PIG', 'SI', 'SICHEL', 'ZIP', 'ZIP2')
+all.models <- lapply(discrete.dist, function(dist) {
+  gamlss(SOSHcount ~ cs(FCPI) + cs(Dist200) + cs(SSTmean) +
+           offset(log(Binarea)) + random(Month),
+         data = sosh.data, 
+         family = get('dist'))
+})
+```
+
+4. Hmm, only two of the nine models converged. Try refitting.
+```{r}
+model.rankings <- sapply(all.models, function(model) c(family = model$family[1], # Distribution used
+                                                    df = extractAIC(model)[1], # degrees of freedom
+                                                    AIC = extractAIC(model)[2], # AIC value
+                                                    converged = getElement(model, 'converged'))) %>% # whether model converged
+  t %>%
+  as.data.frame %>%
+  arrange(AIC)
+model.rankings
+```
+```{r, cache = TRUE, results = 'hide'}
+all.models <- lapply(discrete.dist, function(dist) {
+  result <- gamlss(SOSHcount ~ cs(FCPI) + cs(Dist200) + cs(SSTmean) +
+                     offset(log(Binarea)) + random(Month),
+                   data = sosh.data, 
+                   family = get('dist'))
+  if(!getElement(result, 'converged')) try(result <- refit(result))
+  result
+})
+```
+
+5. Now five of nine models converge
+```{r}
+model.rankings <- sapply(all.models, function(model) c(family = model$family[1], # Distribution used
+                                                    df = extractAIC(model)[1], # degrees of freedom
+                                                    AIC = extractAIC(model)[2], # AIC value
+                                                    converged = getElement(model, 'converged'))) %>% # whether model converged
+  t %>%
+  as.data.frame %>%
+  arrange(AIC)
+model.rankings
+```
