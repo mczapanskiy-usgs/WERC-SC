@@ -6,6 +6,7 @@ library(mosaic)
 library(ggplot2)
 library(grid)
 library(gridExtra)
+library(lubridate)
 
 read.csv('~/WERC-SC/HALE/catch_traploc_weeks_baitTypes_edited.csv',
          stringsAsFactors = FALSE) -> catch
@@ -48,13 +49,13 @@ ggplot(catch, aes(predEvent)) +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 
 # count of predEvents per trapline per year
-traplineCount <- 
+traplinePredEvent <- 
   catch %>%
   group_by(Trapline, Year, predEvent) %>%
   tally
 
 # plot of predEvents per trapline per year
-ggplot(traplineCount, aes(Year, n, color=predEvent)) +
+ggplot(traplinePredEvent, aes(Year, n, color=predEvent)) +
   geom_point() +
   labs(x = 'Year', y = 'Frequency') +
   facet_wrap(~ Trapline, nrow = 4) +
