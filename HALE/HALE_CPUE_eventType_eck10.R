@@ -11,6 +11,9 @@ library(lubridate)
 read.csv('~/WERC-SC/HALE/catch_traploc_weeks_baitTypes_edited.csv',
          stringsAsFactors = FALSE) -> catch
 
+catch$otherCaught <- as.character(catch$otherCaught)
+catch$otherCaught[is.na(catch$otherCaught)] <- ""
+
 # create function to identify different predator event types
 is.predEvent <- function(predCaught, birdCaught, otherCaught, trapStatus, baitStatus) {
   case_when(

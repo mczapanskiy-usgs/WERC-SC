@@ -31,7 +31,7 @@ PredEventsPerLineWeek <- weeklyCatches %>%
   summarize(NEvents = n())
 
 ## number of predEvents per number of traps, for each week on each Trapline
-PredEventPUE <- merge(TrapsPerLineWeek, PredEventsPerLineWeek) %>% 
+PredEventPUE <- merge(TrapsPerLineWeek, PredEventsPerLineWeek, catch$date) %>% 
   mutate(CPUE = NEvents/NTraps) %>% 
   arrange(Trapline, week, predEvent)
 

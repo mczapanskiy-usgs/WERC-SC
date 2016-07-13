@@ -43,7 +43,7 @@ read.csv('~/WERC-SC/HALE/catch_duplicateID_withtraploc.csv',
   mutate(date = as.POSIXct(date, format = '%Y-%m-%d')) %>%
   arrange(Trapline, TrapNum, date) %>%
   group_by(Trapline, TrapNum, StartDate) %>%
-  mutate(prevCheckInterval = difftime(lead(date), date, units = 'days') %>% as.numeric %>% floor) %>% 
+  mutate(prevCheckInterval = difftime(date, lag(date), units = 'days') %>% as.numeric %>% floor) %>% # mutate(prevCheckInterval = difftime(lead(date), date, units = 'days') %>% as.numeric %>% floor) %>% 
   ungroup %>%
   mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14) -> catch_traploc_weekChecks # change the number to adjust the "effort" interval
 
