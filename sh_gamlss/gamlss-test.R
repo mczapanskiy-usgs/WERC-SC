@@ -75,3 +75,12 @@ model.rankings <- foreach(dist.list = monthly.geo.ocean.models, .combine = rbind
                OceanAIC = tryCatch(extractAIC(models$ocean.model)[2], error = function(e) NA))
   }
 }
+
+model.rankings %>%
+  group_by(Month) %>%
+  arrange(-GeoConverged, GeoAIC) %>% 
+  slice(1:4)
+model.rankings %>%
+  group_by(Month) %>%
+  arrange(-OceanConverged, OceanAIC) %>% 
+  slice(1:4)

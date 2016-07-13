@@ -5,11 +5,15 @@ date: "July 12, 2016"
 output: html_document
 ---
 
+```{r set-options, echo = FALSE, cache = FALSE}
+options(width = 120)
+```
+
 Goal: demonstrate improved quality of seabird distribution models by incorporating individual tracking data
 Method: Locations from tracked sooty shearwaters have been aggregated into kernel density estimates. These utilization distributions will be used in conjunction with more commonly used variables to create distribution models. The model of choice is GAMLSS, for its ability to handle non-linear relationships and errors.
 
 1. Load packages
-```{r load_packages, message = FALSE}
+```{r load_packages, message = FALSE, warning = FALSE}
 library(dplyr)
 library(gamlss)
 library(foreach)
@@ -101,8 +105,14 @@ model.rankings <- foreach(dist.list = monthly.geo.ocean.models, .combine = rbind
 model.rankings
 ```
 
-5. The best fitting models mostly come from the July survey. The SI and SICHEL distributions worked best for both types of models.
+5. SI, SICHEL, and PIG distributions tend to perform the best (which makes sense, they're all closely related). The geographic models outperform their oceanographic counterparts in every month but June.
 ```{r best_fits}
-arrange(model.rankings, -GeoConverged, GeoAIC) %>% slice(1:5)
-arrange(model.rankings, -OceanConverged, OceanAIC) %>% slice(1:5)
+model.rankings %>%
+  group_by(Month) %>%
+  arrange(-GeoConverged, GeoAIC) %>% 
+  slice(1:4)
+model.rankings %>%
+  group_by(Month) %>%
+  arrange(-OceanConverged, OceanAIC) %>% 
+  slice(1:4)
 ```

@@ -11,7 +11,7 @@
 
 <meta name="author" content="Max Czapanskiy" />
 
-<meta name="date" content="2016-06-29" />
+<meta name="date" content="2016-07-12" />
 
 <title>SOSH GAMLSS</title>
 
@@ -118,127 +118,2394 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">SOSH GAMLSS</h1>
 <h4 class="author"><em>Max Czapanskiy</em></h4>
-<h4 class="date"><em>June 29, 2016</em></h4>
+<h4 class="date"><em>July 12, 2016</em></h4>
 
 </div>
 
 
-<p>Goal: demonstrate improved quality of seabird distribution models by incorporating individual tracking data Method: Locations from tracked sooty shearwaters have been aggregated into kernel density estimates. These home ranges will be used in conjunction with more commonly used variables to create distribution models. The model of choice is GAMLSS, for its ability to handle non-linear relationships and errors.</p>
-<p>Our progress so far. 1. Load packages</p>
-<pre class="r"><code>library(dplyr)</code></pre>
-<pre><code>## Warning: package 'dplyr' was built under R version 3.2.5</code></pre>
-<pre><code>## 
-## Attaching package: 'dplyr'</code></pre>
-<pre><code>## The following objects are masked from 'package:stats':
-## 
-##     filter, lag</code></pre>
-<pre><code>## The following objects are masked from 'package:base':
-## 
-##     intersect, setdiff, setequal, union</code></pre>
-<pre class="r"><code>library(gamlss)</code></pre>
-<pre><code>## Warning: package 'gamlss' was built under R version 3.2.5</code></pre>
-<pre><code>## Loading required package: splines</code></pre>
-<pre><code>## Loading required package: gamlss.data</code></pre>
-<pre><code>## Warning: package 'gamlss.data' was built under R version 3.2.5</code></pre>
-<pre><code>## Loading required package: gamlss.dist</code></pre>
-<pre><code>## Warning: package 'gamlss.dist' was built under R version 3.2.5</code></pre>
-<pre><code>## Loading required package: MASS</code></pre>
-<pre><code>## 
-## Attaching package: 'MASS'</code></pre>
-<pre><code>## The following object is masked from 'package:dplyr':
-## 
-##     select</code></pre>
-<pre><code>## Loading required package: nlme</code></pre>
-<pre><code>## 
-## Attaching package: 'nlme'</code></pre>
-<pre><code>## The following object is masked from 'package:dplyr':
-## 
-##     collapse</code></pre>
-<pre><code>## Loading required package: parallel</code></pre>
-<pre><code>##  **********   GAMLSS Version 4.4-0  **********</code></pre>
-<pre><code>## For more on GAMLSS look at http://www.gamlss.org/</code></pre>
-<pre><code>## Type gamlssNews() to see new features/changes/bug fixes.</code></pre>
-<ol start="2" style="list-style-type: decimal">
-<li>data</li>
+<p>Goal: demonstrate improved quality of seabird distribution models by incorporating individual tracking data Method: Locations from tracked sooty shearwaters have been aggregated into kernel density estimates. These utilization distributions will be used in conjunction with more commonly used variables to create distribution models. The model of choice is GAMLSS, for its ability to handle non-linear relationships and errors.</p>
+<ol style="list-style-type: decimal">
+<li>Load packages</li>
 </ol>
-<pre class="r"><code>sosh.data &lt;- read.csv('TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %&gt;%
-  dplyr::select(SOSHcount, Binarea, Month, FCPI, Dist200, SSTmean) %&gt;%
+<pre class="r"><code>library(dplyr)
+library(gamlss)
+library(foreach)</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>Load data</li>
+</ol>
+<pre class="r"><code>sosh.data &lt;- read.csv('TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %&gt;% 
+  dplyr::select(SOSHcount, Binarea, Month, 
+                Latitude, DistCoast, Dist200, DepCI,
+                SSTmean, STD_SST, MEAN_Beaufort, L10CHLproxy, STD_CHL_log10, Watermass,
+                L10CHLsurvey, CHLsurvanom, L10CHLsurvclim, FCPI) %&gt;%
   filter(Month &gt; 2) %&gt;% # exclude tiny January, February surveys
   mutate(SOSHcount = as.integer(SOSHcount),
          Month = factor(Month)) %&gt;%
   na.omit
 head(sosh.data)</code></pre>
-<pre><code>##   SOSHcount   Binarea Month      FCPI  Dist200  SSTmean
-## 1         0 0.6070346     7 0.1824324 39.84471 15.10290
-## 2         0 1.0199987     7 0.2905405 11.65864 14.72605
-## 3         0 1.0199989     7 0.2770270 17.33907 15.30328
-## 4         0 1.0164059     7 0.2567568 22.74802 15.38545
-## 5         0 1.0199985     7 0.2905405 28.56728 15.70420
-## 6         0 1.0199988     7 0.2364865 34.69352 15.70320</code></pre>
+<pre><code>##   SOSHcount   Binarea Month Latitude DistCoast  Dist200     DepCI  SSTmean   STD_SST MEAN_Beaufort L10CHLproxy
+## 1         0 0.6070346     7 45.74943 90.730011 39.84471 0.3441763 15.10290 0.1543211             3 -0.13471743
+## 2         0 1.0199987     7 45.75098 31.043267 11.65864 0.1656442 14.72605 0.5041291             3 -0.09102068
+## 3         0 1.0199989     7 45.75140 24.261040 17.33907 0.1140940 15.30328 0.1757790             3  0.00484971
+## 4         0 1.0164059     7 45.75116 17.711237 22.74802 0.2592593 15.38545 0.2115198             3  0.07141375
+## 5         0 1.0199985     7 45.75159 11.183655 28.56728 0.2884615 15.70420 0.1791671             3  0.16948388
+## 6         0 1.0199988     7 45.75038  4.532045 34.69352 0.6710526 15.70320 0.1887719             3  0.31959755
+##   STD_CHL_log10 Watermass L10CHLsurvey CHLsurvanom L10CHLsurvclim      FCPI
+## 1    0.02840480         3   -0.7665744  -1.2941501     -0.2932137 0.1824324
+## 2    0.06258219         3    0.3587903  -1.5384094      0.6951271 0.2905405
+## 3    0.02031565         1    0.4023360  -1.5200367      0.7013794 0.2770270
+## 4    0.05416992         1    0.2798753  -1.5658311      0.7424677 0.2567568
+## 5    0.02248318         2    0.5573132  -0.8559388      0.8132451 0.2905405
+## 6    0.04746003         2    0.5720522  -0.3275567      0.7162526 0.2364865</code></pre>
 <pre class="r"><code>summary(sosh.data)</code></pre>
-<pre><code>##    SOSHcount          Binarea       Month         FCPI         
-##  Min.   :  0.000   Min.   :0.0122   6 :587   Min.   :0.006757  
-##  1st Qu.:  0.000   1st Qu.:0.5100   7 :573   1st Qu.:0.175676  
-##  Median :  0.000   Median :1.0200   9 :574   Median :0.216216  
-##  Mean   :  4.009   Mean   :0.8312   10:602   Mean   :0.213781  
-##  3rd Qu.:  1.000   3rd Qu.:1.0200            3rd Qu.:0.250000  
-##  Max.   :595.000   Max.   :1.0200            Max.   :0.317568  
-##     Dist200            SSTmean      
-##  Min.   : 0.01411   Min.   : 8.371  
-##  1st Qu.: 7.70763   1st Qu.:12.741  
-##  Median :17.27896   Median :13.943  
-##  Mean   :19.86010   Mean   :13.683  
-##  3rd Qu.:29.41150   3rd Qu.:14.847  
-##  Max.   :80.15171   Max.   :16.916</code></pre>
+<pre><code>##    SOSHcount          Binarea       Month       Latitude       DistCoast          Dist200             DepCI        
+##  Min.   :  0.000   Min.   :0.0122   6 :512   Min.   :39.25   Min.   :  1.974   Min.   : 0.01411   Min.   :0.01885  
+##  1st Qu.:  0.000   1st Qu.:0.5100   7 :561   1st Qu.:41.25   1st Qu.: 11.506   1st Qu.: 7.87697   1st Qu.:0.23184  
+##  Median :  0.000   Median :1.0200   9 :569   Median :44.00   Median : 22.894   Median :17.27896   Median :0.33641  
+##  Mean   :  3.879   Mean   :0.8249   10:538   Mean   :43.59   Mean   : 33.173   Mean   :19.79308   Mean   :0.42077  
+##  3rd Qu.:  0.000   3rd Qu.:1.0200            3rd Qu.:45.55   3rd Qu.: 50.999   3rd Qu.:29.18043   3rd Qu.:0.57890  
+##  Max.   :595.000   Max.   :1.0200            Max.   :47.05   Max.   :125.649   Max.   :80.15171   Max.   :1.00000  
+##     SSTmean          STD_SST       MEAN_Beaufort    L10CHLproxy       STD_CHL_log10       Watermass    
+##  Min.   : 8.371   Min.   :0.0000   Min.   :0.000   Min.   :-0.60703   Min.   :0.00000   Min.   :1.000  
+##  1st Qu.:12.785   1st Qu.:0.1609   1st Qu.:2.000   1st Qu.:-0.04165   1st Qu.:0.02528   1st Qu.:1.000  
+##  Median :13.956   Median :0.1940   Median :2.729   Median : 0.17588   Median :0.04042   Median :3.000  
+##  Mean   :13.705   Mean   :0.2534   Mean   :2.575   Mean   : 0.14823   Mean   :0.05143   Mean   :2.444  
+##  3rd Qu.:14.861   3rd Qu.:0.2822   3rd Qu.:3.037   3rd Qu.: 0.32251   3rd Qu.:0.06532   3rd Qu.:3.000  
+##  Max.   :16.916   Max.   :1.3345   Max.   :6.000   Max.   : 1.06842   Max.   :0.39497   Max.   :4.000  
+##   L10CHLsurvey      CHLsurvanom      L10CHLsurvclim          FCPI        
+##  Min.   :-0.7825   Min.   :-2.2561   Min.   :-0.53229   Min.   :0.03378  
+##  1st Qu.:-0.1748   1st Qu.:-0.8558   1st Qu.:-0.00885   1st Qu.:0.17568  
+##  Median : 0.1007   Median :-0.3395   Median : 0.32011   Median :0.21622  
+##  Mean   : 0.1674   Mean   :-0.3365   Mean   : 0.32061   Mean   :0.21730  
+##  3rd Qu.: 0.4927   3rd Qu.: 0.2051   3rd Qu.: 0.64963   3rd Qu.:0.25676  
+##  Max.   : 1.4523   Max.   : 1.8245   Max.   : 1.13857   Max.   :0.31757</code></pre>
 <ol start="3" style="list-style-type: decimal">
-<li>Create models using canonical discrete distributions WITHOUT home range variable:</li>
+<li>Create geographic and oceanographic models by month using canonical discrete distributions WITHOUT home range variable:</li>
 </ol>
 <pre class="r"><code># Create models using canonical discrete distributions.
 # SOSHcount as function of FCPI, Dist200, SSTmean (all three cubic splines) with Month as random variable 
 # and log(Binarea) as offset
+# Create models using canonical discrete distributions for each month.
+# Geographic + oceanographic models
+# geo = SOSHcount ~  cs(Latitude)+cs(DistCoast)+cs(Dist200)+cs(DepCI) + offset(log(Binarea))
+# ocean = SOSHcount ~ cs(SSTmean)+cs(STD_SST)+cs(MEAN_Beaufort)+cs(L10CHLproxy)+cs(STD_CHL_log10)+Watermass+cs(L10CHLsurvey)+
+#   cs(CHLsurvanom)+cs(L10CHLsurvclim)+cs(FCPI) + offset(log(Binarea))
 discrete.dist &lt;- c('PO', 'NBI', 'NBII', 'DEL', 'PIG', 'SI', 'SICHEL', 'ZIP', 'ZIP2')
-all.models &lt;- lapply(discrete.dist, function(dist) {
-  gamlss(SOSHcount ~ cs(FCPI) + cs(Dist200) + cs(SSTmean) +
-           offset(log(Binarea)) + random(Month),
-         data = sosh.data, 
-         family = get('dist'))
-})</code></pre>
+months &lt;- c(6, 7, 9, 10)
+# For each discrete distribution...
+monthly.geo.ocean.models &lt;- foreach(dist = discrete.dist) %do% {
+  # For each month's survey...
+  foreach(month = months) %do% {
+    print(sprintf('Distribution %s, month %i', dist, month))
+    
+    # Filter SOSH data to the month of interest
+    month.data &lt;- filter(sosh.data, Month == month)
+    if(nrow(month.data) == 0) stop(sprintf('No data in month %i', month))
+    
+    # Fit geographic model
+    print('Fitting geographic model')
+    geo.model &lt;- try(gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                            data = month.data,
+                            family = get('dist')))
+    # Try one round of refitting if it doesn't converge
+    if(class(geo.model) != 'try-error' &amp;&amp; !getElement(geo.model, 'converged')) {
+      print('Refitting geographic model')
+      try(geo.model &lt;- refit(geo.model))
+    }
+    
+    # Fit oceanographic model
+    print('Fitting oceanographic model')
+    ocean.model &lt;- try(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                                cs(STD_CHL_log10) + Watermass + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                                cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                              data = month.data,
+                              family = get('dist')))
+    # Try one round of refitting if it doesn't converge
+    if(class(ocean.model) != 'try-error' &amp;&amp; !getElement(ocean.model, 'converged')) {
+      print('Refitting oceanographic model')
+      try(ocean.model &lt;- refit(ocean.model))
+    }
+    
+    list(dist = dist,
+         month = month,
+         geo.model = geo.model,
+         ocean.model = ocean.model)
+  }
+}</code></pre>
+<pre><code>## [1] &quot;Distribution PO, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 14394.4 
+## GAMLSS-RS iteration 2: Global Deviance = 14394.41 
+## GAMLSS-RS iteration 3: Global Deviance = 14394.44 
+## GAMLSS-RS iteration 4: Global Deviance = 14394.41 
+## GAMLSS-RS iteration 5: Global Deviance = 14394.37 
+## GAMLSS-RS iteration 6: Global Deviance = 14394.43 
+## GAMLSS-RS iteration 7: Global Deviance = 14394.37 
+## GAMLSS-RS iteration 8: Global Deviance = 14394.47 
+## GAMLSS-RS iteration 9: Global Deviance = 14394.43 
+## GAMLSS-RS iteration 10: Global Deviance = 14394.38 
+## GAMLSS-RS iteration 11: Global Deviance = 14394.37 
+## GAMLSS-RS iteration 12: Global Deviance = 14394.4 
+## GAMLSS-RS iteration 13: Global Deviance = 14394.38 
+## GAMLSS-RS iteration 14: Global Deviance = 14394.32 
+## GAMLSS-RS iteration 15: Global Deviance = 14394.36 
+## GAMLSS-RS iteration 16: Global Deviance = 14394.36 
+## GAMLSS-RS iteration 17: Global Deviance = 14394.48 
+## GAMLSS-RS iteration 18: Global Deviance = 14394.38 
+## GAMLSS-RS iteration 19: Global Deviance = 14394.44 
+## GAMLSS-RS iteration 20: Global Deviance = 14394.36</code></pre>
 <pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
-<pre><code>## Warning in runif(length(y), aval, bval): NAs produced</code></pre>
-<pre><code>## Warning in RS(): Algorithm RS has not yet converged
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 14394.48 
+## GAMLSS-RS iteration 22: Global Deviance = 14394.48 
+## GAMLSS-RS iteration 23: Global Deviance = 14394.42 
+## GAMLSS-RS iteration 24: Global Deviance = 14394.42 
+## GAMLSS-RS iteration 25: Global Deviance = 14394.42 
+## GAMLSS-RS iteration 26: Global Deviance = 14394.45 
+## GAMLSS-RS iteration 27: Global Deviance = 14394.42 
+## GAMLSS-RS iteration 28: Global Deviance = 14394.43 
+## GAMLSS-RS iteration 29: Global Deviance = 14394.41 
+## GAMLSS-RS iteration 30: Global Deviance = 14394.46 
+## GAMLSS-RS iteration 31: Global Deviance = 14394.41 
+## GAMLSS-RS iteration 32: Global Deviance = 14394.4 
+## GAMLSS-RS iteration 33: Global Deviance = 14394.39 
+## GAMLSS-RS iteration 34: Global Deviance = 14394.41 
+## GAMLSS-RS iteration 35: Global Deviance = 14394.34 
+## GAMLSS-RS iteration 36: Global Deviance = 14394.4 
+## GAMLSS-RS iteration 37: Global Deviance = 14394.48 
+## GAMLSS-RS iteration 38: Global Deviance = 14394.16 
+## GAMLSS-RS iteration 39: Global Deviance = 14394.41 
+## GAMLSS-RS iteration 40: Global Deviance = 14394.41 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 9867.783 
+## GAMLSS-RS iteration 2: Global Deviance = 9867.775 
+## GAMLSS-RS iteration 3: Global Deviance = 9867.769 
+## GAMLSS-RS iteration 4: Global Deviance = 9867.766 
+## GAMLSS-RS iteration 5: Global Deviance = 9867.761 
+## GAMLSS-RS iteration 6: Global Deviance = 9867.761 
+## [1] &quot;Distribution PO, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 2857.297 
+## GAMLSS-RS iteration 2: Global Deviance = 2856.612 
+## GAMLSS-RS iteration 3: Global Deviance = 2856.606 
+## GAMLSS-RS iteration 4: Global Deviance = 2856.593 
+## GAMLSS-RS iteration 5: Global Deviance = 2856.596 
+## GAMLSS-RS iteration 6: Global Deviance = 2856.597 
+## GAMLSS-RS iteration 7: Global Deviance = 2856.597 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 2138.019 
+## GAMLSS-RS iteration 2: Global Deviance = 2138.257 
+## GAMLSS-RS iteration 3: Global Deviance = 2138.436 
+## GAMLSS-RS iteration 4: Global Deviance = 2138.484 
+## GAMLSS-RS iteration 5: Global Deviance = 2138.523 
+## GAMLSS-RS iteration 6: Global Deviance = 2138.549 
+## GAMLSS-RS iteration 7: Global Deviance = 2138.564 
+## GAMLSS-RS iteration 8: Global Deviance = 2138.574 
+## GAMLSS-RS iteration 9: Global Deviance = 2138.58 
+## GAMLSS-RS iteration 10: Global Deviance = 2138.591 
+## GAMLSS-RS iteration 11: Global Deviance = 2138.591 
+## [1] &quot;Distribution PO, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 2885.538 
+## GAMLSS-RS iteration 2: Global Deviance = 2885.36 
+## GAMLSS-RS iteration 3: Global Deviance = 2885.309 
+## GAMLSS-RS iteration 4: Global Deviance = 2884.99 
+## GAMLSS-RS iteration 5: Global Deviance = 2885.377 
+## GAMLSS-RS iteration 6: Global Deviance = 2885.345 
+## GAMLSS-RS iteration 7: Global Deviance = 2885.391 
+## GAMLSS-RS iteration 8: Global Deviance = 2885.012 
+## GAMLSS-RS iteration 9: Global Deviance = 2885.16 
+## GAMLSS-RS iteration 10: Global Deviance = 2885.107 
+## GAMLSS-RS iteration 11: Global Deviance = 2885.108 
+## GAMLSS-RS iteration 12: Global Deviance = 2885.271 
+## GAMLSS-RS iteration 13: Global Deviance = 2885.119 
+## GAMLSS-RS iteration 14: Global Deviance = 2884.724 
+## GAMLSS-RS iteration 15: Global Deviance = 2884.72 
+## GAMLSS-RS iteration 16: Global Deviance = 2884.7 
+## GAMLSS-RS iteration 17: Global Deviance = 2883.008 
+## GAMLSS-RS iteration 18: Global Deviance = 2884.596 
+## GAMLSS-RS iteration 19: Global Deviance = 2884.388 
+## GAMLSS-RS iteration 20: Global Deviance = 2884.372</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 2886.92 
+## GAMLSS-RS iteration 22: Global Deviance = 2885.734 
+## GAMLSS-RS iteration 23: Global Deviance = 2885.764 
+## GAMLSS-RS iteration 24: Global Deviance = 2885.731 
+## GAMLSS-RS iteration 25: Global Deviance = 2885.565 
+## GAMLSS-RS iteration 26: Global Deviance = 2885.688 
+## GAMLSS-RS iteration 27: Global Deviance = 2885.907 
+## GAMLSS-RS iteration 28: Global Deviance = 2885.706 
+## GAMLSS-RS iteration 29: Global Deviance = 2885.519 
+## GAMLSS-RS iteration 30: Global Deviance = 2885.554 
+## GAMLSS-RS iteration 31: Global Deviance = 2885.715 
+## GAMLSS-RS iteration 32: Global Deviance = 2885.102 
+## GAMLSS-RS iteration 33: Global Deviance = 2885.433 
+## GAMLSS-RS iteration 34: Global Deviance = 2885.505 
+## GAMLSS-RS iteration 35: Global Deviance = 2885.343 
+## GAMLSS-RS iteration 36: Global Deviance = 2885.139 
+## GAMLSS-RS iteration 37: Global Deviance = 2885.223 
+## GAMLSS-RS iteration 38: Global Deviance = 2885.395 
+## GAMLSS-RS iteration 39: Global Deviance = 2885.167 
+## GAMLSS-RS iteration 40: Global Deviance = 2885.576</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 2321.512 
+## GAMLSS-RS iteration 2: Global Deviance = 2321.511 
+## [1] &quot;Distribution PO, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 3786.557 
+## GAMLSS-RS iteration 2: Global Deviance = 3786.328 
+## GAMLSS-RS iteration 3: Global Deviance = 3781.318 
+## GAMLSS-RS iteration 4: Global Deviance = 3784.655 
+## GAMLSS-RS iteration 5: Global Deviance = 3784.661 
+## GAMLSS-RS iteration 6: Global Deviance = 3782.794 
+## GAMLSS-RS iteration 7: Global Deviance = 3779.487 
+## GAMLSS-RS iteration 8: Global Deviance = 3786.39 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1930.961 
+## GAMLSS-RS iteration 2: Global Deviance = 1930.969 
+## GAMLSS-RS iteration 3: Global Deviance = 1930.983 
+## GAMLSS-RS iteration 4: Global Deviance = 1930.995 
+## GAMLSS-RS iteration 5: Global Deviance = 1931.003 
+## GAMLSS-RS iteration 6: Global Deviance = 1931.008 
+## GAMLSS-RS iteration 7: Global Deviance = 1931.012 
+## GAMLSS-RS iteration 8: Global Deviance = 1931.014 
+## GAMLSS-RS iteration 9: Global Deviance = 1931.014 
+## [1] &quot;Distribution NBI, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1557.722 
+## GAMLSS-RS iteration 2: Global Deviance = 1557.908 
+## GAMLSS-RS iteration 3: Global Deviance = 1558.043 
+## GAMLSS-RS iteration 4: Global Deviance = 1558.065 
+## GAMLSS-RS iteration 5: Global Deviance = 1558.07 
+## GAMLSS-RS iteration 6: Global Deviance = 1558.071 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1503.688 
+## GAMLSS-RS iteration 2: Global Deviance = 1501.889 
+## GAMLSS-RS iteration 3: Global Deviance = 1502.042 
+## GAMLSS-RS iteration 4: Global Deviance = 1502.08 
+## GAMLSS-RS iteration 5: Global Deviance = 1502.088 
+## GAMLSS-RS iteration 6: Global Deviance = 1502.107 
+## GAMLSS-RS iteration 7: Global Deviance = 1502.119 
+## GAMLSS-RS iteration 8: Global Deviance = 1502.132 
+## GAMLSS-RS iteration 9: Global Deviance = 1502.13 
+## GAMLSS-RS iteration 10: Global Deviance = 1502.13 
+## [1] &quot;Distribution NBI, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 821.6391 
+## GAMLSS-RS iteration 2: Global Deviance = 815.1053 
+## GAMLSS-RS iteration 3: Global Deviance = 814.7739 
+## GAMLSS-RS iteration 4: Global Deviance = 814.7342 
+## GAMLSS-RS iteration 5: Global Deviance = 814.7345 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 799.7948 
+## GAMLSS-RS iteration 2: Global Deviance = 795.3689 
+## GAMLSS-RS iteration 3: Global Deviance = 795.4297 
+## GAMLSS-RS iteration 4: Global Deviance = 795.2628 
+## GAMLSS-RS iteration 5: Global Deviance = 795.2247 
+## GAMLSS-RS iteration 6: Global Deviance = 795.2145 
+## GAMLSS-RS iteration 7: Global Deviance = 795.2073 
+## GAMLSS-RS iteration 8: Global Deviance = 795.2047 
+## GAMLSS-RS iteration 9: Global Deviance = 795.2174 
+## GAMLSS-RS iteration 10: Global Deviance = 795.2054 
+## GAMLSS-RS iteration 11: Global Deviance = 795.2131 
+## GAMLSS-RS iteration 12: Global Deviance = 795.2035 
+## GAMLSS-RS iteration 13: Global Deviance = 795.2121 
+## GAMLSS-RS iteration 14: Global Deviance = 795.2091 
+## GAMLSS-RS iteration 15: Global Deviance = 795.2026 
+## GAMLSS-RS iteration 16: Global Deviance = 795.2122 
+## GAMLSS-RS iteration 17: Global Deviance = 795.2092 
+## GAMLSS-RS iteration 18: Global Deviance = 795.2026 
+## GAMLSS-RS iteration 19: Global Deviance = 795.2113 
+## GAMLSS-RS iteration 20: Global Deviance = 795.2084</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 795.1921 
+## GAMLSS-RS iteration 22: Global Deviance = 795.2108 
+## GAMLSS-RS iteration 23: Global Deviance = 795.2092 
+## GAMLSS-RS iteration 24: Global Deviance = 795.2029 
+## GAMLSS-RS iteration 25: Global Deviance = 795.2126 
+## GAMLSS-RS iteration 26: Global Deviance = 795.2035 
+## GAMLSS-RS iteration 27: Global Deviance = 795.2119 
+## GAMLSS-RS iteration 28: Global Deviance = 795.2091 
+## GAMLSS-RS iteration 29: Global Deviance = 795.2026 
+## GAMLSS-RS iteration 30: Global Deviance = 795.2112 
+## GAMLSS-RS iteration 31: Global Deviance = 795.2024 
+## GAMLSS-RS iteration 32: Global Deviance = 795.2128 
+## GAMLSS-RS iteration 33: Global Deviance = 795.2033 
+## GAMLSS-RS iteration 34: Global Deviance = 795.2113 
+## GAMLSS-RS iteration 35: Global Deviance = 795.2026 
+## GAMLSS-RS iteration 36: Global Deviance = 795.2128 
+## GAMLSS-RS iteration 37: Global Deviance = 795.2035 
+## GAMLSS-RS iteration 38: Global Deviance = 795.2114 
+## GAMLSS-RS iteration 39: Global Deviance = 795.2027 
+## GAMLSS-RS iteration 40: Global Deviance = 795.2129</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Distribution NBI, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
 
-## Warning in RS(): Algorithm RS has not yet converged
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
 
-## Warning in RS(): Algorithm RS has not yet converged
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
 
-## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 1293.535</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 2: Global Deviance = 1290.145</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 3: Global Deviance = 1290.091</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 4: Global Deviance = 1289.867 
+## GAMLSS-RS iteration 5: Global Deviance = 1289.888 
+## GAMLSS-RS iteration 6: Global Deviance = 1289.881</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 7: Global Deviance = 1289.511 
+## GAMLSS-RS iteration 8: Global Deviance = 1289.607</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 9: Global Deviance = 1289.33</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 10: Global Deviance = 1289.397</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 11: Global Deviance = 1289.337 
+## GAMLSS-RS iteration 12: Global Deviance = 1288.831</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 13: Global Deviance = 1289.292</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 14: Global Deviance = 1289.017</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 15: Global Deviance = 1292.818</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 16: Global Deviance = 1294.328</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 17: Global Deviance = 1294.013</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 18: Global Deviance = 1292.552</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 19: Global Deviance = 1298.786 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1295.916 
+## GAMLSS-RS iteration 2: Global Deviance = 1291.95 
+## GAMLSS-RS iteration 3: Global Deviance = 1292.045 
+## GAMLSS-RS iteration 4: Global Deviance = 1292.083 
+## GAMLSS-RS iteration 5: Global Deviance = 1292.095 
+## GAMLSS-RS iteration 6: Global Deviance = 1292.1 
+## GAMLSS-RS iteration 7: Global Deviance = 1292.103 
+## GAMLSS-RS iteration 8: Global Deviance = 1292.102 
+## GAMLSS-RS iteration 9: Global Deviance = 1292.098 
+## GAMLSS-RS iteration 10: Global Deviance = 1292.098 
+## [1] &quot;Distribution NBI, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 878.1034 
+## GAMLSS-RS iteration 2: Global Deviance = 871.751 
+## GAMLSS-RS iteration 3: Global Deviance = 870.6974 
+## GAMLSS-RS iteration 4: Global Deviance = 870.4285 
+## GAMLSS-RS iteration 5: Global Deviance = 870.3498 
+## GAMLSS-RS iteration 6: Global Deviance = 870.3326 
+## GAMLSS-RS iteration 7: Global Deviance = 870.3295 
+## GAMLSS-RS iteration 8: Global Deviance = 870.2999 
+## GAMLSS-RS iteration 9: Global Deviance = 870.3089 
+## GAMLSS-RS iteration 10: Global Deviance = 870.319 
+## GAMLSS-RS iteration 11: Global Deviance = 870.318 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 935.8702 
+## GAMLSS-RS iteration 2: Global Deviance = 918.4264 
+## GAMLSS-RS iteration 3: Global Deviance = 917.8217 
+## GAMLSS-RS iteration 4: Global Deviance = 917.8839 
+## GAMLSS-RS iteration 5: Global Deviance = 918.0382 
+## GAMLSS-RS iteration 6: Global Deviance = 918.2308 
+## GAMLSS-RS iteration 7: Global Deviance = 918.43 
+## GAMLSS-RS iteration 8: Global Deviance = 918.6173 
+## GAMLSS-RS iteration 9: Global Deviance = 918.782 
+## GAMLSS-RS iteration 10: Global Deviance = 918.9199 
+## GAMLSS-RS iteration 11: Global Deviance = 918.9785 
+## GAMLSS-RS iteration 12: Global Deviance = 919.0162 
+## GAMLSS-RS iteration 13: Global Deviance = 919.0564 
+## GAMLSS-RS iteration 14: Global Deviance = 919.0978 
+## GAMLSS-RS iteration 15: Global Deviance = 919.1331 
+## GAMLSS-RS iteration 16: Global Deviance = 919.1637 
+## GAMLSS-RS iteration 17: Global Deviance = 919.1886 
+## GAMLSS-RS iteration 18: Global Deviance = 919.2106 
+## GAMLSS-RS iteration 19: Global Deviance = 919.2274 
+## GAMLSS-RS iteration 20: Global Deviance = 919.2411</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 910.4252 
+## GAMLSS-RS iteration 22: Global Deviance = 905.354 
+## GAMLSS-RS iteration 23: Global Deviance = 903.1109 
+## GAMLSS-RS iteration 24: Global Deviance = 902.9818 
+## GAMLSS-RS iteration 25: Global Deviance = 902.9646 
+## GAMLSS-RS iteration 26: Global Deviance = 902.9498 
+## GAMLSS-RS iteration 27: Global Deviance = 902.9506 
+## [1] &quot;Distribution NBII, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1610.754 
+## GAMLSS-RS iteration 2: Global Deviance = 1607.594 
+## GAMLSS-RS iteration 3: Global Deviance = 1605.433 
+## GAMLSS-RS iteration 4: Global Deviance = 1604.034 
+## GAMLSS-RS iteration 5: Global Deviance = 1603.176 
+## GAMLSS-RS iteration 6: Global Deviance = 1602.678 
+## GAMLSS-RS iteration 7: Global Deviance = 1602.397 
+## GAMLSS-RS iteration 8: Global Deviance = 1602.248 
+## GAMLSS-RS iteration 9: Global Deviance = 1602.156 
+## GAMLSS-RS iteration 10: Global Deviance = 1602.116 
+## GAMLSS-RS iteration 11: Global Deviance = 1602.105 
+## GAMLSS-RS iteration 12: Global Deviance = 1602.093 
+## GAMLSS-RS iteration 13: Global Deviance = 1602.079 
+## GAMLSS-RS iteration 14: Global Deviance = 1602.075 
+## GAMLSS-RS iteration 15: Global Deviance = 1602.074 
+## GAMLSS-RS iteration 16: Global Deviance = 1602.074 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1568.209 
+## GAMLSS-RS iteration 2: Global Deviance = 1564.099 
+## GAMLSS-RS iteration 3: Global Deviance = 1561.279 
+## GAMLSS-RS iteration 4: Global Deviance = 1559.499 
+## GAMLSS-RS iteration 5: Global Deviance = 1558.379 
+## GAMLSS-RS iteration 6: Global Deviance = 1557.755 
+## GAMLSS-RS iteration 7: Global Deviance = 1557.474 
+## GAMLSS-RS iteration 8: Global Deviance = 1557.278 
+## GAMLSS-RS iteration 9: Global Deviance = 1557.231 
+## GAMLSS-RS iteration 10: Global Deviance = 1557.165 
+## GAMLSS-RS iteration 11: Global Deviance = 1557.135 
+## GAMLSS-RS iteration 12: Global Deviance = 1557.154 
+## GAMLSS-RS iteration 13: Global Deviance = 1557.138 
+## GAMLSS-RS iteration 14: Global Deviance = 1557.141 
+## GAMLSS-RS iteration 15: Global Deviance = 1557.14 
+## [1] &quot;Distribution NBII, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 912.82 
+## GAMLSS-RS iteration 2: Global Deviance = 905.0899 
+## GAMLSS-RS iteration 3: Global Deviance = 897.5793 
+## GAMLSS-RS iteration 4: Global Deviance = 891.1777 
+## GAMLSS-RS iteration 5: Global Deviance = 885.7691 
+## GAMLSS-RS iteration 6: Global Deviance = 881.5469 
+## GAMLSS-RS iteration 7: Global Deviance = 878.493 
+## GAMLSS-RS iteration 8: Global Deviance = 876.4639 
+## GAMLSS-RS iteration 9: Global Deviance = 875.2281 
+## GAMLSS-RS iteration 10: Global Deviance = 874.5217 
+## GAMLSS-RS iteration 11: Global Deviance = 874.0031 
+## GAMLSS-RS iteration 12: Global Deviance = 873.9253 
+## GAMLSS-RS iteration 13: Global Deviance = 873.8504 
+## GAMLSS-RS iteration 14: Global Deviance = 873.8199 
+## GAMLSS-RS iteration 15: Global Deviance = 873.8097 
+## GAMLSS-RS iteration 16: Global Deviance = 873.8149 
+## GAMLSS-RS iteration 17: Global Deviance = 873.8192 
+## GAMLSS-RS iteration 18: Global Deviance = 873.8171 
+## GAMLSS-RS iteration 19: Global Deviance = 873.8235 
+## GAMLSS-RS iteration 20: Global Deviance = 873.8235 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 907.2657 
+## GAMLSS-RS iteration 2: Global Deviance = 900.4375 
+## GAMLSS-RS iteration 3: Global Deviance = 893.821 
+## GAMLSS-RS iteration 4: Global Deviance = 888.1164 
+## GAMLSS-RS iteration 5: Global Deviance = 883.2539 
+## GAMLSS-RS iteration 6: Global Deviance = 879.0427 
+## GAMLSS-RS iteration 7: Global Deviance = 876.0521 
+## GAMLSS-RS iteration 8: Global Deviance = 874.0868 
+## GAMLSS-RS iteration 9: Global Deviance = 872.7868 
+## GAMLSS-RS iteration 10: Global Deviance = 871.946 
+## GAMLSS-RS iteration 11: Global Deviance = 871.5576 
+## GAMLSS-RS iteration 12: Global Deviance = 871.3804 
+## GAMLSS-RS iteration 13: Global Deviance = 871.0949 
+## GAMLSS-RS iteration 14: Global Deviance = 871.1394 
+## GAMLSS-RS iteration 15: Global Deviance = 871.0956 
+## GAMLSS-RS iteration 16: Global Deviance = 871.1339 
+## GAMLSS-RS iteration 17: Global Deviance = 870.9796 
+## GAMLSS-RS iteration 18: Global Deviance = 870.9831 
+## GAMLSS-RS iteration 19: Global Deviance = 871.006 
+## GAMLSS-RS iteration 20: Global Deviance = 871.0097</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 871.0437 
+## GAMLSS-RS iteration 22: Global Deviance = 870.9988 
+## GAMLSS-RS iteration 23: Global Deviance = 871.0664 
+## GAMLSS-RS iteration 24: Global Deviance = 871.2128 
+## GAMLSS-RS iteration 25: Global Deviance = 871.2021 
+## GAMLSS-RS iteration 26: Global Deviance = 870.9251 
+## GAMLSS-RS iteration 27: Global Deviance = 870.9441 
+## GAMLSS-RS iteration 28: Global Deviance = 870.976 
+## GAMLSS-RS iteration 29: Global Deviance = 870.9944 
+## GAMLSS-RS iteration 30: Global Deviance = 871.0244 
+## GAMLSS-RS iteration 31: Global Deviance = 871.0247 
+## [1] &quot;Distribution NBII, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1386.353 
+## GAMLSS-RS iteration 2: Global Deviance = 1370.923 
+## GAMLSS-RS iteration 3: Global Deviance = 1360.222 
+## GAMLSS-RS iteration 4: Global Deviance = 1354.154 
+## GAMLSS-RS iteration 5: Global Deviance = 1351.318 
+## GAMLSS-RS iteration 6: Global Deviance = 1350.225 
+## GAMLSS-RS iteration 7: Global Deviance = 1349.908 
+## GAMLSS-RS iteration 8: Global Deviance = 1349.804 
+## GAMLSS-RS iteration 9: Global Deviance = 1349.781 
+## GAMLSS-RS iteration 10: Global Deviance = 1349.753 
+## GAMLSS-RS iteration 11: Global Deviance = 1349.724 
+## GAMLSS-RS iteration 12: Global Deviance = 1349.727 
+## GAMLSS-RS iteration 13: Global Deviance = 1349.765 
+## GAMLSS-RS iteration 14: Global Deviance = 1349.76 
+## GAMLSS-RS iteration 15: Global Deviance = 1349.772 
+## GAMLSS-RS iteration 16: Global Deviance = 1349.739 
+## GAMLSS-RS iteration 17: Global Deviance = 1349.741 
+## GAMLSS-RS iteration 18: Global Deviance = 1349.74 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1387.335 
+## GAMLSS-RS iteration 2: Global Deviance = 1372.469 
+## GAMLSS-RS iteration 3: Global Deviance = 1361.959 
+## GAMLSS-RS iteration 4: Global Deviance = 1355.744 
+## GAMLSS-RS iteration 5: Global Deviance = 1352.637 
+## GAMLSS-RS iteration 6: Global Deviance = 1351.257 
+## GAMLSS-RS iteration 7: Global Deviance = 1350.694 
+## GAMLSS-RS iteration 8: Global Deviance = 1350.453 
+## GAMLSS-RS iteration 9: Global Deviance = 1350.381 
+## GAMLSS-RS iteration 10: Global Deviance = 1350.322 
+## GAMLSS-RS iteration 11: Global Deviance = 1350.279 
+## GAMLSS-RS iteration 12: Global Deviance = 1350.245 
+## GAMLSS-RS iteration 13: Global Deviance = 1350.222 
+## GAMLSS-RS iteration 14: Global Deviance = 1350.205 
+## GAMLSS-RS iteration 15: Global Deviance = 1350.19 
+## GAMLSS-RS iteration 16: Global Deviance = 1350.179 
+## GAMLSS-RS iteration 17: Global Deviance = 1350.168 
+## GAMLSS-RS iteration 18: Global Deviance = 1350.161 
+## GAMLSS-RS iteration 19: Global Deviance = 1350.155 
+## GAMLSS-RS iteration 20: Global Deviance = 1350.149</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1350.184 
+## GAMLSS-RS iteration 22: Global Deviance = 1350.169 
+## GAMLSS-RS iteration 23: Global Deviance = 1350.139 
+## GAMLSS-RS iteration 24: Global Deviance = 1350.132 
+## GAMLSS-RS iteration 25: Global Deviance = 1350.13 
+## GAMLSS-RS iteration 26: Global Deviance = 1350.129 
+## [1] &quot;Distribution NBII, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 940.1006 
+## GAMLSS-RS iteration 2: Global Deviance = 933.9212 
+## GAMLSS-RS iteration 3: Global Deviance = 927.7803 
+## GAMLSS-RS iteration 4: Global Deviance = 921.5733 
+## GAMLSS-RS iteration 5: Global Deviance = 916.0414 
+## GAMLSS-RS iteration 6: Global Deviance = 911.0516 
+## GAMLSS-RS iteration 7: Global Deviance = 906.699 
+## GAMLSS-RS iteration 8: Global Deviance = 903.1272 
+## GAMLSS-RS iteration 9: Global Deviance = 900.5128 
+## GAMLSS-RS iteration 10: Global Deviance = 898.9023 
+## GAMLSS-RS iteration 11: Global Deviance = 897.5286 
+## GAMLSS-RS iteration 12: Global Deviance = 896.7211 
+## GAMLSS-RS iteration 13: Global Deviance = 896.2628 
+## GAMLSS-RS iteration 14: Global Deviance = 895.9411 
+## GAMLSS-RS iteration 15: Global Deviance = 895.7546 
+## GAMLSS-RS iteration 16: Global Deviance = 895.6823 
+## GAMLSS-RS iteration 17: Global Deviance = 895.6706 
+## GAMLSS-RS iteration 18: Global Deviance = 895.6154 
+## GAMLSS-RS iteration 19: Global Deviance = 895.6296 
+## GAMLSS-RS iteration 20: Global Deviance = 895.6072</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 895.6556 
+## GAMLSS-RS iteration 22: Global Deviance = 895.6339 
+## GAMLSS-RS iteration 23: Global Deviance = 895.6423 
+## GAMLSS-RS iteration 24: Global Deviance = 895.6558 
+## GAMLSS-RS iteration 25: Global Deviance = 895.6298 
+## GAMLSS-RS iteration 26: Global Deviance = 895.6384 
+## GAMLSS-RS iteration 27: Global Deviance = 895.6028 
+## GAMLSS-RS iteration 28: Global Deviance = 895.6455 
+## GAMLSS-RS iteration 29: Global Deviance = 895.6398 
+## GAMLSS-RS iteration 30: Global Deviance = 895.6417 
+## GAMLSS-RS iteration 31: Global Deviance = 895.627 
+## GAMLSS-RS iteration 32: Global Deviance = 895.6219 
+## GAMLSS-RS iteration 33: Global Deviance = 895.6324 
+## GAMLSS-RS iteration 34: Global Deviance = 895.6188 
+## GAMLSS-RS iteration 35: Global Deviance = 895.6241 
+## GAMLSS-RS iteration 36: Global Deviance = 895.64 
+## GAMLSS-RS iteration 37: Global Deviance = 895.6343 
+## GAMLSS-RS iteration 38: Global Deviance = 895.6404 
+## GAMLSS-RS iteration 39: Global Deviance = 895.6501 
+## GAMLSS-RS iteration 40: Global Deviance = 895.6497 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 913.9135 
+## GAMLSS-RS iteration 2: Global Deviance = 907.4655 
+## GAMLSS-RS iteration 3: Global Deviance = 900.9763 
+## GAMLSS-RS iteration 4: Global Deviance = 894.5936 
+## GAMLSS-RS iteration 5: Global Deviance = 888.4489 
+## GAMLSS-RS iteration 6: Global Deviance = 882.8296 
+## GAMLSS-RS iteration 7: Global Deviance = 877.8793 
+## GAMLSS-RS iteration 8: Global Deviance = 873.7034 
+## GAMLSS-RS iteration 9: Global Deviance = 870.3833 
+## GAMLSS-RS iteration 10: Global Deviance = 867.9323 
+## GAMLSS-RS iteration 11: Global Deviance = 865.5752 
+## GAMLSS-RS iteration 12: Global Deviance = 864.817 
+## GAMLSS-RS iteration 13: Global Deviance = 864.1698 
+## GAMLSS-RS iteration 14: Global Deviance = 863.7739 
+## GAMLSS-RS iteration 15: Global Deviance = 863.5302 
+## GAMLSS-RS iteration 16: Global Deviance = 863.3688 
+## GAMLSS-RS iteration 17: Global Deviance = 863.255 
+## GAMLSS-RS iteration 18: Global Deviance = 863.1781 
+## GAMLSS-RS iteration 19: Global Deviance = 863.1206 
+## GAMLSS-RS iteration 20: Global Deviance = 863.0275</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 862.9195 
+## GAMLSS-RS iteration 22: Global Deviance = 862.953 
+## GAMLSS-RS iteration 23: Global Deviance = 862.9176 
+## GAMLSS-RS iteration 24: Global Deviance = 862.8518 
+## GAMLSS-RS iteration 25: Global Deviance = 862.8424 
+## GAMLSS-RS iteration 26: Global Deviance = 862.7858 
+## GAMLSS-RS iteration 27: Global Deviance = 862.823 
+## GAMLSS-RS iteration 28: Global Deviance = 862.7423 
+## GAMLSS-RS iteration 29: Global Deviance = 862.6997 
+## GAMLSS-RS iteration 30: Global Deviance = 862.6696 
+## GAMLSS-RS iteration 31: Global Deviance = 862.6443 
+## GAMLSS-RS iteration 32: Global Deviance = 862.6215 
+## GAMLSS-RS iteration 33: Global Deviance = 862.6001 
+## GAMLSS-RS iteration 34: Global Deviance = 862.5829 
+## GAMLSS-RS iteration 35: Global Deviance = 862.5671 
+## GAMLSS-RS iteration 36: Global Deviance = 862.5532 
+## GAMLSS-RS iteration 37: Global Deviance = 862.5404 
+## GAMLSS-RS iteration 38: Global Deviance = 862.5286 
+## GAMLSS-RS iteration 39: Global Deviance = 862.5167 
+## GAMLSS-RS iteration 40: Global Deviance = 862.5077</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Distribution DEL, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1707.678 
+## GAMLSS-RS iteration 2: Global Deviance = 1642.213 
+## GAMLSS-RS iteration 3: Global Deviance = 1615.628 
+## GAMLSS-RS iteration 4: Global Deviance = 1594.653 
+## GAMLSS-RS iteration 5: Global Deviance = 1581.472 
+## GAMLSS-RS iteration 6: Global Deviance = 1571.039 
+## GAMLSS-RS iteration 7: Global Deviance = 1563.775 
+## GAMLSS-RS iteration 8: Global Deviance = 1559.11 
+## GAMLSS-RS iteration 9: Global Deviance = 1555.949 
+## GAMLSS-RS iteration 10: Global Deviance = 1554.145 
+## GAMLSS-RS iteration 11: Global Deviance = 1553.621 
+## GAMLSS-RS iteration 12: Global Deviance = 1554.465 
+## GAMLSS-RS iteration 13: Global Deviance = 1557.096 
+## GAMLSS-RS iteration 14: Global Deviance = 1562.765 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1601.196 
+## GAMLSS-RS iteration 2: Global Deviance = 1546.202 
+## GAMLSS-RS iteration 3: Global Deviance = 1529.47 
+## GAMLSS-RS iteration 4: Global Deviance = 1516.918 
+## GAMLSS-RS iteration 5: Global Deviance = 1507.335 
+## GAMLSS-RS iteration 6: Global Deviance = 1499.848 
+## GAMLSS-RS iteration 7: Global Deviance = 1493.89 
+## GAMLSS-RS iteration 8: Global Deviance = 1489.061 
+## GAMLSS-RS iteration 9: Global Deviance = 1485.059 
+## GAMLSS-RS iteration 10: Global Deviance = 1481.807 
+## GAMLSS-RS iteration 11: Global Deviance = 1479.053 
+## GAMLSS-RS iteration 12: Global Deviance = 1476.768 
+## GAMLSS-RS iteration 13: Global Deviance = 1474.932 
+## GAMLSS-RS iteration 14: Global Deviance = 1473.396 
+## GAMLSS-RS iteration 15: Global Deviance = 1472.149 
+## GAMLSS-RS iteration 16: Global Deviance = 1471.165 
+## GAMLSS-RS iteration 17: Global Deviance = 1470.698 
+## GAMLSS-RS iteration 18: Global Deviance = 1470.365 
+## GAMLSS-RS iteration 19: Global Deviance = 1469.011 
+## GAMLSS-RS iteration 20: Global Deviance = 1469.992</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1471.607 
+## GAMLSS-RS iteration 22: Global Deviance = 1471.284 
+## GAMLSS-RS iteration 23: Global Deviance = 1517.756 
+## [1] &quot;Distribution DEL, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 773.6514 
+## GAMLSS-RS iteration 2: Global Deviance = 772.3234 
+## GAMLSS-RS iteration 3: Global Deviance = 771.2053 
+## GAMLSS-RS iteration 4: Global Deviance = 770.4559 
+## GAMLSS-RS iteration 5: Global Deviance = 769.8328 
+## GAMLSS-RS iteration 6: Global Deviance = 769.1138 
+## GAMLSS-RS iteration 7: Global Deviance = 768.7834 
+## GAMLSS-RS iteration 8: Global Deviance = 768.4189 
+## GAMLSS-RS iteration 9: Global Deviance = 768.2169 
+## GAMLSS-RS iteration 10: Global Deviance = 767.9678 
+## GAMLSS-RS iteration 11: Global Deviance = 767.8213 
+## GAMLSS-RS iteration 12: Global Deviance = 767.6334 
+## GAMLSS-RS iteration 13: Global Deviance = 767.5248 
+## GAMLSS-RS iteration 14: Global Deviance = 767.3818 
+## GAMLSS-RS iteration 15: Global Deviance = 767.3025 
+## GAMLSS-RS iteration 16: Global Deviance = 767.1946 
+## GAMLSS-RS iteration 17: Global Deviance = 767.1333 
+## GAMLSS-RS iteration 18: Global Deviance = 767.0438 
+## GAMLSS-RS iteration 19: Global Deviance = 767.001 
+## GAMLSS-RS iteration 20: Global Deviance = 766.9342</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 766.9632 
+## GAMLSS-RS iteration 22: Global Deviance = 766.9159 
+## GAMLSS-RS iteration 23: Global Deviance = 766.8654 
+## GAMLSS-RS iteration 24: Global Deviance = 766.8252 
+## GAMLSS-RS iteration 25: Global Deviance = 766.7632 
+## GAMLSS-RS iteration 26: Global Deviance = 766.7505 
+## GAMLSS-RS iteration 27: Global Deviance = 766.77 
+## GAMLSS-RS iteration 28: Global Deviance = 766.7078 
+## GAMLSS-RS iteration 29: Global Deviance = 766.7291 
+## GAMLSS-RS iteration 30: Global Deviance = 766.678 
+## GAMLSS-RS iteration 31: Global Deviance = 766.6798 
+## GAMLSS-RS iteration 32: Global Deviance = 766.6758 
+## GAMLSS-RS iteration 33: Global Deviance = 766.6988 
+## GAMLSS-RS iteration 34: Global Deviance = 766.6565 
+## GAMLSS-RS iteration 35: Global Deviance = 766.6639 
+## GAMLSS-RS iteration 36: Global Deviance = 766.6627 
+## GAMLSS-RS iteration 37: Global Deviance = 766.6684 
+## GAMLSS-RS iteration 38: Global Deviance = 766.6749 
+## GAMLSS-RS iteration 39: Global Deviance = 766.6745 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 803.4034 
+## GAMLSS-RS iteration 2: Global Deviance = 768.4291 
+## GAMLSS-RS iteration 3: Global Deviance = 767.5933 
+## GAMLSS-RS iteration 4: Global Deviance = 767.2081 
+## GAMLSS-RS iteration 5: Global Deviance = 766.8003 
+## GAMLSS-RS iteration 6: Global Deviance = 766.4286 
+## GAMLSS-RS iteration 7: Global Deviance = 766.3204 
+## GAMLSS-RS iteration 8: Global Deviance = 766.0373 
+## GAMLSS-RS iteration 9: Global Deviance = 765.8383 
+## GAMLSS-RS iteration 10: Global Deviance = 765.6833 
+## GAMLSS-RS iteration 11: Global Deviance = 765.5384 
+## GAMLSS-RS iteration 12: Global Deviance = 765.5209 
+## GAMLSS-RS iteration 13: Global Deviance = 765.3666 
+## GAMLSS-RS iteration 14: Global Deviance = 765.341 
+## GAMLSS-RS iteration 15: Global Deviance = 765.3348 
+## GAMLSS-RS iteration 16: Global Deviance = 765.2865 
+## GAMLSS-RS iteration 17: Global Deviance = 765.2981 
+## GAMLSS-RS iteration 18: Global Deviance = 765.3 
+## GAMLSS-RS iteration 19: Global Deviance = 765.3031 
+## GAMLSS-RS iteration 20: Global Deviance = 765.288</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 765.2748 
+## GAMLSS-RS iteration 22: Global Deviance = 765.2352 
+## GAMLSS-RS iteration 23: Global Deviance = 765.2717 
+## GAMLSS-RS iteration 24: Global Deviance = 765.3601 
+## GAMLSS-RS iteration 25: Global Deviance = 765.4579 
+## GAMLSS-RS iteration 26: Global Deviance = 765.2932 
+## GAMLSS-RS iteration 27: Global Deviance = 765.2732 
+## GAMLSS-RS iteration 28: Global Deviance = 765.2308 
+## GAMLSS-RS iteration 29: Global Deviance = 765.3564 
+## GAMLSS-RS iteration 30: Global Deviance = 765.1901 
+## GAMLSS-RS iteration 31: Global Deviance = 765.2061 
+## GAMLSS-RS iteration 32: Global Deviance = 765.2256 
+## GAMLSS-RS iteration 33: Global Deviance = 765.2511 
+## GAMLSS-RS iteration 34: Global Deviance = 765.3364 
+## GAMLSS-RS iteration 35: Global Deviance = 765.2421 
+## GAMLSS-RS iteration 36: Global Deviance = 765.4066 
+## GAMLSS-RS iteration 37: Global Deviance = 765.3424 
+## GAMLSS-RS iteration 38: Global Deviance = 765.3481 
+## GAMLSS-RS iteration 39: Global Deviance = 765.3153 
+## GAMLSS-RS iteration 40: Global Deviance = 765.2103</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Distribution DEL, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1313.495 
+## GAMLSS-RS iteration 2: Global Deviance = 1302.477 
+## GAMLSS-RS iteration 3: Global Deviance = 1295.143 
+## GAMLSS-RS iteration 4: Global Deviance = 1289.555 
+## GAMLSS-RS iteration 5: Global Deviance = 1285.821 
+## GAMLSS-RS iteration 6: Global Deviance = 1282.097 
+## GAMLSS-RS iteration 7: Global Deviance = 1280.209 
+## GAMLSS-RS iteration 8: Global Deviance = 1278.981 
+## GAMLSS-RS iteration 9: Global Deviance = 1277.987 
+## GAMLSS-RS iteration 10: Global Deviance = 1277.734 
+## GAMLSS-RS iteration 11: Global Deviance = 1277.355 
+## GAMLSS-RS iteration 12: Global Deviance = 1277.172 
+## GAMLSS-RS iteration 13: Global Deviance = 1277.196 
+## GAMLSS-RS iteration 14: Global Deviance = 1276.858 
+## GAMLSS-RS iteration 15: Global Deviance = 1276.781 
+## GAMLSS-RS iteration 16: Global Deviance = 1276.817 
+## GAMLSS-RS iteration 17: Global Deviance = 1276.712 
+## GAMLSS-RS iteration 18: Global Deviance = 1276.684 
+## GAMLSS-RS iteration 19: Global Deviance = 1276.653 
+## GAMLSS-RS iteration 20: Global Deviance = 1276.682</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1276.859 
+## GAMLSS-RS iteration 22: Global Deviance = 1276.84 
+## GAMLSS-RS iteration 23: Global Deviance = 1276.873 
+## GAMLSS-RS iteration 24: Global Deviance = 1276.878 
+## GAMLSS-RS iteration 25: Global Deviance = 1276.857 
+## GAMLSS-RS iteration 26: Global Deviance = 1276.842 
+## GAMLSS-RS iteration 27: Global Deviance = 1276.882 
+## GAMLSS-RS iteration 28: Global Deviance = 1276.868 
+## GAMLSS-RS iteration 29: Global Deviance = 1276.825 
+## GAMLSS-RS iteration 30: Global Deviance = 1276.797 
+## GAMLSS-RS iteration 31: Global Deviance = 1276.803 
+## GAMLSS-RS iteration 32: Global Deviance = 1276.812 
+## GAMLSS-RS iteration 33: Global Deviance = 1276.764 
+## GAMLSS-RS iteration 34: Global Deviance = 1276.811 
+## GAMLSS-RS iteration 35: Global Deviance = 1276.828 
+## GAMLSS-RS iteration 36: Global Deviance = 1276.767 
+## GAMLSS-RS iteration 37: Global Deviance = 1276.817 
+## GAMLSS-RS iteration 38: Global Deviance = 1276.717 
+## GAMLSS-RS iteration 39: Global Deviance = 1276.804 
+## GAMLSS-RS iteration 40: Global Deviance = 1276.79</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1310.922 
+## GAMLSS-RS iteration 2: Global Deviance = 1300.877 
+## GAMLSS-RS iteration 3: Global Deviance = 1295.13 
+## GAMLSS-RS iteration 4: Global Deviance = 1291.373 
+## GAMLSS-RS iteration 5: Global Deviance = 1288.671 
+## GAMLSS-RS iteration 6: Global Deviance = 1286.025 
+## GAMLSS-RS iteration 7: Global Deviance = 1284.412 
+## GAMLSS-RS iteration 8: Global Deviance = 1283.471 
+## GAMLSS-RS iteration 9: Global Deviance = 1282.527 
+## GAMLSS-RS iteration 10: Global Deviance = 1281.798 
+## GAMLSS-RS iteration 11: Global Deviance = 1281.495 
+## GAMLSS-RS iteration 12: Global Deviance = 1281.214 
+## GAMLSS-RS iteration 13: Global Deviance = 1281 
+## GAMLSS-RS iteration 14: Global Deviance = 1280.802 
+## GAMLSS-RS iteration 15: Global Deviance = 1280.636 
+## GAMLSS-RS iteration 16: Global Deviance = 1280.493 
+## GAMLSS-RS iteration 17: Global Deviance = 1280.359 
+## GAMLSS-RS iteration 18: Global Deviance = 1280.354 
+## GAMLSS-RS iteration 19: Global Deviance = 1280.417 
+## GAMLSS-RS iteration 20: Global Deviance = 1279.985</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1280.098 
+## GAMLSS-RS iteration 22: Global Deviance = 1280.145 
+## GAMLSS-RS iteration 23: Global Deviance = 1280.279 
+## GAMLSS-RS iteration 24: Global Deviance = 1279.759 
+## GAMLSS-RS iteration 25: Global Deviance = 1279.869 
+## GAMLSS-RS iteration 26: Global Deviance = 1279.866 
+## GAMLSS-RS iteration 27: Global Deviance = 1279.864 
+## GAMLSS-RS iteration 28: Global Deviance = 1279.856 
+## GAMLSS-RS iteration 29: Global Deviance = 1279.837 
+## GAMLSS-RS iteration 30: Global Deviance = 1279.833 
+## GAMLSS-RS iteration 31: Global Deviance = 1279.83 
+## GAMLSS-RS iteration 32: Global Deviance = 1279.826 
+## GAMLSS-RS iteration 33: Global Deviance = 1279.82 
+## GAMLSS-RS iteration 34: Global Deviance = 1279.931 
+## GAMLSS-RS iteration 35: Global Deviance = 1280.007 
+## GAMLSS-RS iteration 36: Global Deviance = 1280.104 
+## GAMLSS-RS iteration 37: Global Deviance = 1279.673 
+## GAMLSS-RS iteration 38: Global Deviance = 1279.878 
+## GAMLSS-RS iteration 39: Global Deviance = 1280.06 
+## GAMLSS-RS iteration 40: Global Deviance = 1279.67</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Distribution DEL, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 852.2182 
+## GAMLSS-RS iteration 2: Global Deviance = 842.3405 
+## GAMLSS-RS iteration 3: Global Deviance = 836.4521 
+## GAMLSS-RS iteration 4: Global Deviance = 832.5549 
+## GAMLSS-RS iteration 5: Global Deviance = 829.8822 
+## GAMLSS-RS iteration 6: Global Deviance = 828.0634 
+## GAMLSS-RS iteration 7: Global Deviance = 826.863 
+## GAMLSS-RS iteration 8: Global Deviance = 825.9739 
+## GAMLSS-RS iteration 9: Global Deviance = 825.36 
+## GAMLSS-RS iteration 10: Global Deviance = 824.9042 
+## GAMLSS-RS iteration 11: Global Deviance = 824.6266 
+## GAMLSS-RS iteration 12: Global Deviance = 824.356 
+## GAMLSS-RS iteration 13: Global Deviance = 824.1726 
+## GAMLSS-RS iteration 14: Global Deviance = 824.0725 
+## GAMLSS-RS iteration 15: Global Deviance = 823.9896 
+## GAMLSS-RS iteration 16: Global Deviance = 823.9327 
+## GAMLSS-RS iteration 17: Global Deviance = 823.8895 
+## GAMLSS-RS iteration 18: Global Deviance = 823.8915 
+## GAMLSS-RS iteration 19: Global Deviance = 823.8992 
+## GAMLSS-RS iteration 20: Global Deviance = 823.8749</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 823.9093 
+## GAMLSS-RS iteration 22: Global Deviance = 823.8912 
+## GAMLSS-RS iteration 23: Global Deviance = 823.9571 
+## GAMLSS-RS iteration 24: Global Deviance = 823.9196 
+## GAMLSS-RS iteration 25: Global Deviance = 823.9422 
+## GAMLSS-RS iteration 26: Global Deviance = 823.9772 
+## GAMLSS-RS iteration 27: Global Deviance = 823.9242 
+## GAMLSS-RS iteration 28: Global Deviance = 823.9752 
+## GAMLSS-RS iteration 29: Global Deviance = 823.982 
+## GAMLSS-RS iteration 30: Global Deviance = 824.0425 
+## GAMLSS-RS iteration 31: Global Deviance = 824.0106 
+## GAMLSS-RS iteration 32: Global Deviance = 824.0551 
+## GAMLSS-RS iteration 33: Global Deviance = 824.0784 
+## GAMLSS-RS iteration 34: Global Deviance = 824.0525 
+## GAMLSS-RS iteration 35: Global Deviance = 824.0868 
+## GAMLSS-RS iteration 36: Global Deviance = 824.0798 
+## GAMLSS-RS iteration 37: Global Deviance = 824.0862 
+## GAMLSS-RS iteration 38: Global Deviance = 824.1191 
+## GAMLSS-RS iteration 39: Global Deviance = 824.1387 
+## GAMLSS-RS iteration 40: Global Deviance = 824.0956</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 833.0572 
+## GAMLSS-RS iteration 2: Global Deviance = 815.494 
+## GAMLSS-RS iteration 3: Global Deviance = 809.7289 
+## GAMLSS-RS iteration 4: Global Deviance = 805.3553 
+## GAMLSS-RS iteration 5: Global Deviance = 801.4002 
+## GAMLSS-RS iteration 6: Global Deviance = 798.4832 
+## GAMLSS-RS iteration 7: Global Deviance = 796.3898 
+## GAMLSS-RS iteration 8: Global Deviance = 794.8083 
+## GAMLSS-RS iteration 9: Global Deviance = 793.6189 
+## GAMLSS-RS iteration 10: Global Deviance = 792.8244 
+## GAMLSS-RS iteration 11: Global Deviance = 792.1558 
+## GAMLSS-RS iteration 12: Global Deviance = 791.7408 
+## GAMLSS-RS iteration 13: Global Deviance = 791.3325 
+## GAMLSS-RS iteration 14: Global Deviance = 791.0145 
+## GAMLSS-RS iteration 15: Global Deviance = 790.7747 
+## GAMLSS-RS iteration 16: Global Deviance = 790.5886 
+## GAMLSS-RS iteration 17: Global Deviance = 790.4437 
+## GAMLSS-RS iteration 18: Global Deviance = 790.3086 
+## GAMLSS-RS iteration 19: Global Deviance = 790.1965 
+## GAMLSS-RS iteration 20: Global Deviance = 790.0694</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 790.0821 
+## GAMLSS-RS iteration 22: Global Deviance = 790.0109 
+## GAMLSS-RS iteration 23: Global Deviance = 789.9698 
+## GAMLSS-RS iteration 24: Global Deviance = 789.8915 
+## GAMLSS-RS iteration 25: Global Deviance = 789.9554 
+## GAMLSS-RS iteration 26: Global Deviance = 789.896 
+## GAMLSS-RS iteration 27: Global Deviance = 789.8562 
+## GAMLSS-RS iteration 28: Global Deviance = 789.8388 
+## GAMLSS-RS iteration 29: Global Deviance = 789.8079 
+## GAMLSS-RS iteration 30: Global Deviance = 789.7986 
+## GAMLSS-RS iteration 31: Global Deviance = 789.7527 
+## GAMLSS-RS iteration 32: Global Deviance = 789.8181 
+## GAMLSS-RS iteration 33: Global Deviance = 789.7585 
+## GAMLSS-RS iteration 34: Global Deviance = 789.8131 
+## GAMLSS-RS iteration 35: Global Deviance = 789.755 
+## GAMLSS-RS iteration 36: Global Deviance = 789.8061 
+## GAMLSS-RS iteration 37: Global Deviance = 789.75 
+## GAMLSS-RS iteration 38: Global Deviance = 789.8078 
+## GAMLSS-RS iteration 39: Global Deviance = 789.7493 
+## GAMLSS-RS iteration 40: Global Deviance = 789.8047</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Distribution PIG, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1547.09 
+## GAMLSS-RS iteration 2: Global Deviance = 1543.485 
+## GAMLSS-RS iteration 3: Global Deviance = 1541.947 
+## GAMLSS-RS iteration 4: Global Deviance = 1541.088 
+## GAMLSS-RS iteration 5: Global Deviance = 1540.568 
+## GAMLSS-RS iteration 6: Global Deviance = 1540.227 
+## GAMLSS-RS iteration 7: Global Deviance = 1540 
+## GAMLSS-RS iteration 8: Global Deviance = 1539.833 
+## GAMLSS-RS iteration 9: Global Deviance = 1539.721 
+## GAMLSS-RS iteration 10: Global Deviance = 1539.617 
+## GAMLSS-RS iteration 11: Global Deviance = 1539.556 
+## GAMLSS-RS iteration 12: Global Deviance = 1539.509 
+## GAMLSS-RS iteration 13: Global Deviance = 1539.46 
+## GAMLSS-RS iteration 14: Global Deviance = 1539.42 
+## GAMLSS-RS iteration 15: Global Deviance = 1539.389 
+## GAMLSS-RS iteration 16: Global Deviance = 1539.361 
+## GAMLSS-RS iteration 17: Global Deviance = 1539.343 
+## GAMLSS-RS iteration 18: Global Deviance = 1539.33 
+## GAMLSS-RS iteration 19: Global Deviance = 1539.315 
+## GAMLSS-RS iteration 20: Global Deviance = 1539.299</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1539.305 
+## GAMLSS-RS iteration 22: Global Deviance = 1539.284 
+## GAMLSS-RS iteration 23: Global Deviance = 1539.273 
+## GAMLSS-RS iteration 24: Global Deviance = 1539.266 
+## GAMLSS-RS iteration 25: Global Deviance = 1539.261 
+## GAMLSS-RS iteration 26: Global Deviance = 1539.256 
+## GAMLSS-RS iteration 27: Global Deviance = 1539.252 
+## GAMLSS-RS iteration 28: Global Deviance = 1539.248 
+## GAMLSS-RS iteration 29: Global Deviance = 1539.248 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1475.331 
+## GAMLSS-RS iteration 2: Global Deviance = 1475.477 
+## GAMLSS-RS iteration 3: Global Deviance = 1475.58 
+## GAMLSS-RS iteration 4: Global Deviance = 1475.657 
+## GAMLSS-RS iteration 5: Global Deviance = 1475.722 
+## GAMLSS-RS iteration 6: Global Deviance = 1475.774 
+## GAMLSS-RS iteration 7: Global Deviance = 1475.813 
+## GAMLSS-RS iteration 8: Global Deviance = 1475.828 
+## GAMLSS-RS iteration 9: Global Deviance = 1475.871 
+## GAMLSS-RS iteration 10: Global Deviance = 1475.86 
+## GAMLSS-RS iteration 11: Global Deviance = 1475.875 
+## GAMLSS-RS iteration 12: Global Deviance = 1475.872 
+## GAMLSS-RS iteration 13: Global Deviance = 1475.893 
+## GAMLSS-RS iteration 14: Global Deviance = 1475.883 
+## GAMLSS-RS iteration 15: Global Deviance = 1475.883 
+## [1] &quot;Distribution PIG, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 782.6891 
+## GAMLSS-RS iteration 2: Global Deviance = 781.7863 
+## GAMLSS-RS iteration 3: Global Deviance = 780.8064 
+## GAMLSS-RS iteration 4: Global Deviance = 779.7423 
+## GAMLSS-RS iteration 5: Global Deviance = 778.6143 
+## GAMLSS-RS iteration 6: Global Deviance = 777.4737 
+## GAMLSS-RS iteration 7: Global Deviance = 776.3745 
+## GAMLSS-RS iteration 8: Global Deviance = 775.3977 
+## GAMLSS-RS iteration 9: Global Deviance = 774.7465 
+## GAMLSS-RS iteration 10: Global Deviance = 774.232 
+## GAMLSS-RS iteration 11: Global Deviance = 773.8965 
+## GAMLSS-RS iteration 12: Global Deviance = 773.7123 
+## GAMLSS-RS iteration 13: Global Deviance = 773.6366 
+## GAMLSS-RS iteration 14: Global Deviance = 773.6173 
+## GAMLSS-RS iteration 15: Global Deviance = 773.6218 
+## GAMLSS-RS iteration 16: Global Deviance = 773.6341 
+## GAMLSS-RS iteration 17: Global Deviance = 773.6466 
+## GAMLSS-RS iteration 18: Global Deviance = 773.6563 
+## GAMLSS-RS iteration 19: Global Deviance = 773.6619 
+## GAMLSS-RS iteration 20: Global Deviance = 773.6659</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 773.6731 
+## GAMLSS-RS iteration 22: Global Deviance = 773.6722 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 780.2083 
+## GAMLSS-RS iteration 2: Global Deviance = 778.571 
+## GAMLSS-RS iteration 3: Global Deviance = 776.7876 
+## GAMLSS-RS iteration 4: Global Deviance = 774.1636 
+## GAMLSS-RS iteration 5: Global Deviance = 771.1655 
+## GAMLSS-RS iteration 6: Global Deviance = 767.9207 
+## GAMLSS-RS iteration 7: Global Deviance = 764.9053 
+## GAMLSS-RS iteration 8: Global Deviance = 763.1357 
+## GAMLSS-RS iteration 9: Global Deviance = 763.1329 
+## GAMLSS-RS iteration 10: Global Deviance = 763.6773 
+## GAMLSS-RS iteration 11: Global Deviance = 764.0601 
+## GAMLSS-RS iteration 12: Global Deviance = 764.2136 
+## GAMLSS-RS iteration 13: Global Deviance = 764.2985 
+## GAMLSS-RS iteration 14: Global Deviance = 764.3679 
+## GAMLSS-RS iteration 15: Global Deviance = 764.4966 
+## GAMLSS-RS iteration 16: Global Deviance = 764.413 
+## GAMLSS-RS iteration 17: Global Deviance = 764.5043 
+## GAMLSS-RS iteration 18: Global Deviance = 764.4528 
+## GAMLSS-RS iteration 19: Global Deviance = 764.4361 
+## GAMLSS-RS iteration 20: Global Deviance = 764.4996</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 764.5849 
+## GAMLSS-RS iteration 22: Global Deviance = 764.5803 
+## GAMLSS-RS iteration 23: Global Deviance = 764.3907 
+## GAMLSS-RS iteration 24: Global Deviance = 764.4178 
+## GAMLSS-RS iteration 25: Global Deviance = 764.4572 
+## GAMLSS-RS iteration 26: Global Deviance = 764.3641 
+## GAMLSS-RS iteration 27: Global Deviance = 764.3972 
+## GAMLSS-RS iteration 28: Global Deviance = 764.4316 
+## GAMLSS-RS iteration 29: Global Deviance = 764.3781 
+## GAMLSS-RS iteration 30: Global Deviance = 764.4159 
+## GAMLSS-RS iteration 31: Global Deviance = 764.3971 
+## GAMLSS-RS iteration 32: Global Deviance = 764.4145 
+## GAMLSS-RS iteration 33: Global Deviance = 764.5423 
+## GAMLSS-RS iteration 34: Global Deviance = 764.56 
+## GAMLSS-RS iteration 35: Global Deviance = 764.4044 
+## GAMLSS-RS iteration 36: Global Deviance = 764.4291 
+## GAMLSS-RS iteration 37: Global Deviance = 764.4148 
+## GAMLSS-RS iteration 38: Global Deviance = 764.4004 
+## GAMLSS-RS iteration 39: Global Deviance = 764.3374 
+## GAMLSS-RS iteration 40: Global Deviance = 764.3505</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Distribution PIG, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 1279.072</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 2: Global Deviance = 1270.649</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 3: Global Deviance = 1265.525</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 4: Global Deviance = 1263.991 
+## GAMLSS-RS iteration 5: Global Deviance = 1265.022 
+## GAMLSS-RS iteration 6: Global Deviance = 1265.494 
+## GAMLSS-RS iteration 7: Global Deviance = 1265.754 
+## GAMLSS-RS iteration 8: Global Deviance = 1265.859 
+## GAMLSS-RS iteration 9: Global Deviance = 1265.889 
+## GAMLSS-RS iteration 10: Global Deviance = 1265.925 
+## GAMLSS-RS iteration 11: Global Deviance = 1265.842 
+## GAMLSS-RS iteration 12: Global Deviance = 1265.872 
+## GAMLSS-RS iteration 13: Global Deviance = 1265.878 
+## GAMLSS-RS iteration 14: Global Deviance = 1265.729 
+## GAMLSS-RS iteration 15: Global Deviance = 1265.869 
+## GAMLSS-RS iteration 16: Global Deviance = 1265.847 
+## GAMLSS-RS iteration 17: Global Deviance = 1265.628 
+## GAMLSS-RS iteration 18: Global Deviance = 1265.741 
+## GAMLSS-RS iteration 19: Global Deviance = 1265.761 
+## GAMLSS-RS iteration 20: Global Deviance = 1265.825</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1266.797 
+## GAMLSS-RS iteration 22: Global Deviance = 1266.773 
+## GAMLSS-RS iteration 23: Global Deviance = 1266.794 
+## GAMLSS-RS iteration 24: Global Deviance = 1266.788 
+## GAMLSS-RS iteration 25: Global Deviance = 1266.752 
+## GAMLSS-RS iteration 26: Global Deviance = 1266.73 
+## GAMLSS-RS iteration 27: Global Deviance = 1266.751 
+## GAMLSS-RS iteration 28: Global Deviance = 1266.766 
+## GAMLSS-RS iteration 29: Global Deviance = 1266.729 
+## GAMLSS-RS iteration 30: Global Deviance = 1266.726 
+## GAMLSS-RS iteration 31: Global Deviance = 1266.754 
+## GAMLSS-RS iteration 32: Global Deviance = 1266.751 
+## GAMLSS-RS iteration 33: Global Deviance = 1266.75 
+## GAMLSS-RS iteration 34: Global Deviance = 1266.73 
+## GAMLSS-RS iteration 35: Global Deviance = 1266.729 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1286.455 
+## GAMLSS-RS iteration 2: Global Deviance = 1279.896 
+## GAMLSS-RS iteration 3: Global Deviance = 1275.149 
+## GAMLSS-RS iteration 4: Global Deviance = 1273.658 
+## GAMLSS-RS iteration 5: Global Deviance = 1274.212 
+## GAMLSS-RS iteration 6: Global Deviance = 1274.689 
+## GAMLSS-RS iteration 7: Global Deviance = 1274.933 
+## GAMLSS-RS iteration 8: Global Deviance = 1275.032 
+## GAMLSS-RS iteration 9: Global Deviance = 1275.071 
+## GAMLSS-RS iteration 10: Global Deviance = 1275.107 
+## GAMLSS-RS iteration 11: Global Deviance = 1275.119 
+## GAMLSS-RS iteration 12: Global Deviance = 1275.129 
+## GAMLSS-RS iteration 13: Global Deviance = 1275.136 
+## GAMLSS-RS iteration 14: Global Deviance = 1275.147 
+## GAMLSS-RS iteration 15: Global Deviance = 1275.15 
+## GAMLSS-RS iteration 16: Global Deviance = 1275.151 
+## GAMLSS-RS iteration 17: Global Deviance = 1275.152 
+## [1] &quot;Distribution PIG, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 836.2522 
+## GAMLSS-RS iteration 2: Global Deviance = 835.8946 
+## GAMLSS-RS iteration 3: Global Deviance = 835.3088 
+## GAMLSS-RS iteration 4: Global Deviance = 834.9865 
+## GAMLSS-RS iteration 5: Global Deviance = 834.4905 
+## GAMLSS-RS iteration 6: Global Deviance = 833.6622 
+## GAMLSS-RS iteration 7: Global Deviance = 833.1574 
+## GAMLSS-RS iteration 8: Global Deviance = 832.4566 
+## GAMLSS-RS iteration 9: Global Deviance = 831.7085 
+## GAMLSS-RS iteration 10: Global Deviance = 830.9343 
+## GAMLSS-RS iteration 11: Global Deviance = 830.2256 
+## GAMLSS-RS iteration 12: Global Deviance = 829.2116 
+## GAMLSS-RS iteration 13: Global Deviance = 829.1626 
+## GAMLSS-RS iteration 14: Global Deviance = 829.0122 
+## GAMLSS-RS iteration 15: Global Deviance = 829.0121 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 805.6912 
+## GAMLSS-RS iteration 2: Global Deviance = 804.6784 
+## GAMLSS-RS iteration 3: Global Deviance = 804.1744 
+## GAMLSS-RS iteration 4: Global Deviance = 803.3809 
+## GAMLSS-RS iteration 5: Global Deviance = 802.4205 
+## GAMLSS-RS iteration 6: Global Deviance = 801.2719 
+## GAMLSS-RS iteration 7: Global Deviance = 798.9066 
+## GAMLSS-RS iteration 8: Global Deviance = 797.8495 
+## GAMLSS-RS iteration 9: Global Deviance = 795.0278 
+## GAMLSS-RS iteration 10: Global Deviance = 793.8625 
+## GAMLSS-RS iteration 11: Global Deviance = 791.9535 
+## GAMLSS-RS iteration 12: Global Deviance = 792.8053 
+## GAMLSS-RS iteration 13: Global Deviance = 793.3313 
+## GAMLSS-RS iteration 14: Global Deviance = 793.8989 
+## GAMLSS-RS iteration 15: Global Deviance = 794.2626 
+## GAMLSS-RS iteration 16: Global Deviance = 794.4402 
+## GAMLSS-RS iteration 17: Global Deviance = 794.5299 
+## GAMLSS-RS iteration 18: Global Deviance = 794.5881 
+## GAMLSS-RS iteration 19: Global Deviance = 794.6195 
+## GAMLSS-RS iteration 20: Global Deviance = 794.6267</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 794.5976 
+## GAMLSS-RS iteration 22: Global Deviance = 794.6192 
+## GAMLSS-RS iteration 23: Global Deviance = 794.6263 
+## GAMLSS-RS iteration 24: Global Deviance = 794.627 
+## [1] &quot;Distribution SI, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1544.98 
+## GAMLSS-RS iteration 2: Global Deviance = 1541.696 
+## GAMLSS-RS iteration 3: Global Deviance = 1540.365 
+## GAMLSS-RS iteration 4: Global Deviance = 1539.752 
+## GAMLSS-RS iteration 5: Global Deviance = 1539.442 
+## GAMLSS-RS iteration 6: Global Deviance = 1539.266 
+## GAMLSS-RS iteration 7: Global Deviance = 1539.168 
+## GAMLSS-RS iteration 8: Global Deviance = 1539.122 
+## GAMLSS-RS iteration 9: Global Deviance = 1539.089 
+## GAMLSS-RS iteration 10: Global Deviance = 1539.066 
+## GAMLSS-RS iteration 11: Global Deviance = 1539.054 
+## GAMLSS-RS iteration 12: Global Deviance = 1539.046 
+## GAMLSS-RS iteration 13: Global Deviance = 1539.041 
+## GAMLSS-RS iteration 14: Global Deviance = 1539.039 
+## GAMLSS-RS iteration 15: Global Deviance = 1539.036 
+## GAMLSS-RS iteration 16: Global Deviance = 1539.035 
+## GAMLSS-RS iteration 17: Global Deviance = 1539.034 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1475.329 
+## GAMLSS-RS iteration 2: Global Deviance = 1475.493 
+## GAMLSS-RS iteration 3: Global Deviance = 1475.519 
+## GAMLSS-RS iteration 4: Global Deviance = 1475.45 
+## GAMLSS-RS iteration 5: Global Deviance = 1475.441 
+## GAMLSS-RS iteration 6: Global Deviance = 1475.392 
+## GAMLSS-RS iteration 7: Global Deviance = 1475.339 
+## GAMLSS-RS iteration 8: Global Deviance = 1475.258 
+## GAMLSS-RS iteration 9: Global Deviance = 1475.171 
+## GAMLSS-RS iteration 10: Global Deviance = 1475.082 
+## GAMLSS-RS iteration 11: Global Deviance = 1474.997 
+## GAMLSS-RS iteration 12: Global Deviance = 1474.919 
+## GAMLSS-RS iteration 13: Global Deviance = 1474.843 
+## GAMLSS-RS iteration 14: Global Deviance = 1474.772 
+## GAMLSS-RS iteration 15: Global Deviance = 1474.704 
+## GAMLSS-RS iteration 16: Global Deviance = 1474.642 
+## GAMLSS-RS iteration 17: Global Deviance = 1474.585 
+## GAMLSS-RS iteration 18: Global Deviance = 1474.532 
+## GAMLSS-RS iteration 19: Global Deviance = 1474.483 
+## GAMLSS-RS iteration 20: Global Deviance = 1474.439</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1474.44 
+## [1] &quot;Distribution SI, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 777.1887 
+## GAMLSS-RS iteration 2: Global Deviance = 771.0034 
+## GAMLSS-RS iteration 3: Global Deviance = 766.6035 
+## GAMLSS-RS iteration 4: Global Deviance = 763.4814 
+## GAMLSS-RS iteration 5: Global Deviance = 761.3097 
+## GAMLSS-RS iteration 6: Global Deviance = 759.8225 
+## GAMLSS-RS iteration 7: Global Deviance = 758.8277 
+## GAMLSS-RS iteration 8: Global Deviance = 758.167 
+## GAMLSS-RS iteration 9: Global Deviance = 757.738 
+## GAMLSS-RS iteration 10: Global Deviance = 757.4646 
+## GAMLSS-RS iteration 11: Global Deviance = 757.2918 
+## GAMLSS-RS iteration 12: Global Deviance = 757.1856 
+## GAMLSS-RS iteration 13: Global Deviance = 757.1238 
+## GAMLSS-RS iteration 14: Global Deviance = 757.0898 
+## GAMLSS-RS iteration 15: Global Deviance = 757.0725 
+## GAMLSS-RS iteration 16: Global Deviance = 757.0666 
+## GAMLSS-RS iteration 17: Global Deviance = 757.0674 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 773.4728 
+## GAMLSS-RS iteration 2: Global Deviance = 768.5342 
+## GAMLSS-RS iteration 3: Global Deviance = 765.1144 
+## GAMLSS-RS iteration 4: Global Deviance = 762.925 
+## GAMLSS-RS iteration 5: Global Deviance = 761.6093 
+## GAMLSS-RS iteration 6: Global Deviance = 760.647 
+## GAMLSS-RS iteration 7: Global Deviance = 760.2419 
+## GAMLSS-RS iteration 8: Global Deviance = 760.0176 
+## GAMLSS-RS iteration 9: Global Deviance = 760.0125 
+## GAMLSS-RS iteration 10: Global Deviance = 760.1416 
+## GAMLSS-RS iteration 11: Global Deviance = 760.0624 
+## GAMLSS-RS iteration 12: Global Deviance = 760.0277 
+## GAMLSS-RS iteration 13: Global Deviance = 760.2381 
+## GAMLSS-RS iteration 14: Global Deviance = 760.3284 
+## GAMLSS-RS iteration 15: Global Deviance = 760.4072 
+## GAMLSS-RS iteration 16: Global Deviance = 760.5201 
+## GAMLSS-RS iteration 17: Global Deviance = 760.5869 
+## GAMLSS-RS iteration 18: Global Deviance = 760.608 
+## GAMLSS-RS iteration 19: Global Deviance = 760.6549 
+## GAMLSS-RS iteration 20: Global Deviance = 760.6746</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 760.7118 
+## GAMLSS-RS iteration 22: Global Deviance = 760.672 
+## GAMLSS-RS iteration 23: Global Deviance = 760.7838 
+## GAMLSS-RS iteration 24: Global Deviance = 760.8224 
+## GAMLSS-RS iteration 25: Global Deviance = 760.8674 
+## GAMLSS-RS iteration 26: Global Deviance = 760.7938 
+## GAMLSS-RS iteration 27: Global Deviance = 760.8012 
+## GAMLSS-RS iteration 28: Global Deviance = 760.8083 
+## GAMLSS-RS iteration 29: Global Deviance = 760.8138 
+## GAMLSS-RS iteration 30: Global Deviance = 760.8183 
+## GAMLSS-RS iteration 31: Global Deviance = 760.8198 
+## GAMLSS-RS iteration 32: Global Deviance = 760.8228 
+## GAMLSS-RS iteration 33: Global Deviance = 760.8264 
+## GAMLSS-RS iteration 34: Global Deviance = 760.8272 
+## [1] &quot;Distribution SI, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 1270.576</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 2: Global Deviance = 1265.994</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 3: Global Deviance = 1264.093</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 4: Global Deviance = 1263.379</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 5: Global Deviance = 1262.984</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 6: Global Deviance = 1262.977</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 7: Global Deviance = 1262.991</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 8: Global Deviance = 1263.065 
+## GAMLSS-RS iteration 9: Global Deviance = 1263.34 
+## GAMLSS-RS iteration 10: Global Deviance = 1263.461 
+## GAMLSS-RS iteration 11: Global Deviance = 1263.653</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 12: Global Deviance = 1263.552 
+## GAMLSS-RS iteration 13: Global Deviance = 1263.619 
+## GAMLSS-RS iteration 14: Global Deviance = 1263.608 
+## GAMLSS-RS iteration 15: Global Deviance = 1263.8</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 16: Global Deviance = 1263.876</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 17: Global Deviance = 1263.917</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 18: Global Deviance = 1263.801</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 19: Global Deviance = 1263.961 
+## GAMLSS-RS iteration 20: Global Deviance = 1263.879</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1264.855 
+## GAMLSS-RS iteration 22: Global Deviance = 1264.851 
+## GAMLSS-RS iteration 23: Global Deviance = 1264.867 
+## GAMLSS-RS iteration 24: Global Deviance = 1264.881 
+## GAMLSS-RS iteration 25: Global Deviance = 1264.896 
+## GAMLSS-RS iteration 26: Global Deviance = 1264.861 
+## GAMLSS-RS iteration 27: Global Deviance = 1264.876 
+## GAMLSS-RS iteration 28: Global Deviance = 1264.85 
+## GAMLSS-RS iteration 29: Global Deviance = 1264.902 
+## GAMLSS-RS iteration 30: Global Deviance = 1264.898 
+## GAMLSS-RS iteration 31: Global Deviance = 1264.873 
+## GAMLSS-RS iteration 32: Global Deviance = 1264.851 
+## GAMLSS-RS iteration 33: Global Deviance = 1264.863 
+## GAMLSS-RS iteration 34: Global Deviance = 1264.861 
+## GAMLSS-RS iteration 35: Global Deviance = 1264.891 
+## GAMLSS-RS iteration 36: Global Deviance = 1264.881 
+## GAMLSS-RS iteration 37: Global Deviance = 1264.856 
+## GAMLSS-RS iteration 38: Global Deviance = 1264.852 
+## GAMLSS-RS iteration 39: Global Deviance = 1264.842 
+## GAMLSS-RS iteration 40: Global Deviance = 1264.861</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1278.735 
+## GAMLSS-RS iteration 2: Global Deviance = 1275.294 
+## GAMLSS-RS iteration 3: Global Deviance = 1273.636 
+## GAMLSS-RS iteration 4: Global Deviance = 1272.989 
+## GAMLSS-RS iteration 5: Global Deviance = 1272.812 
+## GAMLSS-RS iteration 6: Global Deviance = 1272.83 
+## GAMLSS-RS iteration 7: Global Deviance = 1272.928 
+## GAMLSS-RS iteration 8: Global Deviance = 1273.049 
+## GAMLSS-RS iteration 9: Global Deviance = 1273.175 
+## GAMLSS-RS iteration 10: Global Deviance = 1273.292 
+## GAMLSS-RS iteration 11: Global Deviance = 1273.392 
+## GAMLSS-RS iteration 12: Global Deviance = 1273.478 
+## GAMLSS-RS iteration 13: Global Deviance = 1273.551 
+## GAMLSS-RS iteration 14: Global Deviance = 1273.613 
+## GAMLSS-RS iteration 15: Global Deviance = 1273.664 
+## GAMLSS-RS iteration 16: Global Deviance = 1273.704 
+## GAMLSS-RS iteration 17: Global Deviance = 1273.737 
+## GAMLSS-RS iteration 18: Global Deviance = 1273.763 
+## GAMLSS-RS iteration 19: Global Deviance = 1273.784 
+## GAMLSS-RS iteration 20: Global Deviance = 1273.801</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1273.833 
+## GAMLSS-RS iteration 22: Global Deviance = 1273.831 
+## GAMLSS-RS iteration 23: Global Deviance = 1273.836 
+## GAMLSS-RS iteration 24: Global Deviance = 1273.841 
+## GAMLSS-RS iteration 25: Global Deviance = 1273.847 
+## GAMLSS-RS iteration 26: Global Deviance = 1273.851 
+## GAMLSS-RS iteration 27: Global Deviance = 1273.854 
+## GAMLSS-RS iteration 28: Global Deviance = 1273.857 
+## GAMLSS-RS iteration 29: Global Deviance = 1273.86 
+## GAMLSS-RS iteration 30: Global Deviance = 1273.862 
+## GAMLSS-RS iteration 31: Global Deviance = 1273.863 
+## GAMLSS-RS iteration 32: Global Deviance = 1273.864 
+## GAMLSS-RS iteration 33: Global Deviance = 1273.866 
+## GAMLSS-RS iteration 34: Global Deviance = 1273.866 
+## [1] &quot;Distribution SI, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 832.9245 
+## GAMLSS-RS iteration 2: Global Deviance = 830.2022 
+## GAMLSS-RS iteration 3: Global Deviance = 828.5433 
+## GAMLSS-RS iteration 4: Global Deviance = 827.6098 
+## GAMLSS-RS iteration 5: Global Deviance = 827.0991 
+## GAMLSS-RS iteration 6: Global Deviance = 826.8792 
+## GAMLSS-RS iteration 7: Global Deviance = 826.7814 
+## GAMLSS-RS iteration 8: Global Deviance = 826.7862 
+## GAMLSS-RS iteration 9: Global Deviance = 826.8428 
+## GAMLSS-RS iteration 10: Global Deviance = 826.8714 
+## GAMLSS-RS iteration 11: Global Deviance = 826.907 
+## GAMLSS-RS iteration 12: Global Deviance = 826.9787 
+## GAMLSS-RS iteration 13: Global Deviance = 827.0001 
+## GAMLSS-RS iteration 14: Global Deviance = 827.0312 
+## GAMLSS-RS iteration 15: Global Deviance = 827.0788 
+## GAMLSS-RS iteration 16: Global Deviance = 827.1044 
+## GAMLSS-RS iteration 17: Global Deviance = 827.123 
+## GAMLSS-RS iteration 18: Global Deviance = 827.1341 
+## GAMLSS-RS iteration 19: Global Deviance = 827.142 
+## GAMLSS-RS iteration 20: Global Deviance = 827.1512</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 827.1339 
+## GAMLSS-RS iteration 22: Global Deviance = 827.1642 
+## GAMLSS-RS iteration 23: Global Deviance = 827.1609 
+## GAMLSS-RS iteration 24: Global Deviance = 827.1887 
+## GAMLSS-RS iteration 25: Global Deviance = 827.1573 
+## GAMLSS-RS iteration 26: Global Deviance = 827.1722 
+## GAMLSS-RS iteration 27: Global Deviance = 827.1637 
+## GAMLSS-RS iteration 28: Global Deviance = 827.1926 
+## GAMLSS-RS iteration 29: Global Deviance = 827.1698 
+## GAMLSS-RS iteration 30: Global Deviance = 827.1719 
+## GAMLSS-RS iteration 31: Global Deviance = 827.12 
+## GAMLSS-RS iteration 32: Global Deviance = 827.1912 
+## GAMLSS-RS iteration 33: Global Deviance = 827.167 
+## GAMLSS-RS iteration 34: Global Deviance = 827.1923 
+## GAMLSS-RS iteration 35: Global Deviance = 827.1616 
+## GAMLSS-RS iteration 36: Global Deviance = 827.1752 
+## GAMLSS-RS iteration 37: Global Deviance = 827.1575 
+## GAMLSS-RS iteration 38: Global Deviance = 827.1654 
+## GAMLSS-RS iteration 39: Global Deviance = 827.1431 
+## GAMLSS-RS iteration 40: Global Deviance = 827.1907</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 801.0028 
+## GAMLSS-RS iteration 2: Global Deviance = 798.521 
+## GAMLSS-RS iteration 3: Global Deviance = 797.3487 
+## GAMLSS-RS iteration 4: Global Deviance = 796.8471 
+## GAMLSS-RS iteration 5: Global Deviance = 796.6489 
+## GAMLSS-RS iteration 6: Global Deviance = 796.6887 
+## GAMLSS-RS iteration 7: Global Deviance = 796.8504 
+## GAMLSS-RS iteration 8: Global Deviance = 797.0836 
+## GAMLSS-RS iteration 9: Global Deviance = 797.3225 
+## GAMLSS-RS iteration 10: Global Deviance = 797.543 
+## GAMLSS-RS iteration 11: Global Deviance = 797.7339 
+## GAMLSS-RS iteration 12: Global Deviance = 797.8992 
+## GAMLSS-RS iteration 13: Global Deviance = 798.0345 
+## GAMLSS-RS iteration 14: Global Deviance = 798.1419 
+## GAMLSS-RS iteration 15: Global Deviance = 798.2329 
+## GAMLSS-RS iteration 16: Global Deviance = 798.3046 
+## GAMLSS-RS iteration 17: Global Deviance = 798.3618 
+## GAMLSS-RS iteration 18: Global Deviance = 798.4067 
+## GAMLSS-RS iteration 19: Global Deviance = 798.4427 
+## GAMLSS-RS iteration 20: Global Deviance = 798.4705</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 798.4959 
+## GAMLSS-RS iteration 22: Global Deviance = 798.5094 
+## GAMLSS-RS iteration 23: Global Deviance = 798.5228 
+## GAMLSS-RS iteration 24: Global Deviance = 798.533 
+## GAMLSS-RS iteration 25: Global Deviance = 798.54 
+## GAMLSS-RS iteration 26: Global Deviance = 798.548 
+## GAMLSS-RS iteration 27: Global Deviance = 798.5519 
+## GAMLSS-RS iteration 28: Global Deviance = 798.5547 
+## GAMLSS-RS iteration 29: Global Deviance = 798.5565 
+## GAMLSS-RS iteration 30: Global Deviance = 798.5584 
+## GAMLSS-RS iteration 31: Global Deviance = 798.5589 
+## [1] &quot;Distribution SICHEL, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1546.678 
+## GAMLSS-RS iteration 2: Global Deviance = 1542.354 
+## GAMLSS-RS iteration 3: Global Deviance = 1540.829 
+## GAMLSS-RS iteration 4: Global Deviance = 1540.078 
+## GAMLSS-RS iteration 5: Global Deviance = 1539.712 
+## GAMLSS-RS iteration 6: Global Deviance = 1539.511 
+## GAMLSS-RS iteration 7: Global Deviance = 1539.409 
+## GAMLSS-RS iteration 8: Global Deviance = 1539.375 
+## GAMLSS-RS iteration 9: Global Deviance = 1539.299 
+## GAMLSS-RS iteration 10: Global Deviance = 1539.301 
+## GAMLSS-RS iteration 11: Global Deviance = 1539.305 
+## GAMLSS-RS iteration 12: Global Deviance = 1539.309 
+## GAMLSS-RS iteration 13: Global Deviance = 1539.315 
+## GAMLSS-RS iteration 14: Global Deviance = 1539.32 
+## GAMLSS-RS iteration 15: Global Deviance = 1539.324 
+## GAMLSS-RS iteration 16: Global Deviance = 1539.329 
+## GAMLSS-RS iteration 17: Global Deviance = 1539.334 
+## GAMLSS-RS iteration 18: Global Deviance = 1539.339 
+## GAMLSS-RS iteration 19: Global Deviance = 1539.343 
+## GAMLSS-RS iteration 20: Global Deviance = 1539.351</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1539.367 
+## GAMLSS-RS iteration 22: Global Deviance = 1539.364 
+## GAMLSS-RS iteration 23: Global Deviance = 1539.366 
+## GAMLSS-RS iteration 24: Global Deviance = 1539.368 
+## GAMLSS-RS iteration 25: Global Deviance = 1539.37 
+## GAMLSS-RS iteration 26: Global Deviance = 1539.373 
+## GAMLSS-RS iteration 27: Global Deviance = 1539.375 
+## GAMLSS-RS iteration 28: Global Deviance = 1539.377 
+## GAMLSS-RS iteration 29: Global Deviance = 1539.379 
+## GAMLSS-RS iteration 30: Global Deviance = 1539.38 
+## GAMLSS-RS iteration 31: Global Deviance = 1539.382 
+## GAMLSS-RS iteration 32: Global Deviance = 1539.384 
+## GAMLSS-RS iteration 33: Global Deviance = 1539.386 
+## GAMLSS-RS iteration 34: Global Deviance = 1539.388 
+## GAMLSS-RS iteration 35: Global Deviance = 1539.389 
+## GAMLSS-RS iteration 36: Global Deviance = 1539.391 
+## GAMLSS-RS iteration 37: Global Deviance = 1539.393 
+## GAMLSS-RS iteration 38: Global Deviance = 1539.394 
+## GAMLSS-RS iteration 39: Global Deviance = 1539.396 
+## GAMLSS-RS iteration 40: Global Deviance = 1539.397 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1475.035 
+## GAMLSS-RS iteration 2: Global Deviance = 1474.02 
+## GAMLSS-RS iteration 3: Global Deviance = 1473.686 
+## GAMLSS-RS iteration 4: Global Deviance = 1473.623 
+## GAMLSS-RS iteration 5: Global Deviance = 1473.771 
+## GAMLSS-RS iteration 6: Global Deviance = 1473.811 
+## GAMLSS-RS iteration 7: Global Deviance = 1473.779 
+## GAMLSS-RS iteration 8: Global Deviance = 1473.764 
+## GAMLSS-RS iteration 9: Global Deviance = 1473.793 
+## GAMLSS-RS iteration 10: Global Deviance = 1473.831 
+## GAMLSS-RS iteration 11: Global Deviance = 1473.85 
+## GAMLSS-RS iteration 12: Global Deviance = 1473.863 
+## GAMLSS-RS iteration 13: Global Deviance = 1473.868 
+## GAMLSS-RS iteration 14: Global Deviance = 1473.87 
+## GAMLSS-RS iteration 15: Global Deviance = 1473.871 
+## [1] &quot;Distribution SICHEL, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 775.7538 
+## GAMLSS-RS iteration 2: Global Deviance = 768.316 
+## GAMLSS-RS iteration 3: Global Deviance = 764.3466 
+## GAMLSS-RS iteration 4: Global Deviance = 761.8972 
+## GAMLSS-RS iteration 5: Global Deviance = 760.3057 
+## GAMLSS-RS iteration 6: Global Deviance = 759.25 
+## GAMLSS-RS iteration 7: Global Deviance = 758.5172 
+## GAMLSS-RS iteration 8: Global Deviance = 758.0038 
+## GAMLSS-RS iteration 9: Global Deviance = 757.6025 
+## GAMLSS-RS iteration 10: Global Deviance = 757.4046 
+## GAMLSS-RS iteration 11: Global Deviance = 757.2207 
+## GAMLSS-RS iteration 12: Global Deviance = 757.1472 
+## GAMLSS-RS iteration 13: Global Deviance = 757.0722 
+## GAMLSS-RS iteration 14: Global Deviance = 757.0544 
+## GAMLSS-RS iteration 15: Global Deviance = 757.0398 
+## GAMLSS-RS iteration 16: Global Deviance = 757.0378 
+## GAMLSS-RS iteration 17: Global Deviance = 757.0514 
+## GAMLSS-RS iteration 18: Global Deviance = 757.0495 
+## GAMLSS-RS iteration 19: Global Deviance = 757.0705 
+## GAMLSS-RS iteration 20: Global Deviance = 757.0748</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 757.0925 
+## GAMLSS-RS iteration 22: Global Deviance = 757.0897 
+## GAMLSS-RS iteration 23: Global Deviance = 757.0932 
+## GAMLSS-RS iteration 24: Global Deviance = 757.0976 
+## GAMLSS-RS iteration 25: Global Deviance = 757.1013 
+## GAMLSS-RS iteration 26: Global Deviance = 757.1046 
+## GAMLSS-RS iteration 27: Global Deviance = 757.1076 
+## GAMLSS-RS iteration 28: Global Deviance = 757.1092 
+## GAMLSS-RS iteration 29: Global Deviance = 757.1111 
+## GAMLSS-RS iteration 30: Global Deviance = 757.1124 
+## GAMLSS-RS iteration 31: Global Deviance = 757.1136 
+## GAMLSS-RS iteration 32: Global Deviance = 757.1144 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 772.7261 
+## GAMLSS-RS iteration 2: Global Deviance = 766.7079 
+## GAMLSS-RS iteration 3: Global Deviance = 763.7772 
+## GAMLSS-RS iteration 4: Global Deviance = 762.0823 
+## GAMLSS-RS iteration 5: Global Deviance = 761.0339 
+## GAMLSS-RS iteration 6: Global Deviance = 760.4334 
+## GAMLSS-RS iteration 7: Global Deviance = 760.1893 
+## GAMLSS-RS iteration 8: Global Deviance = 759.988 
+## GAMLSS-RS iteration 9: Global Deviance = 759.8377 
+## GAMLSS-RS iteration 10: Global Deviance = 759.9763 
+## GAMLSS-RS iteration 11: Global Deviance = 760.0897 
+## GAMLSS-RS iteration 12: Global Deviance = 760.2535 
+## GAMLSS-RS iteration 13: Global Deviance = 760.3202 
+## GAMLSS-RS iteration 14: Global Deviance = 760.4155 
+## GAMLSS-RS iteration 15: Global Deviance = 760.5074 
+## GAMLSS-RS iteration 16: Global Deviance = 760.6186 
+## GAMLSS-RS iteration 17: Global Deviance = 760.6734 
+## GAMLSS-RS iteration 18: Global Deviance = 760.7281 
+## GAMLSS-RS iteration 19: Global Deviance = 760.7706 
+## GAMLSS-RS iteration 20: Global Deviance = 760.8286</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 760.8743 
+## GAMLSS-RS iteration 22: Global Deviance = 760.8899 
+## GAMLSS-RS iteration 23: Global Deviance = 760.9157 
+## GAMLSS-RS iteration 24: Global Deviance = 760.8904 
+## GAMLSS-RS iteration 25: Global Deviance = 760.9302 
+## GAMLSS-RS iteration 26: Global Deviance = 760.9517 
+## GAMLSS-RS iteration 27: Global Deviance = 760.997 
+## GAMLSS-RS iteration 28: Global Deviance = 760.9662 
+## GAMLSS-RS iteration 29: Global Deviance = 760.9594 
+## GAMLSS-RS iteration 30: Global Deviance = 760.8921 
+## GAMLSS-RS iteration 31: Global Deviance = 760.9863 
+## GAMLSS-RS iteration 32: Global Deviance = 760.9956 
+## GAMLSS-RS iteration 33: Global Deviance = 760.9685 
+## GAMLSS-RS iteration 34: Global Deviance = 760.9677 
+## [1] &quot;Distribution SICHEL, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 1273.795</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 2: Global Deviance = 1266.386</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 3: Global Deviance = 1263.807</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 4: Global Deviance = 1263.111</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 5: Global Deviance = 1263.22 
+## GAMLSS-RS iteration 6: Global Deviance = 1263.543</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 7: Global Deviance = 1263.7 
+## GAMLSS-RS iteration 8: Global Deviance = 1263.874 
+## GAMLSS-RS iteration 9: Global Deviance = 1264.136</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 10: Global Deviance = 1263.899</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 11: Global Deviance = 1263.972</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 12: Global Deviance = 1263.903 
+## GAMLSS-RS iteration 13: Global Deviance = 1264.231</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations
+
+## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 14: Global Deviance = 1263.944</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 15: Global Deviance = 1263.848 
+## GAMLSS-RS iteration 16: Global Deviance = 1264.177 
+## GAMLSS-RS iteration 17: Global Deviance = 1263.976</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 18: Global Deviance = 1264.01</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 19: Global Deviance = 1263.914</code></pre>
+<pre><code>## Warning in additive.fit(x = X, y = wv, w = wt * w, s = s, who = who, smooth.frame, : additive.fit convergence not
+## obtained in 30 iterations</code></pre>
+<pre><code>## GAMLSS-RS iteration 20: Global Deviance = 1263.91</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1264.875 
+## GAMLSS-RS iteration 22: Global Deviance = 1264.872 
+## GAMLSS-RS iteration 23: Global Deviance = 1264.865 
+## GAMLSS-RS iteration 24: Global Deviance = 1264.88 
+## GAMLSS-RS iteration 25: Global Deviance = 1264.873 
+## GAMLSS-RS iteration 26: Global Deviance = 1264.9 
+## GAMLSS-RS iteration 27: Global Deviance = 1264.893 
+## GAMLSS-RS iteration 28: Global Deviance = 1264.879 
+## GAMLSS-RS iteration 29: Global Deviance = 1264.873 
+## GAMLSS-RS iteration 30: Global Deviance = 1264.875 
+## GAMLSS-RS iteration 31: Global Deviance = 1264.897 
+## GAMLSS-RS iteration 32: Global Deviance = 1264.874 
+## GAMLSS-RS iteration 33: Global Deviance = 1264.897 
+## GAMLSS-RS iteration 34: Global Deviance = 1264.88 
+## GAMLSS-RS iteration 35: Global Deviance = 1264.873 
+## GAMLSS-RS iteration 36: Global Deviance = 1264.868 
+## GAMLSS-RS iteration 37: Global Deviance = 1264.869 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1281.077 
+## GAMLSS-RS iteration 2: Global Deviance = 1274.627 
+## GAMLSS-RS iteration 3: Global Deviance = 1272.969 
+## GAMLSS-RS iteration 4: Global Deviance = 1272.943 
+## GAMLSS-RS iteration 5: Global Deviance = 1273.137 
+## GAMLSS-RS iteration 6: Global Deviance = 1273.327 
+## GAMLSS-RS iteration 7: Global Deviance = 1273.45 
+## GAMLSS-RS iteration 8: Global Deviance = 1273.529 
+## GAMLSS-RS iteration 9: Global Deviance = 1273.564 
+## GAMLSS-RS iteration 10: Global Deviance = 1273.6 
+## GAMLSS-RS iteration 11: Global Deviance = 1273.683 
+## GAMLSS-RS iteration 12: Global Deviance = 1273.791 
+## GAMLSS-RS iteration 13: Global Deviance = 1273.82 
+## GAMLSS-RS iteration 14: Global Deviance = 1273.851 
+## GAMLSS-RS iteration 15: Global Deviance = 1273.872 
+## GAMLSS-RS iteration 16: Global Deviance = 1273.885 
+## GAMLSS-RS iteration 17: Global Deviance = 1273.893 
+## GAMLSS-RS iteration 18: Global Deviance = 1273.897 
+## GAMLSS-RS iteration 19: Global Deviance = 1273.9 
+## GAMLSS-RS iteration 20: Global Deviance = 1273.901</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 1273.905 
+## GAMLSS-RS iteration 22: Global Deviance = 1273.905 
+## [1] &quot;Distribution SICHEL, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 831.9837 
+## GAMLSS-RS iteration 2: Global Deviance = 829.2319 
+## GAMLSS-RS iteration 3: Global Deviance = 827.995 
+## GAMLSS-RS iteration 4: Global Deviance = 827.2216 
+## GAMLSS-RS iteration 5: Global Deviance = 826.9974 
+## GAMLSS-RS iteration 6: Global Deviance = 826.8682 
+## GAMLSS-RS iteration 7: Global Deviance = 826.5933 
+## GAMLSS-RS iteration 8: Global Deviance = 826.7419 
+## GAMLSS-RS iteration 9: Global Deviance = 826.7287 
+## GAMLSS-RS iteration 10: Global Deviance = 826.7547 
+## GAMLSS-RS iteration 11: Global Deviance = 826.7682 
+## GAMLSS-RS iteration 12: Global Deviance = 826.7679 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 800.9553 
+## GAMLSS-RS iteration 2: Global Deviance = 798.6921 
+## GAMLSS-RS iteration 3: Global Deviance = 797.5016 
+## GAMLSS-RS iteration 4: Global Deviance = 796.9673 
+## GAMLSS-RS iteration 5: Global Deviance = 796.7386 
+## GAMLSS-RS iteration 6: Global Deviance = 796.3353 
+## GAMLSS-RS iteration 7: Global Deviance = 796.6821 
+## GAMLSS-RS iteration 8: Global Deviance = 796.7685 
+## GAMLSS-RS iteration 9: Global Deviance = 796.8754 
+## GAMLSS-RS iteration 10: Global Deviance = 796.9868 
+## GAMLSS-RS iteration 11: Global Deviance = 797.0923 
+## GAMLSS-RS iteration 12: Global Deviance = 797.1869 
+## GAMLSS-RS iteration 13: Global Deviance = 797.2686 
+## GAMLSS-RS iteration 14: Global Deviance = 797.3335 
+## GAMLSS-RS iteration 15: Global Deviance = 797.3807 
+## GAMLSS-RS iteration 16: Global Deviance = 797.4121 
+## GAMLSS-RS iteration 17: Global Deviance = 797.4299 
+## GAMLSS-RS iteration 18: Global Deviance = 797.4325 
+## GAMLSS-RS iteration 19: Global Deviance = 797.4199 
+## GAMLSS-RS iteration 20: Global Deviance = 797.3941</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 797.3536 
+## GAMLSS-RS iteration 22: Global Deviance = 797.3035 
+## GAMLSS-RS iteration 23: Global Deviance = 797.2396 
+## GAMLSS-RS iteration 24: Global Deviance = 797.1664 
+## GAMLSS-RS iteration 25: Global Deviance = 797.0826 
+## GAMLSS-RS iteration 26: Global Deviance = 796.99 
+## GAMLSS-RS iteration 27: Global Deviance = 796.8876 
+## GAMLSS-RS iteration 28: Global Deviance = 796.7782 
+## GAMLSS-RS iteration 29: Global Deviance = 796.6613 
+## GAMLSS-RS iteration 30: Global Deviance = 796.5407 
+## GAMLSS-RS iteration 31: Global Deviance = 796.4166 
+## GAMLSS-RS iteration 32: Global Deviance = 796.2938 
+## GAMLSS-RS iteration 33: Global Deviance = 796.1774 
+## GAMLSS-RS iteration 34: Global Deviance = 796.0649 
+## GAMLSS-RS iteration 35: Global Deviance = 795.9624 
+## GAMLSS-RS iteration 36: Global Deviance = 795.8726 
+## GAMLSS-RS iteration 37: Global Deviance = 795.7973 
+## GAMLSS-RS iteration 38: Global Deviance = 795.739 
+## GAMLSS-RS iteration 39: Global Deviance = 795.6967 
+## GAMLSS-RS iteration 40: Global Deviance = 795.6691</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Distribution ZIP, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
 <pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
 ## Increase gd.tol and if persist, try different steps
 ## or model maybe inappropriate</code></pre>
-<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 21481.04 
+## GAMLSS-RS iteration 2: Global Deviance = 21974.87 
+## [1] &quot;Fitting oceanographic model&quot;</code></pre>
 <pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
 ## Increase gd.tol and if persist, try different steps
 ## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 15322.54 
+## GAMLSS-RS iteration 2: Global Deviance = 15760.84 
+## [1] &quot;Distribution ZIP, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
+## Increase gd.tol and if persist, try different steps
+## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 4410.207 
+## GAMLSS-RS iteration 2: Global Deviance = 4836.528 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 4752.88 
+## GAMLSS-RS iteration 2: Global Deviance = 4824.343 
+## [1] &quot;Distribution ZIP, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 3013.264 
+## GAMLSS-RS iteration 2: Global Deviance = 2858.748 
+## GAMLSS-RS iteration 3: Global Deviance = 2849.831 
+## GAMLSS-RS iteration 4: Global Deviance = 2842.061 
+## GAMLSS-RS iteration 5: Global Deviance = 2839.048 
+## GAMLSS-RS iteration 6: Global Deviance = 2837.491 
+## GAMLSS-RS iteration 7: Global Deviance = 2836.966 
+## GAMLSS-RS iteration 8: Global Deviance = 2836.921 
+## GAMLSS-RS iteration 9: Global Deviance = 2836.808 
+## GAMLSS-RS iteration 10: Global Deviance = 2836.869 
+## GAMLSS-RS iteration 11: Global Deviance = 2837.939 
+## GAMLSS-RS iteration 12: Global Deviance = 2836.673 
+## GAMLSS-RS iteration 13: Global Deviance = 2835.805 
+## GAMLSS-RS iteration 14: Global Deviance = 2837.186 
+## GAMLSS-RS iteration 15: Global Deviance = 2835.929 
+## GAMLSS-RS iteration 16: Global Deviance = 2835.805 
+## GAMLSS-RS iteration 17: Global Deviance = 2835.482 
+## GAMLSS-RS iteration 18: Global Deviance = 2836.467 
+## GAMLSS-RS iteration 19: Global Deviance = 2837.431 
+## GAMLSS-RS iteration 20: Global Deviance = 2838.195</code></pre>
 <pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
-<p>Hmm, only two of the nine models converged:</p>
-<pre class="r"><code>model.rankings &lt;- sapply(all.models, function(model) c(family = model$family[1], # Distribution used
-                                                    df = extractAIC(model)[1], # degrees of freedom
-                                                    AIC = extractAIC(model)[2], # AIC value
-                                                    converged = getElement(model, 'converged'))) %&gt;% # whether model converged
-  t %&gt;%
-  as.data.frame %&gt;%
-  arrange(AIC)
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 2895.29 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 2125.51 
+## GAMLSS-RS iteration 2: Global Deviance = 2121.706 
+## GAMLSS-RS iteration 3: Global Deviance = 2124.474 
+## GAMLSS-RS iteration 4: Global Deviance = 2125.358 
+## GAMLSS-RS iteration 5: Global Deviance = 2125.854 
+## GAMLSS-RS iteration 6: Global Deviance = 2126.131 
+## GAMLSS-RS iteration 7: Global Deviance = 2126.375 
+## GAMLSS-RS iteration 8: Global Deviance = 2126.541 
+## GAMLSS-RS iteration 9: Global Deviance = 2126.688 
+## GAMLSS-RS iteration 10: Global Deviance = 2125.063 
+## GAMLSS-RS iteration 11: Global Deviance = 2125.263 
+## GAMLSS-RS iteration 12: Global Deviance = 2125.295 
+## GAMLSS-RS iteration 13: Global Deviance = 2124.878 
+## GAMLSS-RS iteration 14: Global Deviance = 2124.891 
+## GAMLSS-RS iteration 15: Global Deviance = 2124.862 
+## GAMLSS-RS iteration 16: Global Deviance = 2124.863 
+## [1] &quot;Distribution ZIP, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
+## Increase gd.tol and if persist, try different steps
+## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 6388.285 
+## GAMLSS-RS iteration 2: Global Deviance = 6560.017 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 2539.408 
+## GAMLSS-RS iteration 2: Global Deviance = 2600.894 
+## [1] &quot;Distribution ZIP2, month 6&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
+## Increase gd.tol and if persist, try different steps
+## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 19615.29</code></pre>
+<pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
+## Increase gd.tol and if persist, try different steps
+## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 2: Global Deviance = 19699.85 
+## [1] &quot;Fitting oceanographic model&quot;</code></pre>
+<pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
+## Increase gd.tol and if persist, try different steps
+## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 13032.63</code></pre>
+<pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
+## Increase gd.tol and if persist, try different steps
+## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 2: Global Deviance = 12978.11 
+## GAMLSS-RS iteration 3: Global Deviance = 13099.27 
+## [1] &quot;Distribution ZIP2, month 7&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
+## Increase gd.tol and if persist, try different steps
+## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 4882.632 
+## GAMLSS-RS iteration 2: Global Deviance = 5265.468 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 4159.911 
+## GAMLSS-RS iteration 2: Global Deviance = 4052.071 
+## GAMLSS-RS iteration 3: Global Deviance = 3834.645 
+## GAMLSS-RS iteration 4: Global Deviance = 3616.17 
+## GAMLSS-RS iteration 5: Global Deviance = 3365.002 
+## GAMLSS-RS iteration 6: Global Deviance = 3184.524 
+## GAMLSS-RS iteration 7: Global Deviance = 3050.346 
+## GAMLSS-RS iteration 8: Global Deviance = 2947.257 
+## GAMLSS-RS iteration 9: Global Deviance = 2871.42 
+## GAMLSS-RS iteration 10: Global Deviance = 2817.797 
+## GAMLSS-RS iteration 11: Global Deviance = 2780.106 
+## GAMLSS-RS iteration 12: Global Deviance = 2753.086 
+## GAMLSS-RS iteration 13: Global Deviance = 2733.058 
+## GAMLSS-RS iteration 14: Global Deviance = 2731.906 
+## GAMLSS-RS iteration 15: Global Deviance = 2731.841 
+## GAMLSS-RS iteration 16: Global Deviance = 2731.95 
+## GAMLSS-RS iteration 17: Global Deviance = 2717.442 
+## GAMLSS-RS iteration 18: Global Deviance = 2703.627 
+## GAMLSS-RS iteration 19: Global Deviance = 2702.964 
+## GAMLSS-RS iteration 20: Global Deviance = 2702.923</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting oceanographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 2845.874 
+## [1] &quot;Distribution ZIP2, month 9&quot;
+## [1] &quot;Fitting geographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 4166.673 
+## GAMLSS-RS iteration 2: Global Deviance = 3055.769 
+## GAMLSS-RS iteration 3: Global Deviance = 2926.039 
+## GAMLSS-RS iteration 4: Global Deviance = 2884.355 
+## GAMLSS-RS iteration 5: Global Deviance = 2866.437 
+## GAMLSS-RS iteration 6: Global Deviance = 2860.097 
+## GAMLSS-RS iteration 7: Global Deviance = 2852.479 
+## GAMLSS-RS iteration 8: Global Deviance = 2849.499 
+## GAMLSS-RS iteration 9: Global Deviance = 2847.109 
+## GAMLSS-RS iteration 10: Global Deviance = 2844.246 
+## GAMLSS-RS iteration 11: Global Deviance = 2843.186 
+## GAMLSS-RS iteration 12: Global Deviance = 2842.868 
+## GAMLSS-RS iteration 13: Global Deviance = 2841.318 
+## GAMLSS-RS iteration 14: Global Deviance = 2840.13 
+## GAMLSS-RS iteration 15: Global Deviance = 2839.019 
+## GAMLSS-RS iteration 16: Global Deviance = 2839.81 
+## GAMLSS-RS iteration 17: Global Deviance = 2840.308 
+## GAMLSS-RS iteration 18: Global Deviance = 2838.694 
+## GAMLSS-RS iteration 19: Global Deviance = 2838.846 
+## GAMLSS-RS iteration 20: Global Deviance = 2838.353</code></pre>
+<pre><code>## Warning in RS(): Algorithm RS has not yet converged</code></pre>
+<pre><code>## [1] &quot;Refitting geographic model&quot;
+## GAMLSS-RS iteration 21: Global Deviance = 2899.72 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 2259.852 
+## GAMLSS-RS iteration 2: Global Deviance = 2298.712 
+## [1] &quot;Distribution ZIP2, month 10&quot;
+## [1] &quot;Fitting geographic model&quot;</code></pre>
+<pre><code>## Warning in glim.fit(f = mu.object, X = mu.X, y = y, w = w, fv = mu, os = mu.offset, : The deviance has increased in an inner iteration for mu
+## Increase gd.tol and if persist, try different steps
+## or model maybe inappropriate</code></pre>
+<pre><code>## GAMLSS-RS iteration 1: Global Deviance = 6646.068 
+## GAMLSS-RS iteration 2: Global Deviance = 6774.694 
+## [1] &quot;Fitting oceanographic model&quot;
+## GAMLSS-RS iteration 1: Global Deviance = 1909.46 
+## GAMLSS-RS iteration 2: Global Deviance = 2028.832</code></pre>
+<ol start="4" style="list-style-type: decimal">
+<li>Summarize model results for ranking (parameters, convergence, EDF, AIC)</li>
+</ol>
+<pre class="r"><code>model.rankings &lt;- foreach(dist.list = monthly.geo.ocean.models, .combine = rbind) %do% {
+  foreach(models = dist.list, .combine = rbind) %do% {
+    data.frame(Distribution = models$dist,
+               Month = models$month,
+               GeoConverged = tryCatch(getElement(models$geo.model, 'converged'), error = function(e) NA),
+               GeoEDF = tryCatch(extractAIC(models$geo.model)[1], error = function(e) NA),
+               GeoAIC = tryCatch(extractAIC(models$geo.model)[2], error = function(e) NA),
+               OceanConverged = tryCatch(getElement(models$ocean.model, 'converged'), error = function(e) NA),
+               OceanEDF = tryCatch(extractAIC(models$ocean.model)[1], error = function(e) NA),
+               OceanAIC = tryCatch(extractAIC(models$ocean.model)[2], error = function(e) NA))
+  }
+}
 model.rankings</code></pre>
-<pre><code>##   family               df              AIC converged
-## 1    ZIP 18.0071345121078  28911.395952418     FALSE
-## 2   ZIP2 18.0014909654322 29625.4903327527     FALSE
-## 3     PO 16.7520989137105 39349.8151421477     FALSE
-## 4    PIG  17.843136038588 5422.94335424973     FALSE
-## 5     SI 18.8408820690253 5424.97914610195     FALSE
-## 6 SICHEL 18.8368436465229 5425.03010632109      TRUE
-## 7    DEL 18.8464078999266 5515.85128347208     FALSE
-## 8    NBI 17.6887906893023 5628.66336102279      TRUE
-## 9   NBII 17.7726490877903 5738.17643260422     FALSE</code></pre>
+<pre><code>##    Distribution Month GeoConverged   GeoEDF     GeoAIC OceanConverged OceanEDF  OceanAIC
+## 1            PO     6         TRUE 17.37874 14429.1667           TRUE 37.99683 9943.7542
+## 2            PO     7         TRUE 17.22401  2891.0454           TRUE 38.00131 2214.5934
+## 3            PO     9        FALSE 18.93800  2923.4516           TRUE 37.99780 2397.5065
+## 4            PO    10           NA       NA         NA           TRUE 38.00199 2007.0185
+## 5           NBI     6         TRUE 19.76089  1597.5923           TRUE 39.00236 1580.1343
+## 6           NBI     7         TRUE 19.64882   854.0322          FALSE 39.13214  873.4772
+## 7           NBI     9           NA       NA         NA           TRUE 39.00057 1370.0993
+## 8           NBI    10         TRUE 19.58401   909.4861           TRUE 38.99920  980.9490
+## 9          NBII     6         TRUE 19.57903  1641.2317           TRUE 38.99889 1635.1381
+## 10         NBII     7         TRUE 19.35685   912.5372           TRUE 38.99838  949.0214
+## 11         NBII     9         TRUE 20.09472  1389.9298           TRUE 39.00067 1428.1303
+## 12         NBII    10         TRUE 19.07953   933.8088          FALSE 38.99957  940.5069
+## 13          DEL     6           NA       NA         NA          FALSE 40.00075 1549.9930
+## 14          DEL     7         TRUE 19.65512   805.9848          FALSE 40.00069  845.2117
+## 15          DEL     9        FALSE 20.45258  1317.6952          FALSE 39.99796 1359.6662
+## 16          DEL    10        FALSE 19.89777   863.8912          FALSE 40.00183  869.8083
+## 17          PIG     6         TRUE 19.54640  1578.3406           TRUE 39.00198 1553.8867
+## 18          PIG     7         TRUE 19.31741   812.3070          FALSE 38.99947  842.3494
+## 19          PIG     9         TRUE 19.86607  1306.4611           TRUE 39.00097 1353.1537
+## 20          PIG    10         TRUE 18.99260   866.9973           TRUE 38.99810  872.6232
+## 21           SI     6         TRUE 20.52629  1580.0869           TRUE 40.00172 1554.4433
+## 22           SI     7         TRUE 20.37716   797.8217           TRUE 39.99933  840.8259
+## 23           SI     9        FALSE 21.06764  1306.9966           TRUE 39.99924 1353.8648
+## 24           SI    10        FALSE 20.06495   867.3206           TRUE 40.00079  878.5605
+## 25       SICHEL     6         TRUE 20.54553  1580.4882           TRUE 40.00036 1553.8717
+## 26       SICHEL     7         TRUE 20.36798   797.8504           TRUE 39.99781  840.9633
+## 27       SICHEL     9         TRUE 21.07391  1307.0165           TRUE 39.99925 1353.9031
+## 28       SICHEL    10         TRUE 20.07979   866.9274          FALSE 39.99872  875.6666
+## 29          ZIP     6           NA       NA         NA             NA       NA        NA
+## 30          ZIP     7           NA       NA         NA             NA       NA        NA
+## 31          ZIP     9        FALSE 18.87002  2875.9347           TRUE 39.00053 2202.8639
+## 32          ZIP    10           NA       NA         NA             NA       NA        NA
+## 33         ZIP2     6           NA       NA         NA             NA       NA        NA
+## 34         ZIP2     7           NA       NA         NA          FALSE 38.99981 2780.9224
+## 35         ZIP2     9        FALSE 18.90885  2876.1709             NA       NA        NA
+## 36         ZIP2    10           NA       NA         NA             NA       NA        NA</code></pre>
+<ol start="5" style="list-style-type: decimal">
+<li>SI, SICHEL, and PIG distributions tend to perform the best (which makes sense, they’re all closely related). The geographic models outperform their oceanographic counterparts in every month but June.</li>
+</ol>
+<pre class="r"><code>model.rankings %&gt;%
+  group_by(Month) %&gt;%
+  arrange(-GeoConverged, GeoAIC) %&gt;% 
+  slice(1:4)</code></pre>
+<pre><code>## Source: local data frame [16 x 8]
+## Groups: Month [4]
+## 
+##    Distribution Month GeoConverged   GeoEDF    GeoAIC OceanConverged OceanEDF  OceanAIC
+##          (fctr) (dbl)        (lgl)    (dbl)     (dbl)          (lgl)    (dbl)     (dbl)
+## 1           PIG     6         TRUE 19.54640 1578.3406           TRUE 39.00198 1553.8867
+## 2            SI     6         TRUE 20.52629 1580.0869           TRUE 40.00172 1554.4433
+## 3        SICHEL     6         TRUE 20.54553 1580.4882           TRUE 40.00036 1553.8717
+## 4           NBI     6         TRUE 19.76089 1597.5923           TRUE 39.00236 1580.1343
+## 5            SI     7         TRUE 20.37716  797.8217           TRUE 39.99933  840.8259
+## 6        SICHEL     7         TRUE 20.36798  797.8504           TRUE 39.99781  840.9633
+## 7           DEL     7         TRUE 19.65512  805.9848          FALSE 40.00069  845.2117
+## 8           PIG     7         TRUE 19.31741  812.3070          FALSE 38.99947  842.3494
+## 9           PIG     9         TRUE 19.86607 1306.4611           TRUE 39.00097 1353.1537
+## 10       SICHEL     9         TRUE 21.07391 1307.0165           TRUE 39.99925 1353.9031
+## 11         NBII     9         TRUE 20.09472 1389.9298           TRUE 39.00067 1428.1303
+## 12           SI     9        FALSE 21.06764 1306.9966           TRUE 39.99924 1353.8648
+## 13       SICHEL    10         TRUE 20.07979  866.9274          FALSE 39.99872  875.6666
+## 14          PIG    10         TRUE 18.99260  866.9973           TRUE 38.99810  872.6232
+## 15          NBI    10         TRUE 19.58401  909.4861           TRUE 38.99920  980.9490
+## 16         NBII    10         TRUE 19.07953  933.8088          FALSE 38.99957  940.5069</code></pre>
+<pre class="r"><code>model.rankings %&gt;%
+  group_by(Month) %&gt;%
+  arrange(-OceanConverged, OceanAIC) %&gt;% 
+  slice(1:4)</code></pre>
+<pre><code>## Source: local data frame [16 x 8]
+## Groups: Month [4]
+## 
+##    Distribution Month GeoConverged   GeoEDF    GeoAIC OceanConverged OceanEDF  OceanAIC
+##          (fctr) (dbl)        (lgl)    (dbl)     (dbl)          (lgl)    (dbl)     (dbl)
+## 1        SICHEL     6         TRUE 20.54553 1580.4882           TRUE 40.00036 1553.8717
+## 2           PIG     6         TRUE 19.54640 1578.3406           TRUE 39.00198 1553.8867
+## 3            SI     6         TRUE 20.52629 1580.0869           TRUE 40.00172 1554.4433
+## 4           NBI     6         TRUE 19.76089 1597.5923           TRUE 39.00236 1580.1343
+## 5            SI     7         TRUE 20.37716  797.8217           TRUE 39.99933  840.8259
+## 6        SICHEL     7         TRUE 20.36798  797.8504           TRUE 39.99781  840.9633
+## 7          NBII     7         TRUE 19.35685  912.5372           TRUE 38.99838  949.0214
+## 8            PO     7         TRUE 17.22401 2891.0454           TRUE 38.00131 2214.5934
+## 9           PIG     9         TRUE 19.86607 1306.4611           TRUE 39.00097 1353.1537
+## 10           SI     9        FALSE 21.06764 1306.9966           TRUE 39.99924 1353.8648
+## 11       SICHEL     9         TRUE 21.07391 1307.0165           TRUE 39.99925 1353.9031
+## 12          NBI     9           NA       NA        NA           TRUE 39.00057 1370.0993
+## 13          PIG    10         TRUE 18.99260  866.9973           TRUE 38.99810  872.6232
+## 14           SI    10        FALSE 20.06495  867.3206           TRUE 40.00079  878.5605
+## 15          NBI    10         TRUE 19.58401  909.4861           TRUE 38.99920  980.9490
+## 16           PO    10           NA       NA        NA           TRUE 38.00199 2007.0185</code></pre>
 
 
 
