@@ -18,20 +18,20 @@ catch <- mutate(catch,
 
 ## if there are multiple predEvents in a week, choose the most important one 
 weeklyCatches <- catch %>%
-  group_by(Trapline, TrapNum, week) %>% 
+  group_by(Trapline, TrapNum, Year, week) %>% 
   summarize(predEvent = min(predEvent))
 
 ## count the number of Trapline events (weeklyCatches) per week (aka number of traps in the trapline)
-TrapsPerLineWeek <- weeklyCatches %>%
-  group_by(Trapline, week) %>%
+trapsPerLineWeek <- weeklyCatches %>%
+  group_by(Trapline, Year, week) %>%
   summarize(NTraps = n())
 # count number of each predEvent per week per trapline
-PredEventsPerLineWeek <- weeklyCatches %>% 
+predEventsPerLineWeek <- weeklyCatches %>% 
   group_by(Trapline, week, predEvent) %>% 
   summarize(NEvents = n())
 
 ## number of predEvents per number of traps, for each week on each Trapline
-PredEventPUE <- merge(TrapsPerLineWeek, PredEventsPerLineWeek, catch$date) %>% 
+predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>% 
   mutate(CPUE = NEvents/NTraps) %>% 
   arrange(Trapline, week, predEvent)
 
@@ -41,6 +41,28 @@ uniqueTrapsPerWeek <- catch %>%
   summarize(N = n()) %>% 
   filter(N > 1) %>% 
   arrange(-N)
+
+### summary stats and graphs of predEventPUE
+# frequency of predEvents per trapline per year
+traplineCPUE <- 
+  predEventPUE %>%
+  group_by(Trapline, Year, predEvent) %>%
+  summarize(annualFreq = mean(CPUE)) # summarize(sumWeeklyFreq = sum(CPUE))
+  
+# plot of predEvents per trapline per year
+ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
+  geom_point() +
+  labs(x = 'Year', y = 'Annual Events per Unit Effort') +
+  facet_wrap(~ Trapline, nrow = 4) +
+  theme(axis.text.x = element_text(angle=60, hjust=1))
+
+
+# histogram of pred events per trapline
+ggplot(predEventPUE, aes(CPUE)) +
+  geom_bar() +
+  labs(x = 'Predator event type', y = 'frequency') +
+  facet_wrap(~ Trapline, nrow = 4) +
+  theme(axis.text.x = element_text(angle=60, hjust=1))
 
 
 # # take a look at which traps were checked multiple times in one week 
