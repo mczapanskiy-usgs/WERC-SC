@@ -22,7 +22,7 @@ is.predEvent <- function(predCaught, birdCaught, otherCaught, trapStatus, baitSt
     predCaught == "MM" ~ "mouseCaught",
     predCaught %in% c("RR", "RN", "RB") ~ "ratCaught",
     birdCaught != "" | otherCaught != "" ~ "birdOtherCaught",
-    trapStatus == 'O' & baitStatus == "N" ~ "baitStolen",
+    trapStatus == 'O' & baitStatus == "N" ~ "baitLost",
     predCaught == "" & birdCaught == "" & trapStatus == "C" ~ "trapTriggered", ## this includes events when predator escaped
     TRUE ~ "none")
 }
@@ -47,8 +47,8 @@ catch_summary
 # histogram of pred events per trapline
 ggplot(catch, aes(predEvent)) +
   geom_bar() +
-  labs(x = 'Predator event type', y = 'frequency') +
-  facet_wrap(~ Trapline, nrow = 4) +
+  labs(x = 'Predator Event Type', y = 'Number of Events') +
+  # facet_wrap(~ Trapline, nrow = 4) +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 
 # count of predEvents per trapline per year
@@ -60,7 +60,7 @@ traplinePredEvent <-
 # plot of predEvents per trapline per year
 ggplot(traplinePredEvent, aes(Year, n, color=predEvent)) +
   geom_point() +
-  labs(x = 'Year', y = 'Frequency') +
+  labs(x = 'Year', y = 'Numeber of Events') +
   facet_wrap(~ Trapline, nrow = 4) +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 

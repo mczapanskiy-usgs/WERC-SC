@@ -10,11 +10,11 @@ read.csv('~/WERC-SC/HALE/catch_traploc_weeks_baitTypes_edited_predEvent.csv',
          stringsAsFactors = FALSE) -> catch
 
 ## add variable IDing the check week so all trapsin a given week are group together by trapline (Jan 1-7, 2000 = week 1...)
-# also rank predEvent by importance (catCaught > mongooseCaught > ratCaught > mouseCaught > birdOtherCaught > baitStolen > trapTriggered > none)
+# also rank predEvent by importance (catCaught > mongooseCaught > ratCaught > mouseCaught > birdOtherCaught > baitLost > trapTriggered > none)
 catch <- mutate(catch, 
                 date = mdy(date), # change data from character to POSIXct
                 week = as.numeric(as.period(interval(min(date), date) %/% weeks(1))), #lubridate function
-                predEvent = factor(predEvent, level = c('catCaught', 'mongooseCaught', 'ratCaught', 'mouseCaught', 'birdOtherCaught', 'baitStolen', 'trapTriggered', 'none'), ordered = TRUE)) 
+                predEvent = factor(predEvent, level = c('catCaught', 'mongooseCaught', 'ratCaught', 'mouseCaught', 'birdOtherCaught', 'baitLost', 'trapTriggered', 'none'), ordered = TRUE)) 
 
 ## if there are multiple predEvents in a week, choose the most important one 
 weeklyCatches <- catch %>%
@@ -52,17 +52,17 @@ traplineCPUE <-
 # plot of predEvents per trapline per year
 ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
   geom_point() +
-  labs(x = 'Year', y = 'Annual Events per Unit Effort') +
+  labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort') +
   facet_wrap(~ Trapline, nrow = 4) +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 
-
-# histogram of pred events per trapline
-ggplot(predEventPUE, aes(CPUE)) +
-  geom_bar() +
-  labs(x = 'Predator event type', y = 'frequency') +
-  facet_wrap(~ Trapline, nrow = 4) +
-  theme(axis.text.x = element_text(angle=60, hjust=1))
+# 
+# # histogram of pred events per trapline
+# ggplot(predEventPUE, aes(CPUE)) +
+#   geom_bar() +
+#   labs(x = 'Predator event type', y = 'frequency') +
+#   facet_wrap(~ Trapline, nrow = 4) +
+#   theme(axis.text.x = element_text(angle=60, hjust=1))
 
 
 # # take a look at which traps were checked multiple times in one week 
