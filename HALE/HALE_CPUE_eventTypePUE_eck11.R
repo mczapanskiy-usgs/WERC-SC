@@ -37,6 +37,7 @@ predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>%
 
 ## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
 uniqueTrapsPerWeek <- catch %>% 
+  filter(!TrapChecked) # first remove dates when trap hadn't been checked in >14 days
   group_by(Trapline, week, TrapNum) %>% 
   summarize(N = n()) %>% 
   filter(N > 1) %>% 
@@ -54,7 +55,18 @@ ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
   geom_point() +
   labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort') +
   facet_wrap(~ Trapline, nrow = 4) +
+  theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1))
+
+#plot cat, rat, mongoose or mice caught per trapline per year
+preds <- ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
+  geom_point() +
+  labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort') +
+  facet_wrap(~ Trapline, nrow = 4) +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle=60, hjust=1)) +
+  ylim(0, 0.4)
+preds %+% subset(traplineCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
 
 # 
 # # histogram of pred events per trapline

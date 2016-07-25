@@ -37,6 +37,10 @@ write.csv(catch, file = '~/WERC-SC/HALE/catch_traploc_weeks_baitTypes_edited_pre
 
 
 ### summary stats and graphs of predEvent data
+# first remove dates when trap hadn't been checked in >14 days
+catch %>% 
+  filter(!TrapChecked)
+
 # different pred event counts
 catch_summary <-
   catch %>%
@@ -49,6 +53,7 @@ ggplot(catch, aes(predEvent)) +
   geom_bar() +
   labs(x = 'Predator Event Type', y = 'Number of Events') +
   # facet_wrap(~ Trapline, nrow = 4) +
+  theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 
 # count of predEvents per trapline per year
@@ -62,6 +67,7 @@ ggplot(traplinePredEvent, aes(Year, n, color=predEvent)) +
   geom_point() +
   labs(x = 'Year', y = 'Numeber of Events') +
   facet_wrap(~ Trapline, nrow = 4) +
+  theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 
 
