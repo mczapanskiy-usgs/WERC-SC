@@ -14,7 +14,9 @@ read.csv('~/WERC-SC/HALE/catch_traploc_weeks_baitTypes_edited_predEvent.csv',
 catch <- mutate(catch, 
                 date = mdy(date), # change data from character to POSIXct
                 week = as.numeric(as.period(interval(min(date), date) %/% weeks(1))), #lubridate function
-                predEvent = factor(predEvent, level = c('catCaught', 'mongooseCaught', 'ratCaught', 'mouseCaught', 'birdOtherCaught', 'baitLost', 'trapTriggered', 'none'), ordered = TRUE)) 
+                predEvent = factor(predEvent, 
+                                   level = c('catCaught', 'mongooseCaught', 'ratCaught', 'mouseCaught', 'birdOtherCaught', 'baitLost', 'trapTriggered', 'none'), 
+                                   ordered = TRUE)) 
 
 ## if there are multiple predEvents in a week, choose the most important one 
 weeklyCatches <- catch %>%
@@ -25,6 +27,7 @@ weeklyCatches <- catch %>%
 trapsPerLineWeek <- weeklyCatches %>%
   group_by(Trapline, Year, week) %>%
   summarize(NTraps = n())
+
 # count number of each predEvent per week per trapline
 predEventsPerLineWeek <- weeklyCatches %>% 
   group_by(Trapline, week, predEvent) %>% 
@@ -33,7 +36,7 @@ predEventsPerLineWeek <- weeklyCatches %>%
 ## number of predEvents per number of traps, for each week on each Trapline
 predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>% 
   mutate(CPUE = NEvents/NTraps) %>% 
-  arrange(Trapline, week, predEvent)
+  arrange(Trapline, season, week, predEvent)
 
 ## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
 uniqueTrapsPerWeek <- catch %>% 
