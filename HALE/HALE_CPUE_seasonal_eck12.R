@@ -58,7 +58,7 @@ ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq, color=Year)) + # , group = Y
 monthlyPreds <- ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq, color=Year)) +
   geom_point() +
   labs(x = 'Month', y = 'Monthly Frequency') +
-  facet_wrap(~ predEvent, nrow = 2) +
+  facet_wrap(~ predEvent, nrow = 4) +
   theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 monthlyPreds %+% subset(monthlyTraplineCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
