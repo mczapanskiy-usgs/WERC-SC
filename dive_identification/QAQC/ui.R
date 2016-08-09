@@ -1,5 +1,3 @@
-library(shiny)
-
 shinyUI(fluidPage(
   
   # QAQC Options
@@ -8,24 +6,25 @@ shinyUI(fluidPage(
     sidebarPanel(
       radioButtons('validDive',
                    'Valid dive?',
-                   choices = list('True' = 1,
-                                  'False' = 0,
-                                  'Unclear' = -1)),
+                   choices = list('True' = 't',
+                                  'False' = 'f',
+                                  'Unclear' = 'u'),
+                   selected = defaultInput$validDive),
       radioButtons('surfCal',
                   'Surface calibration:',
-                  choices = list('None' = 'none',
-                                 'Minimum Pressure' = 'min',
+                  choices = list('Minimum Pressure' = 'min',
                                  'Median Pressure (-1:1m)' = 'med'),
-                                 selected = 'min'),
-      radioButtons('plungeError',
-                   'Plunge error?',
-                   choices = list('False' = 0,
-                                  'True' = 1),
-                                  selected = 0),
+                  selected = defaultInput$surfCal),
+      checkboxGroupInput('errors',
+                         'Errors?',
+                         choices = c('Plunge' = 'plunge',
+                                     'Split' = 'split'),
+                         selected = defaultInput$errors),
       actionButton('nextDive',
                    'Next'),
       h3('Details:'),
       p(textOutput('species')),
+      p(textOutput('threshold')),
       p(textOutput('site')),
       p(textOutput('nest')),
       p(textOutput('band')),
@@ -34,7 +33,10 @@ shinyUI(fluidPage(
     
     # Dive plot
     mainPanel(
-      imageOutput('divePlot')
+      tabsetPanel(
+        tabPanel("Dive Plots", imageOutput('divePlot')),
+        tabPanel("Dive Table", DT::dataTableOutput('diveTable'))
+      )
     )
   )
 ))

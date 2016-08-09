@@ -6,3 +6,6 @@
 ~$*
 *.sqlite-journal
 *.sqlite
+HALE/catch_duplicateID.RData
+src/wetdry-analysis.R
+Hawaii_data/*
