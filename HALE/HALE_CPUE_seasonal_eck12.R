@@ -50,17 +50,18 @@ monthlyTraplineCPUE <-
 ## plot of predEvents per trapline per month
 ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq, color=Year)) + # , group = Year)) +
   geom_point() + # geom_line() +
+  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(x = 'Month', y = 'Monthly Frequency') +
   facet_wrap(~ predEvent, nrow = 4) +
   theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 # predEvents per trapline per month, for just predators
-monthlyPreds <- ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq, color=Year)) +
+monthlyPreds <- ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq)) +
   geom_point() +
+  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) + # theme(axis.text.x = element_text(angle=60, hjust=1))
   labs(x = 'Month', y = 'Monthly Frequency') +
   facet_wrap(~ predEvent, nrow = 4) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle=60, hjust=1))
+  theme_bw() 
 monthlyPreds %+% subset(monthlyTraplineCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
 
 ## plot of predEvents per trapline per season

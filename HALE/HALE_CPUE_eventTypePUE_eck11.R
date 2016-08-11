@@ -20,12 +20,12 @@ catch <- mutate(catch,
 
 ## if there are multiple predEvents in a week, choose the most important one 
 weeklyCatches <- catch %>%
-  group_by(Trapline, TrapNum, Year, week) %>% 
+  group_by(Trapline, TrapNum, Year, baitType, week) %>% 
   summarize(predEvent = min(predEvent))
 
 ## count the number of Trapline events (weeklyCatches) per week (aka number of traps in the trapline)
 trapsPerLineWeek <- weeklyCatches %>%
-  group_by(Trapline, Year, week) %>%
+  group_by(Trapline, Year, baitType, week) %>%
   summarize(NTraps = n())
 
 # count number of each predEvent per week per trapline
@@ -36,7 +36,7 @@ predEventsPerLineWeek <- weeklyCatches %>%
 ## number of predEvents per number of traps, for each week on each Trapline
 predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>% 
   mutate(CPUE = NEvents/NTraps) %>% 
-  arrange(Trapline, season, week, predEvent)
+  arrange(Trapline, Year, baitType, week, predEvent)
 
 ## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
 uniqueTrapsPerWeek <- catch %>% 
@@ -46,6 +46,12 @@ uniqueTrapsPerWeek <- catch %>%
   filter(N > 1) %>% 
   arrange(-N)
 
+  
+# save predEventPUE data file to GitHub file
+write.csv(catch, file = '~/WERC-SC/HALE/predEventPUE.csv',
+            row.names = FALSE) 
+  
+  
 ### summary stats and graphs of predEventPUE
 # frequency of predEvents per trapline per year
 traplineCPUE <- 
