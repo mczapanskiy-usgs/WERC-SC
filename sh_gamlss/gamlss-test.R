@@ -3,6 +3,7 @@ library(dplyr)
 library(foreach)
 library(doParallel)
 library(MASS)
+library(ggplot2)
 
 # Read data
 sosh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>% 
@@ -159,48 +160,225 @@ monthly.ocean.ranks %>%
 # We see SI and SICHEL are the only two distributions to show up in both models' top 4 across months
 # SI has the slightly higher mean AIC weight, so we'll go with that.
 
-# Cull models using selected distribution
-nCores <- detectCores()
-gamlssCl <- makeCluster(nCores)
-registerDoParallel(gamlssCl)
+# Cull models using selected distribution (SI)
 
-culled.models <- foreach(month = months[1],
-                         .packages = c('gamlss',
-                                       'dplyr')) %do% {
+# Recursively drop parameters by largest decrease in AIC until model degrades
+cull.model <- function(model) {
+  aic <- extractAIC(model)[2]
+    
+  # Re-fit model to n-1 terms
+  model.terms <- model %>% formula %>% terms
+  term.labels <- attr(model.terms, 'term.labels')
+  submodels <- foreach(i = seq(term.labels)) %do% {
+    dropped <- term.labels[i]
+    submodel <- try(update(model, reformulate(sprintf('. - %s', dropped))))
+    list(dropped = dropped,
+         submodel = submodel)
+  }
+  
+  # Which submodels converged? Which submodel has the greatest decrease in AIC?
+  drop.results <- foreach(i = seq(submodels), .combine = rbind) %do% {
+    tryCatch(with(submodels[[i]], data.frame(dropped = dropped, 
+                                             i = i,
+                                             converged = submodel$converged,
+                                             AIC = extractAIC(submodel)[2],
+                                             deltaAIC = extractAIC(submodel)[2] - aic)),
+             error = function(e) data.frame(dropped = NA,
+                                            i = NA,
+                                            converged = NA,
+                                            AIC = NA,
+                                            deltaAIC = NA))
+  } %>%
+    filter(converged) %>%
+    arrange(deltaAIC)
+  
+  # If no submodels converge or if no submodels are an improvement, return the original model
+  if(nrow(drop.results) == 0 || min(drop.results$deltaAIC, na.rm = TRUE) > 0) {
+    return(model)
+  } else {
+    # Otherwise, repeat the process on the best submodel
+    best.submodel <- submodels[[drop.results$i[1]]]$submodel
+    return(cull.model(best.submodel))
+  }
+}
+
+# Month 6 
+month6 <- filter(sosh.data, Month == 6)
+
+# Geo
+geo6global <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                     data = month6,
+                     family = SI,
+                     control = gamlss.control(n.cyc = 100))
+geo6dropterm <- dropterm(geo6global, test = 'Chisq')
+geo6culled <- cull.model(geo6global)
+geo6dropped <- setdiff(terms(geo6global) %>% attr('term.labels'), terms(geo6culled) %>% attr('term.labels'))
+
+# Ocean
+ocean6global <- gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                         cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                         cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                       data = month6,
+                       family = SI,
+                       control = gamlss.control(n.cyc = 100))
+ocean6dropterm <- dropterm(ocean6global, test = 'Chisq')
+ocean6culled <- cull.model(ocean6global)
+ocean6dropped <- setdiff(terms(ocean6global) %>% attr('term.labels'), terms(ocean6culled) %>% attr('term.labels'))
+
+# Month 7 
+month7 <- filter(sosh.data, Month == 7)
+
+# Geo
+geo7global <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                     data = month7,
+                     family = SI,
+                     control = gamlss.control(n.cyc = 100))
+geo7dropterm <- dropterm(geo7global, test = 'Chisq')
+geo7culled <- cull.model(geo7global)
+geo7dropped <- setdiff(terms(geo7global) %>% attr('term.labels'), terms(geo7culled) %>% attr('term.labels'))
+
+# Ocean
+ocean7global <- try(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                             cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                             cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                           data = month7,
+                           family = SI,
+                           control = gamlss.control(n.cyc = 100)))
+ocean7dropterm <- dropterm(ocean7global, test = 'Chisq')
+ocean7culled <- cull.model(ocean7global)
+ocean7dropped <- setdiff(terms(ocean7global) %>% attr('term.labels'), terms(ocean7culled) %>% attr('term.labels'))
+
+# Month 9 
+month9 <- filter(sosh.data, Month == 9)
+
+# Geo
+# For some reason month 9 geo model doesn't converge reliably
+geo9global <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                      data = month9,
+                      family = SI)
+geo9dropterm <- dropterm(geo9global, test = 'Chisq')
+geo9culled <- cull.model(geo9global)
+geo9dropped <- setdiff(terms(geo9global) %>% attr('term.labels'), terms(geo9culled) %>% attr('term.labels'))
+
+# Ocean
+ocean9global <- gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                         cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                         cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                       data = month9,
+                       family = SI,
+                       control = gamlss.control(n.cyc = 100))
+ocean9dropterm <- dropterm(ocean9global, test = 'Chisq')
+ocean9culled <- cull.model(ocean9global)
+ocean9dropped <- setdiff(terms(ocean9global) %>% attr('term.labels'), terms(ocean9culled) %>% attr('term.labels'))
+
+# Month 10 
+month10 <- filter(sosh.data, Month == 10)
+
+# Geo
+geo10global <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                     data = month10,
+                     family = SI,
+                     control = gamlss.control(n.cyc = 100))
+geo10dropterm <- dropterm(geo10global, test = 'Chisq')
+geo10culled <- cull.model(geo10global)
+geo10dropped <- setdiff(terms(geo10global) %>% attr('term.labels'), terms(geo10culled) %>% attr('term.labels'))
+
+# Ocean
+ocean10global <- try(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                             cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                             cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                           data = month10,
+                           family = SI,
+                           control = gamlss.control(n.cyc = 100)))
+ocean10dropterm <- dropterm(ocean10global, test = 'Chisq')
+ocean10culled <- cull.model(ocean10global)
+ocean10dropped <- setdiff(terms(ocean10global) %>% attr('term.labels'), terms(ocean10culled) %>% attr('term.labels'))
+
+# Geo variable rankings
+geo.var.ranks <- mapply(function(df, month) {
+  df %>% 
+    mutate(Month = month,
+           Variable = row.names(.), 
+           AICw = calcAICw(AIC)) %>% 
+    arrange(-AICw) %>%
+    mutate(VarRank = row_number())
+},
+list(geo6dropterm,
+     geo7dropterm,
+     #geo9dropterm,
+     geo10dropterm),
+c(6, 7, 10),
+SIMPLIFY = FALSE) %>%
+  bind_rows 
+
+geo.mean.ranks <- geo.var.ranks %>%
+  group_by(Variable) %>%
+  summarize(MeanRank = mean(VarRank)) %>%
+  arrange(MeanRank, Variable)
+
+ggplot(geo.var.ranks,
+       aes(x = Variable,
+           y = VarRank,
+           color = factor(Month),
+           group = factor(Month))) +
+  geom_point(size = 3) +
+  geom_line() +
+  scale_x_discrete(limits = geo.mean.ranks$Variable)
+
+# Ocean variable rankings
+ocean.var.ranks <- mapply(function(df, month) {
+  df %>% 
+    mutate(Month = month,
+           Variable = row.names(.), 
+           AICw = calcAICw(AIC)) %>% 
+    arrange(-AICw) %>%
+    mutate(VarRank = row_number())
+},
+list(ocean6dropterm,
+     ocean7dropterm,
+     ocean9dropterm,
+     ocean10dropterm),
+c(6, 7, 9, 10),
+SIMPLIFY = FALSE) %>%
+  bind_rows 
+
+ocean.mean.ranks <- ocean.var.ranks %>%
+  group_by(Variable) %>%
+  summarize(MeanRank = mean(VarRank)) %>%
+  arrange(MeanRank, Variable)
+
+ggplot(ocean.var.ranks,
+       aes(x = Variable,
+           y = VarRank,
+           color = factor(Month),
+           group = factor(Month))) +
+  geom_point(size = 3) +
+  geom_line() +
+  scale_x_discrete(limits = ocean.mean.ranks$Variable)
+
+culled.models <- foreach(month = months) %do% {
   # Filter SOSH data to the month of interest
   month.data <- filter(sosh.data, Month == month)
   
-  # Function to recursively re-fit model with n-1 terms until quality degrades
-  cull.vars <- function(model, var.list) {
-    if(length(var.list) == 0) 
-      stop('All variables culled')
-    
-    new.formula <- as.formula(sprintf('~ . - %s', var.list[1]))
-    model2 <- try(update(model, new.formula))
-    if(class(model2) == 'try-error')
-      return(NULL)
-    
-    if(extractAIC(model)[2] < extractAIC(model2)[2]) 
-      return(model)
-    
-    cull.vars(model2, var.list[-1])
-  }
-  
   # Cull geographic model
-  # Re-run model (this is a workaround, dropterm doesn't work with models produced in the earlier foreach loop)
+  # Re-run model (this is a workaround, stepGAIC.CH doesn't work with models produced in the earlier foreach loop)
   geo.model <- try(gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
                           data = month.data,
                           family = SI,
                           control = gamlss.control(n.cyc = 100)))
   
-  # Re-fit models with n-1 terms to gauge relative significance
+  # Use stepGAIC.CH to find best parsimonious model for geographic variables
+  best.geo.model <- NULL
+  dropped.geo.terms <- NULL
+  delta.geo.AIC <- NULL
   if(class(geo.model) != 'try-error') {
-    geo.var.rank <- dropterm(geo.model, test = 'Chisq') %>% 
-      mutate(Variable = row.names(.)) %>% 
-      arrange(AIC) %>%
-      filter(Variable != '<none>')
+    best.geo.model <- stepGAIC.CH(geo.model)
     
-    best.geo.model <- cull.vars(geo.model, geo.var.rank$Variable)
+    geo.model.terms <- geo.model %>% formula %>% terms.formula %>% attr('term.labels')
+    best.geo.model.terms <- best.geo.model %>% formula %>% terms.formula %>% attr('term.labels')
+    dropped.geo.terms <- setdiff(geo.model.terms, best.geo.model.terms)
+    
+    delta.geo.AIC <- extractAIC(best.geo.model)[2] - extractAIC(geo.model)[2]
   }
   
   # Repeat process with oceanographic model
@@ -211,98 +389,24 @@ culled.models <- foreach(month = months[1],
                             family = SI,
                             control = gamlss.control(n.cyc = 100)))
   
+  best.ocean.model <- NULL
+  dropped.ocean.terms <- NULL
+  delta.ocean.AIC <- NULL
   if(class(ocean.model) != 'try-error') {
-    ocean.var.rank <- dropterm(ocean.model, test = 'Chisq') %>% 
-      mutate(Variable = row.names(.)) %>% 
-      arrange(AIC) %>%
-      filter(Variable != '<none>')
+    best.ocean.model <- stepGAIC.CH(ocean.model)
     
-    best.ocean.model <- cull.vars(ocean.model, ocean.var.rank$Variable)
+    ocean.model.terms <- ocean.model %>% formula %>% terms.formula %>% attr('term.labels')
+    best.ocean.model.terms <- best.ocean.model %>% formula %>% terms.formula %>% attr('term.labels')
+    dropped.ocean.terms <- setdiff(ocean.model.terms, best.ocean.model.terms)
+    
+    delta.ocean.AIC <- extractAIC(best.ocean.model)[2] - extractAIC(ocean.model)[2]
   }
   
   list(month = month,
-       geo.var.rank = geo.var.rank,
        best.geo.model = best.geo.model,
-       ocean.var.rank = ocean.var.rank,
-       best.ocean.model = best.ocean.model)
+       dropped.geo.terms = dropped.geo.terms,
+       delta.geo.AIC = delta.geo.AIC,
+       best.ocean.model = best.ocean.model,
+       dropped.ocean.terms = dropped.ocean.terms,
+       delta.ocean.AIC = delta.ocean.AIC)
 }
-                                                  
-stopCluster(gamlssCl)
-
-
-
-library(dplyr)
-library(gamlss)
-nCores <- detectCores()
-gamlssCl <- makeCluster(nCores)
-registerDoParallel(gamlssCl)
-test <- foreach(s = unique(iris$Species)) %do% {
-  species.data <- filter(iris, Species == s)
-  model <- gamlss(Petal.Length ~ cs(Sepal.Length) + cs(Sepal.Width) + cs(Petal.Width), 
-                  data = species.data, 
-                  family = GA)
-  best.model <- stepGAIC.CH(model)
-  
-  model.terms <- model %>% formula %>% terms.formula %>% attr('term.labels')
-  best.model.terms <- best.model %>% formula %>% terms.formula %>% attr('term.labels')
-  dropped.terms <- setdiff(model.terms, best.model.terms)
-  
-  list(species = s,
-       best.model = best.model,
-       dropped.terms = dropped.terms)
-}
-stopCluster(gamlssCl)
-test.par
-# [[1]]
-# Df AIC LRT Pr(Chi)     Variable
-# 1 NA  NA  NA      NA Sepal.Length
-# 2 NA  NA  NA      NA  Sepal.Width
-# 3 NA  NA  NA      NA Petal.Length
-# 
-# [[2]]
-# Df AIC LRT Pr(Chi)     Variable
-# 1 NA  NA  NA      NA Sepal.Length
-# 2 NA  NA  NA      NA  Sepal.Width
-# 3 NA  NA  NA      NA Petal.Length
-# 
-# [[3]]
-# Df AIC LRT Pr(Chi)     Variable
-# 1 NA  NA  NA      NA Sepal.Length
-# 2 NA  NA  NA      NA  Sepal.Width
-# 3 NA  NA  NA      NA Petal.Length
-
-test.serial <- foreach(s = unique(iris$Species)) %do% {
-  species.data <- filter(iris, Species == s)
-  model <- gamlss(Petal.Length ~ Sepal.Length + Sepal.Width + Petal.Length, 
-                  data = species.data, 
-                  family = GA)
-  var.rank <- dropterm(model, test = 'Chisq') %>%
-    mutate(Variable = row.names(.)) %>% 
-    arrange(AIC) %>%
-    filter(Variable != '<none>')
-  
-  var.rank
-}
-test.serial
-# [[1]]
-# Df       AIC        LRT   Pr(Chi)     Variable
-# 1  1 -31.66335 0.06406465 0.8001832  Sepal.Width
-# 2  0 -29.72741 0.00000000        NA Petal.Length
-# 3  1 -29.43731 2.29010516 0.1302011 Sepal.Length
-# 
-# [[2]]
-# Df      AIC       LRT      Pr(Chi)     Variable
-# 1  0 31.03608  0.000000           NA Petal.Length
-# 2  1 33.81852  4.782442 2.875132e-02  Sepal.Width
-# 3  1 56.00459 26.968510 2.067972e-07 Sepal.Length
-# 
-# [[3]]
-# Df      AIC         LRT      Pr(Chi)     Variable
-# 1  1 16.29265  0.08628226 7.689578e-01  Sepal.Width
-# 2  0 18.20637  0.00000000           NA Petal.Length
-# 3  1 77.14978 60.94341742 5.873901e-15 Sepal.Length
-
-model <- gamlss(Petal.Length ~ cs(Sepal.Length) + cs(Sepal.Width) + cs(Petal.Length) + Species, 
-                data = iris, 
-                family = GA)
-stepGAIC.CH(model)
