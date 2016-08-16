@@ -294,119 +294,103 @@ ocean10dropterm <- dropterm(ocean10global, test = 'Chisq')
 ocean10culled <- cull.model(ocean10global)
 ocean10dropped <- setdiff(terms(ocean10global) %>% attr('term.labels'), terms(ocean10culled) %>% attr('term.labels'))
 
-# Geo variable rankings
-geo.var.ranks <- mapply(function(df, month) {
-  df %>% 
-    mutate(Month = month,
-           Variable = row.names(.), 
-           AICw = calcAICw(AIC)) %>% 
-    arrange(-AICw) %>%
-    mutate(VarRank = row_number())
-},
-list(geo6dropterm,
-     geo7dropterm,
-     #geo9dropterm,
-     geo10dropterm),
-c(6, 7, 10),
-SIMPLIFY = FALSE) %>%
-  bind_rows 
+# Combining culled models
+combined6culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) +
+                      cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                      as.factor(Watermass) + cs(L10CHLsurvey) + cs(L10CHLsurvclim) + 
+                      cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month6,  
+                    control = gamlss.control(n.cyc = 100)) 
 
-geo.mean.ranks <- geo.var.ranks %>%
-  group_by(Variable) %>%
-  summarize(MeanRank = mean(VarRank)) %>%
-  arrange(MeanRank, Variable)
+combined7culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + 
+                      cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month7,  
+                    control = gamlss.control(n.cyc = 100)) 
 
-ggplot(geo.var.ranks,
-       aes(x = Variable,
-           y = VarRank,
-           color = factor(Month),
-           group = factor(Month))) +
-  geom_point(size = 3) +
-  geom_line() +
-  scale_x_discrete(limits = geo.mean.ranks$Variable)
+combined9culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) +
+                      cs(SSTmean) + cs(MEAN_Beaufort) +  
+                      cs(STD_CHL_log10) + cs(CHLsurvanom) + cs(L10CHLsurvclim) +  
+                      cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month9,  
+                    control = gamlss.control(n.cyc = 100)) 
 
-# Ocean variable rankings
-ocean.var.ranks <- mapply(function(df, month) {
-  df %>% 
-    mutate(Month = month,
-           Variable = row.names(.), 
-           AICw = calcAICw(AIC)) %>% 
-    arrange(-AICw) %>%
-    mutate(VarRank = row_number())
-},
-list(ocean6dropterm,
-     ocean7dropterm,
-     ocean9dropterm,
-     ocean10dropterm),
-c(6, 7, 9, 10),
-SIMPLIFY = FALSE) %>%
-  bind_rows 
+combined10culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + 
+                       cs(SSTmean) + cs(STD_SST) + cs(L10CHLproxy) +  
+                       as.factor(Watermass) + cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month10,  
+                    control = gamlss.control(n.cyc = 100)) 
 
-ocean.mean.ranks <- ocean.var.ranks %>%
-  group_by(Variable) %>%
-  summarize(MeanRank = mean(VarRank)) %>%
-  arrange(MeanRank, Variable)
-
-ggplot(ocean.var.ranks,
-       aes(x = Variable,
-           y = VarRank,
-           color = factor(Month),
-           group = factor(Month))) +
-  geom_point(size = 3) +
-  geom_line() +
-  scale_x_discrete(limits = ocean.mean.ranks$Variable)
-
-culled.models <- foreach(month = months) %do% {
-  # Filter SOSH data to the month of interest
-  month.data <- filter(sosh.data, Month == month)
-  
-  # Cull geographic model
-  # Re-run model (this is a workaround, stepGAIC.CH doesn't work with models produced in the earlier foreach loop)
-  geo.model <- try(gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
-                          data = month.data,
-                          family = SI,
-                          control = gamlss.control(n.cyc = 100)))
-  
-  # Use stepGAIC.CH to find best parsimonious model for geographic variables
-  best.geo.model <- NULL
-  dropped.geo.terms <- NULL
-  delta.geo.AIC <- NULL
-  if(class(geo.model) != 'try-error') {
-    best.geo.model <- stepGAIC.CH(geo.model)
-    
-    geo.model.terms <- geo.model %>% formula %>% terms.formula %>% attr('term.labels')
-    best.geo.model.terms <- best.geo.model %>% formula %>% terms.formula %>% attr('term.labels')
-    dropped.geo.terms <- setdiff(geo.model.terms, best.geo.model.terms)
-    
-    delta.geo.AIC <- extractAIC(best.geo.model)[2] - extractAIC(geo.model)[2]
+# Model analysis
+model.options <- foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
+  foreach(month = c(6, 7, 9, 10), .combine = rbind) %do% {
+    foreach(scope = c('global', 'culled'), .combine = rbind) %do% {
+      if(type == 'combined' && scope == 'global')
+        return(NULL)
+      model <- try(get(paste(type, month, scope, sep = '')))
+      if(class(model)[1] == 'try-error')
+        return(NULL)
+      aic <- extractAIC(model)[2]
+      predictors <- model %>% formula %>% terms %>% attr('term.labels') %>% paste(collapse = ', ')
+      data.frame(type = type,
+                 month = month,
+                 scope = scope,
+                 AIC = aic,
+                 predictors = predictors)
+    }
   }
-  
-  # Repeat process with oceanographic model
-  ocean.model <- try(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
-                              cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
-                              cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
-                            data = month.data,
-                            family = SI,
-                            control = gamlss.control(n.cyc = 100)))
-  
-  best.ocean.model <- NULL
-  dropped.ocean.terms <- NULL
-  delta.ocean.AIC <- NULL
-  if(class(ocean.model) != 'try-error') {
-    best.ocean.model <- stepGAIC.CH(ocean.model)
-    
-    ocean.model.terms <- ocean.model %>% formula %>% terms.formula %>% attr('term.labels')
-    best.ocean.model.terms <- best.ocean.model %>% formula %>% terms.formula %>% attr('term.labels')
-    dropped.ocean.terms <- setdiff(ocean.model.terms, best.ocean.model.terms)
-    
-    delta.ocean.AIC <- extractAIC(best.ocean.model)[2] - extractAIC(ocean.model)[2]
+} %>%
+  group_by(month) %>%
+  mutate(AICw = calcAICw(AIC)) %>%
+  ungroup %>%
+  arrange(month, type, scope)
+
+ggplot(model.options,
+       aes(x = paste(type, scope),
+           y = AICw)) +
+  geom_bar(stat = 'identity') +
+  facet_wrap(~ month,
+             nrow = 4) +
+  scale_x_discrete('Model Option',
+                   limits = c('geo global', 'geo culled',
+                              'ocean global', 'ocean culled',
+                              'combined culled')) +
+  ggtitle('Relative Model Performance')
+
+predictor.comparison <- foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
+  foreach(month = c(6, 7, 9, 10), .combine = rbind) %do% {
+    foreach(scope = c('global', 'culled'), .combine = rbind) %do% {
+      if(type == 'combined' && scope == 'global')
+        return(NULL)
+      model <- try(get(paste(type, month, scope, sep = '')))
+      if(class(model)[1] == 'try-error')
+        return(NULL)
+      predictors <- model %>% formula %>% terms %>% attr('term.labels')
+      data.frame(type = type,
+                 month = month,
+                 scope = scope,
+                 predictor = predictors)
+    }
   }
-  
-  list(month = month,
-       best.geo.model = best.geo.model,
-       dropped.geo.terms = dropped.geo.terms,
-       delta.geo.AIC = delta.geo.AIC,
-       best.ocean.model = best.ocean.model,
-       dropped.ocean.terms = dropped.ocean.terms,
-       delta.ocean.AIC = delta.ocean.AIC)
 }
+
+predictor.comparison %>%
+  filter(type == 'geo', scope == 'culled') %>%
+  ggplot(aes(x = factor(month), 
+             y = predictor)) +
+  geom_tile(fill = '#045a8d') +
+  labs(title = 'Predictor Retention\nGeographic Models',
+       x = 'Month',
+       y = 'Predictor') 
+
+predictor.comparison %>%
+  filter(type == 'ocean', scope == 'culled') %>%
+  ggplot(aes(x = factor(month), 
+             y = predictor)) +
+  geom_tile(fill = '#006d2c') +
+  labs(title = 'Predictor Retention\nOceanographic Models',
+       x = 'Month',
+       y = 'Predictor') 
