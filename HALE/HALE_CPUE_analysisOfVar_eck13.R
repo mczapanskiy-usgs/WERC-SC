@@ -4,17 +4,27 @@ library("stats", lib.loc="C:/Program Files/R/R-3.2.3/library")
 library("data.table", lib.loc="~/R/win-library/3.2")
 library("dplyr", lib.loc="~/R/win-library/3.2")
 library("nnet", lib.loc="C:/Program Files/R/R-3.2.3/library")
+library(ggplot2)
+library(Rcpp)
 
 read.csv('~/WERC-SC/HALE/TraplineWeeklyCatches.csv',
          stringsAsFactors = FALSE) -> weeklyCatches
-
-# ## convert data to the correct data types
-# weeklyCatches$Year = as.numeric(weeklyCatches$Year)
-# weeklyCatches$week = as.numeric(weeklyCatches$week)
 
 ## get a feel for the data
 with(weeklyCatches, table(predEvent, Year))
 with(weeklyCatches, table(predEvent, baitType))
 
+mutate(weeklyCatches, catch = (predEvent %in% c('catCaught', 'ratCaught', 'mongooseCaught', 'mouseCaught'))) -> weeklyCatches
+
+catchGLM <- lm(catch ~ baitType + Year + Month + Trapline, data = weeklyCatches)
+summary(catchGLM)
+anova(catchGLM)
+# ## convert data to the correct data types
+# weeklyCatches$Year = as.numeric(weeklyCatches$Year)
+# weeklyCatches$week = as.numeric(weeklyCatches$week)
+
+# catch <- c("catCaught", "ratCaught", "mongooseCaught", "mouseCaught")
+# noCatch <- c("baitLost", "none", "trapTriggered", "birdOtherCaught")
+  
 # test <- multinom(predEvent ~ baitType + Year, data = weeklyCatches)
   

@@ -20,7 +20,7 @@ catch <- mutate(catch,
 
 ## if there are multiple predEvents in a week, choose the most important one 
 weeklyCatches <- catch %>%
-  group_by(Trapline, TrapNum, Year, week, baitType) %>% 
+  group_by(Trapline, TrapNum, Year, Month, week, baitType) %>% 
   summarize(predEvent = min(predEvent))
 
 ## count the number of Trapline events (weeklyCatches) per week (aka number of traps in the trapline)
