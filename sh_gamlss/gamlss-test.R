@@ -4,16 +4,20 @@ library(foreach)
 library(doParallel)
 library(MASS)
 library(ggplot2)
+library(tidyr)
 
 # Read data
-sosh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>% 
+sosh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>%
   dplyr::select(SOSHcount, Binarea, Month, 
                 Latitude, DistCoast, Dist200, DepCI,
                 SSTmean, STD_SST, MEAN_Beaufort, L10CHLproxy, STD_CHL_log10, Watermass,
-                L10CHLsurvey, CHLsurvanom, L10CHLsurvclim, FCPI) %>%
+                L10CHLsurvey, CHLsurvanom, L10CHLsurvclim, FCPI,
+                SOSH0610UD, SOSH0607UD = sosh0607MN, SOSH0910UD = sosh0910MN) %>%
   filter(Month > 2) %>% # exclude tiny January, February surveys
   mutate(SOSHcount = as.integer(SOSHcount),
-         Month = factor(Month)) %>%
+         Month = factor(Month),
+         SOSH0607UD = ifelse(is.na(SOSH0607UD) && Month %in% 9:10, 0, SOSH0607UD),
+         SOSH0910UD = ifelse(is.na(SOSH0910UD) && Month %in% 6:7, 0, SOSH0910UD)) %>% 
   na.omit
 head(sosh.data)
 summary(sosh.data)
@@ -377,8 +381,17 @@ predictor.comparison <- foreach(type = c('geo', 'ocean', 'combined'), .combine =
   }
 }
 
+geo.predictor.prevalence <- predictor.comparison %>% 
+  filter(type == 'geo',
+         scope == 'culled') %>%
+  group_by(predictor) %>%
+  summarize(N = n()) %>%
+  ungroup() %>%
+  arrange(N, predictor)
+
 predictor.comparison %>%
   filter(type == 'geo', scope == 'culled') %>%
+  mutate(predictor = factor(predictor, levels = geo.predictor.prevalence$predictor)) %>%
   ggplot(aes(x = factor(month), 
              y = predictor)) +
   geom_tile(fill = '#045a8d') +
@@ -386,11 +399,181 @@ predictor.comparison %>%
        x = 'Month',
        y = 'Predictor') 
 
+ocean.predictor.prevalence <- predictor.comparison %>% 
+  filter(type == 'ocean',
+         scope == 'culled') %>%
+  group_by(predictor) %>%
+  summarize(N = n()) %>%
+  ungroup() %>%
+  arrange(N, predictor)
+
 predictor.comparison %>%
   filter(type == 'ocean', scope == 'culled') %>%
+  mutate(predictor = factor(predictor, levels = ocean.predictor.prevalence$predictor)) %>%
   ggplot(aes(x = factor(month), 
              y = predictor)) +
   geom_tile(fill = '#006d2c') +
   labs(title = 'Predictor Retention\nOceanographic Models',
        x = 'Month',
        y = 'Predictor') 
+
+# Adding in UD variable
+
+# Code generator
+foreach(month = c(6:7, 9:10), .combine = c) %do% {
+  foreach(type = c('geo', 'ocean', 'combined'), .combine = c) %do% {
+    foreach(scope = c('global', 'culled'), .combine = c) %do% {
+      foreach(ud = c('all', 'season'), .combine = c) %do% {
+        if(type == 'combined' && scope == 'global')
+          return(NULL)
+        
+        varname <- if(ud == 'all') {
+          '0610'
+        } else if(month %in% 6:7) {
+          '0607'
+        } else {
+          '0910'
+        }
+        
+        sprintf('%s%i%sUD%s <- tryCatch(update(%s%i%s, ~ . + SOSH%sUD), error = function(e) NA)', type, month, scope, ud, type, month, scope, varname)
+      }
+    }
+  }
+} %>% paste(collapse = '\n') %>% cat
+
+# Month 6
+geo6globalUDall <- tryCatch(update(geo6global, ~ . + SOSH0610UD), error = function(e) NA)
+geo6globalUDseason <- tryCatch(update(geo6global, ~ . + SOSH0607UD), error = function(e) NA)
+geo6culledUDall <- tryCatch(update(geo6culled, ~ . + SOSH0610UD), error = function(e) NA)
+geo6culledUDseason <- tryCatch(update(geo6culled, ~ . + SOSH0607UD), error = function(e) NA)
+ocean6globalUDall <- tryCatch(update(ocean6global, ~ . + SOSH0610UD), error = function(e) NA)
+ocean6globalUDseason <- tryCatch(update(ocean6global, ~ . + SOSH0607UD), error = function(e) NA)
+ocean6culledUDall <- tryCatch(update(ocean6culled, ~ . + SOSH0610UD), error = function(e) NA)
+ocean6culledUDseason <- tryCatch(update(ocean6culled, ~ . + SOSH0607UD), error = function(e) NA)
+combined6culledUDall <- tryCatch(update(combined6culled, ~ . + SOSH0610UD), error = function(e) NA)
+combined6culledUDseason <- tryCatch(update(combined6culled, ~ . + SOSH0607UD), error = function(e) NA)
+
+# Month 7
+geo7globalUDall <- tryCatch(update(geo7global, ~ . + SOSH0610UD), error = function(e) NA)
+geo7globalUDseason <- tryCatch(update(geo7global, ~ . + SOSH0607UD), error = function(e) NA)
+geo7culledUDall <- tryCatch(update(geo7culled, ~ . + SOSH0610UD), error = function(e) NA)
+geo7culledUDseason <- tryCatch(update(geo7culled, ~ . + SOSH0607UD), error = function(e) NA)
+ocean7globalUDall <- tryCatch(update(ocean7global, ~ . + SOSH0610UD), error = function(e) NA)
+ocean7globalUDseason <- tryCatch(update(ocean7global, ~ . + SOSH0607UD), error = function(e) NA)
+ocean7culledUDall <- tryCatch(update(ocean7culled, ~ . + SOSH0610UD), error = function(e) NA)
+ocean7culledUDseason <- tryCatch(update(ocean7culled, ~ . + SOSH0607UD), error = function(e) NA)
+combined7culledUDall <- tryCatch(update(combined7culled, ~ . + SOSH0610UD), error = function(e) NA)
+combined7culledUDseason <- tryCatch(update(combined7culled, ~ . + SOSH0607UD), error = function(e) NA)
+
+# Month 9
+geo9globalUDall <- tryCatch(update(geo9global, ~ . + SOSH0610UD), error = function(e) NA)
+geo9globalUDseason <- tryCatch(update(geo9global, ~ . + SOSH0910UD), error = function(e) NA)
+geo9culledUDall <- tryCatch(update(geo9culled, ~ . + SOSH0610UD), error = function(e) NA)
+geo9culledUDseason <- tryCatch(update(geo9culled, ~ . + SOSH0910UD), error = function(e) NA)
+ocean9globalUDall <- tryCatch(update(ocean9global, ~ . + SOSH0610UD), error = function(e) NA)
+ocean9globalUDseason <- tryCatch(update(ocean9global, ~ . + SOSH0910UD), error = function(e) NA)
+ocean9culledUDall <- tryCatch(update(ocean9culled, ~ . + SOSH0610UD), error = function(e) NA)
+ocean9culledUDseason <- tryCatch(update(ocean9culled, ~ . + SOSH0910UD), error = function(e) NA)
+combined9culledUDall <- tryCatch(update(combined9culled, ~ . + SOSH0610UD), error = function(e) NA)
+combined9culledUDseason <- tryCatch(update(combined9culled, ~ . + SOSH0910UD), error = function(e) NA)
+
+# Month 10
+geo10globalUDall <- tryCatch(update(geo10global, ~ . + SOSH0610UD), error = function(e) NA)
+geo10globalUDseason <- tryCatch(update(geo10global, ~ . + SOSH0910UD), error = function(e) NA)
+geo10culledUDall <- tryCatch(update(geo10culled, ~ . + SOSH0610UD), error = function(e) NA)
+geo10culledUDseason <- tryCatch(update(geo10culled, ~ . + SOSH0910UD), error = function(e) NA)
+ocean10globalUDall <- tryCatch(update(ocean10global, ~ . + SOSH0610UD), error = function(e) NA)
+ocean10globalUDseason <- tryCatch(update(ocean10global, ~ . + SOSH0910UD), error = function(e) NA)
+ocean10culledUDall <- tryCatch(update(ocean10culled, ~ . + SOSH0610UD), error = function(e) NA)
+ocean10culledUDseason <- tryCatch(update(ocean10culled, ~ . + SOSH0910UD), error = function(e) NA)
+combined10culledUDall <- tryCatch(update(combined10culled, ~ . + SOSH0610UD), error = function(e) NA)
+combined10culledUDseason <- tryCatch(update(combined10culled, ~ . + SOSH0910UD), error = function(e) NA)
+
+# Check UD models against base 
+UDcomparison <- foreach(month = c(6:7, 9:10), .combine = rbind) %do% {
+  foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
+    foreach(scope = c('global', 'culled'), .combine = rbind) %do% {
+      if(type == 'combined' && scope == 'global')
+        return(NULL)
+      
+      tryCatch({
+        model.name <- sprintf('%s%i%s', type, month, scope) 
+        base <- get(model.name)
+        udall <- get(sprintf('%s%s', model.name, 'UDall'))
+        udseason <- get(sprintf('%s%s', model.name, 'UDseason'))
+        
+        data.frame(model = model.name,
+                   UD = c('base', 'UDall', 'UDseason'),
+                   AIC = c(extractAIC(base)[2],
+                           extractAIC(udall)[2],
+                           extractAIC(udseason)[2])) %>%
+          mutate(AICw = calcAICw(AIC))
+      }, error = function(e) NULL)
+    }
+  }
+}
+
+UDcomparison %>% 
+  select(model, UD, AICw) %>% 
+  spread(UD, AICw)
+
+ggplot(UDcomparison, 
+       aes(x = model,
+           y = AICw, 
+           fill = UD)) + 
+  geom_bar(stat = 'identity') +
+  scale_fill_discrete('UD Usage', labels = c('None', 'All\n(6-10)', 'Season\n(6-7, 9-10)')) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = 'Relative Performance of UD Models',
+       x = 'Base Model')
+
+# Check UD models against base by month
+UDcomparison.monthly <- foreach(month = c(6:7, 9:10), .combine = rbind) %do% {
+  foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
+    foreach(scope = c('global', 'culled'), .combine = rbind) %do% {
+      if(type == 'combined' && scope == 'global')
+        return(NULL)
+      
+      tryCatch({
+        model.name <- sprintf('%s%i%s', type, month, scope) 
+        base <- get(model.name)
+        udall <- get(sprintf('%s%s', model.name, 'UDall'))
+        udseason <- get(sprintf('%s%s', model.name, 'UDseason'))
+        
+        data.frame(type = type,
+                   scope = scope,
+                   month = month,
+                   UD = c('base', 'UDall', 'UDseason'),
+                   AIC = c(extractAIC(base)[2],
+                           extractAIC(udall)[2],
+                           extractAIC(udseason)[2]))
+      }, error = function(e) NULL)
+    }
+  }
+} %>%
+  group_by(month) %>%
+  mutate(AICw = calcAICw(AIC)) %>%
+  ungroup %>%
+  mutate(month = factor(month),
+         model.UD = paste(model, UD, sep = '.'))
+
+UDcomparison.monthly %>%
+  select(-AIC) %>%
+  spread(month, AICw)
+
+UDcomparison.monthly %>%
+  mutate(AICw = AICw + 1) %>%
+  ggplot(aes(x = paste(type, scope, sep = '.'),
+             y = AICw,
+             fill = UD)) +
+  geom_bar(stat = 'identity',
+           position = 'dodge') +
+  facet_wrap(~ month) +
+  scale_y_log10(limits = 1:2,
+                breaks = seq(1, 2, length = 5),
+                labels = function(b) b - 1) +
+  scale_fill_discrete('UD Usage', labels = c('None', 'All\n(6-10)', 'Season\n(6-7, 9-10)')) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = 'Relative Performance of UD Models By Month',
+       x = 'Model Type and Scope',
+       y = 'AIC Weight\n(Modified logarithmic scale, log(AICw + 1)-1')
