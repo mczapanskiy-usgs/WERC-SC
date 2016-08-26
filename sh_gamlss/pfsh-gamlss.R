@@ -42,13 +42,14 @@ try.fit <- function(formula, data, family, n_refit = N_REFIT) {
 }
 
 # Let's try split-apply-combine on monthly data with one distribution
-# discrete.dist <- list(PO, NBI)#, NBII, DEL, PIG, SI, SICHEL, ZIP, ZIP2)
-# sosh.data %>%
-#   split(.$Month) %>%
-#   map(~map2(discrete.dist,
-#             ~try.fit(SOSHcount ~  cs(Latitude)+cs(DistCoast)+cs(Dist200)+cs(DepCI) + offset(log(Binarea)),
-#                      data = .x,
-#                      family = .y)))
+discrete.dist <- list(SI, PIG)#, NBII, DEL, PIG, SI, SICHEL, ZIP, ZIP2)
+models <- expand.grid(month = levels(pfsh.data$Month),
+                      family = list(SI, PIG)) %>%
+  by_row(~try.fit(SOSHcount ~  cs(Latitude)+cs(DistCoast)+cs(Dist200)+cs(DepCI) + offset(log(Binarea)),
+                    data = filter(sosh.data, Month == .$month),
+                    family = .$family[[1]]))
+
+models <- expand.grid(list(PO, NBI))
 
 # Register parallel backend for speed increase
 nCores <- detectCores()
