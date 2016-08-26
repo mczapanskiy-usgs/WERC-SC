@@ -50,37 +50,30 @@ registerDoParallel(gamlssCl)
 # geo = SOSHcount ~  cs(Latitude)+cs(DistCoast)+cs(Dist200)+cs(DepCI) + offset(log(Binarea))
 # ocean = SOSHcount ~ cs(SSTmean)+cs(STD_SST)+cs(MEAN_Beaufort)+cs(L10CHLproxy)+cs(STD_CHL_log10)+Watermass+cs(L10CHLsurvey)+
 #   cs(CHLsurvanom)+cs(L10CHLsurvclim)+cs(FCPI) + offset(log(Binarea))
-discrete.dist <- c('PO', 'NBI', 'NBII', 'DEL', 'PIG', 'SI', 'SICHEL', 'ZIP', 'ZIP2')
+discrete.dist <- list(PO, NBI, NBII, DEL, PIG, SI, SICHEL, ZIP, ZIP2)
+dist.names <- sapply(discrete.dist, function(dist) dist()$family[1])
 months <- c(6, 7, 9, 10)
 # For each discrete distribution...
-monthly.geo.ocean.models <- foreach(dist = discrete.dist,
-                                    .packages = c('foreach',
-                                                  'doParallel',
-                                                  'gamlss',
-                                                  'dplyr')) %dopar% {
+base.models <- foreach(dist = discrete.dist,
+                       .packages = c('foreach',
+                                     'doParallel',
+                                     'gamlss',
+                                     'dplyr')) %dopar% {
   # For each month's survey...
   foreach(month = months) %do% {
-    print(sprintf('Distribution %s, month %i', dist, month))
-    
-    # Filter SOSH data to the month of interest
-    month.data <- filter(sosh.data, Month == month)
-    if(nrow(month.data) == 0) stop(sprintf('No data in month %i', month))
-    
     # Fit geographic model
-    print('Fitting geographic model')
     geo.model <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
-                         data = month.data,
-                         family = get('dist'))
+                                 data = filter(sosh.data, Month == month),
+                                 family = dist)
     
     # Fit oceanographic model
-    print('Fitting oceanographic model')
     ocean.model <- try.fit(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
-                                cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
-                                cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
-                           data = month.data,
-                           family = get('dist'))
-    
-    list(dist = dist,
+                             cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                             cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                           data = filter(sosh.data, Month == month),
+                           family = dist)
+
+    list(dist = dist()$family[1],  # This gets the distribution's name
          month = month,
          data = month.data,
          geo.model = geo.model,
@@ -91,15 +84,15 @@ monthly.geo.ocean.models <- foreach(dist = discrete.dist,
 stopCluster(gamlssCl)
 
 # Utility function for accessing models
-get.model <- function(dist = 'SI', month, predictors) {
-  distIdx <- match(dist, discrete.dist)
+get.model <- function(dist = 'SI', month, type) {
+  distIdx <- match(dist, dist.names)
   if(is.na(dist)) stop(sprintf('Distribution %s not found', dist))
   monthIdx <- match(month, months)
   if(is.na(month)) stop(sprintf('Month %i not found', month))
-  if(predictors == 'geo') {
-    monthly.geo.ocean.models[[distIdx]][[monthIdx]]$geo.model
+  if(type == 'geo') {
+    base.models[[distIdx]][[monthIdx]]$geo.model
   } else if (predictors == 'ocean') {
-    monthly.geo.ocean.models[[distIdx]][[monthIdx]]$ocean.model
+    base.models[[distIdx]][[monthIdx]]$ocean.model
   } else {
     stop('Parameter predictors must be "geo" or "ocean"')
   }
@@ -115,28 +108,41 @@ calcAICw <- function(vAIC) {
   relLikelihood / normalizingFactor
 }
 
-model.rankings <- foreach(dist.list = monthly.geo.ocean.models, .combine = rbind) %do% {
-  foreach(models = dist.list, .combine = rbind) %do% {
-    data.frame(Distribution = models$dist,
-               Month = models$month,
-               GeoConverged = tryCatch(getElement(models$geo.model, 'converged'), error = function(e) NA),
-               GeoEDF = tryCatch(extractAIC(models$geo.model)[1], error = function(e) NA),
-               GeoAIC = tryCatch(extractAIC(models$geo.model)[2], error = function(e) NA),
-               OceanConverged = tryCatch(getElement(models$ocean.model, 'converged'), error = function(e) NA),
-               OceanEDF = tryCatch(extractAIC(models$ocean.model)[1], error = function(e) NA),
-               OceanAIC = tryCatch(extractAIC(models$ocean.model)[2], error = function(e) NA))
-  }
+# Utility function for calculating number of estimated parameters (k) 
+## IS THIS RIGHT?
+calcK <- function(model) {
+  model %>% formula %>% terms %>% attr('term.labels') %>% length + 2
 }
+
+model.rankings <- foreach(dist = dist.names, .combine = rbind) %do% {
+  foreach(month = months, .combine = rbind) %do% {
+    foreach(type = c('geo', 'ocean'), .combine = rbind) %do% {
+      model <- get.model(dist, month, type)
+      data.frame(Distribution = dist,
+                 Month = month,
+                 Type = type,
+                 Converged = tryCatch(getElement(model, 'converged'), error = function(e) NA),
+                 EDF = tryCatch(extractAIC(model)[1], error = function(e) NA),
+                 AIC = tryCatch(extractAIC(model)[2], error = function(e) NA),
+                 K = tryCatch(calcK(model), error = function(e) NA),
+                 LogL = tryCatch(logLik(model), error = function(e) NA))
+    }
+  }
+} %>%
+  group_by(Month) %>%
+  mutate(deltaAIC = AIC - min(AIC, na.rm = TRUE),
+         AICw = calcAICw(ifelse(Converged, AIC, NA)))
 
 # Sort models by month and quality of fit
 monthly.geo.ranks <- model.rankings %>%
+  filter(Type == 'geo',
+         Converged == TRUE) %>%
   group_by(Month) %>%
-  mutate(GeoDeltaAIC = GeoAIC - min(GeoAIC, na.rm = TRUE),
-         GeoAICw = calcAICw(GeoAIC) %>% round(3)) %>%
-  arrange(-GeoAICw) %>% 
+  arrange(-AICw) %>% 
   slice(1:4) %>% 
   ungroup %>%
-  select(Distribution:GeoAICw)
+  select(Distribution, Month, K, LogL, AIC, deltaAIC, AICw)
+
 monthly.ocean.ranks <- model.rankings %>%
   group_by(Month) %>%
   mutate(OceanDeltaAIC = OceanAIC - min(OceanAIC, na.rm = TRUE),
@@ -577,3 +583,13 @@ UDcomparison.monthly %>%
   labs(title = 'Relative Performance of UD Models By Month',
        x = 'Model Type and Scope',
        y = 'AIC Weight\n(Modified logarithmic scale, log(AICw + 1)-1')
+
+
+
+foreach(sp = unique(iris$Species)) %do% {
+  foreach(dist = list(GA, EXP, NO)) %do% {
+    gamlss(Petal.Length ~ Petal.Width + Sepal.Length + Sepal.Width, 
+           data = filter(iris, Species == sp), 
+           family = dist)
+  }
+} -> iris.species.models
