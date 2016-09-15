@@ -9,9 +9,6 @@ library(mosaic)
 ## read in file
 read.csv('~/WERC-SC/HALE/catch_traploc_weeks_baitTypes_edited_predEvent.csv',
          stringsAsFactors = FALSE) -> raw_catch
-catch <- mutate(raw_catch, 
-                date = mdy(date), 
-                Week = interval(min(date), date))
 ## add variable IDing the check week so all trapsin a given week are group together by trapline (Jan 1-7, 2000 = week 1...)
 # also rank predEvent by importance (catCaught > mongooseCaught > ratCaught > mouseCaught > birdOtherCaught > baitLost > trapTriggered > none)
 catch <- mutate(raw_catch, 
@@ -31,23 +28,23 @@ catch <- mutate(raw_catch,
 
 ## if there are multiple predEvents in a week, choose the most important one 
 weeklyCatches <- catch %>%
-  group_by(Trapline, TrapNum, Season, Year, Month, Week) %>% 
+  group_by(Trapline, TrapNum, Year, Week, trap, Season, Month) %>% 
   summarize(predEvent = min(predEvent))
 
 ## count the number of Trapline events (weeklyCatches) per week (aka number of traps in the trapline)
 trapsPerLineWeek <- weeklyCatches %>%
-  group_by(Trapline, Season, Year, Month, Week) %>%
+  group_by(Trapline, Week) %>%
   summarize(NTraps = n())
 
 # count number of each predEvent per week per trapline
 predEventsPerLineWeek <- weeklyCatches %>% 
-  group_by(Trapline, Season, Month, Week, predEvent) %>% 
+  group_by(Trapline, Week, predEvent) %>% 
   summarize(NEvents = n())
 
 ## number of predEvents per number of traps, for each week on each Trapline
 predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>% 
   mutate(CPUE = NEvents/NTraps) %>% 
-  arrange(Trapline, Season, Year, Month, Week, predEvent)
+  arrange(Trapline, Week, predEvent) # TrapNum, trap, Season, Year, Month,
 
 ## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
 uniqueTrapsPerWeek <- catch %>% 

@@ -3,35 +3,31 @@
 library("stats", lib.loc="C:/Program Files/R/R-3.2.3/library")
 library("data.table", lib.loc="~/R/win-library/3.2")
 library("dplyr", lib.loc="~/R/win-library/3.2")
-library("nnet", lib.loc="C:/Program Files/R/R-3.2.3/library")
 library(ggplot2)
-library(Rcpp)
+library("ez", lib.loc="~/R/win-library/3.2")
 
-# read.csv('~/WERC-SC/HALE/TraplineWeeklyCatches.csv',
-#          stringsAsFactors = FALSE) -> weeklyCatches
-# 
-# ## get a feel for the data
-# with(weeklyCatches, table(predEvent, Year))
-# with(weeklyCatches, table(predEvent, baitType))
-# 
-# mutate(weeklyCatches, catch = (predEvent %in% c('catCaught', 'ratCaught', 'mongooseCaught', 'mouseCaught'))) -> weeklyCatches
-# 
-# catchGLM <- lm(catch ~ Year + Month, data = weeklyCatches)
-# summary(catchGLM)
-# anova(catchGLM)
-# 
-# mutate(weeklySeasonalCatches, catch = (predEvent %in% c('catCaught', 'ratCaught', 'mongooseCaught', 'mouseCaught'))) -> weeklySeasonalCatches
-# 
-# seasonCatchGLM <- lm(catch ~ Year + season, data = weeklySeasonalCatches)
-# summary(seasonCatchGLM)
-# anova(seasonCatchGLM)
+read.csv('~/WERC-SC/HALE/TraplinePredEventPUE.csv',
+          stringsAsFactors = FALSE) -> predEventPUE
 
-# ## convert data to the correct data types
-# weeklyCatches$Year = as.numeric(weeklyCatches$Year)
-# weeklyCatches$week = as.numeric(weeklyCatches$week)
+## normal distribution? frequency histogram should be ~symetical, SD of most variable sample shoudl be <10x the SD of the least variable sample
+hist(predEventPUE$CPUE)
+sd(predEventPUE$CPUE)
 
-# catch <- c("catCaught", "ratCaught", "mongooseCaught", "mouseCaught")
-# noCatch <- c("baitLost", "none", "trapTriggered", "birdOtherCaught")
-  
-# test <- multinom(predEvent ~ baitType + Year, data = weeklyCatches)
-  
+## anova using the car library
+ratCaught <- filter(predEventPUE, predEvent == "ratCaught")
+rat <- ezANOVA(ratCaught, dv = CPUE, wid = trap, with = c('Year', 'Trapline', 'Season'), type = 2)
+
+anova <- ezANOVA(predEventPUE, 
+                 dv = CPUE, 
+                 wid = trap, 
+                 within_full = c('Year', 'Season'), 
+                 between = c('Year', 'Trapline', 'Season'), 
+                 observed = ('Year'), 
+                 type = 2)
+# friedman.test
+
+
+## anova using normal stats package
+# ratCaught <- filter(predEvent == "ratCaught")
+# rat <- aov(CPUE ~ Year * Trapline * Season, data = ratCaught)
+# summary(aov(rt ~ color * shape + Error(subj/(color + shape)), data = Hays.df)) from http://www.psych.upenn.edu/~baron/rpsych/rpsych.html#htoc60
