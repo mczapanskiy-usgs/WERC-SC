@@ -16,35 +16,35 @@ catch <- mutate(raw_catch,
                 Week = as.numeric(as.period(lubridate::interval(min(date), date) %/% weeks(1))), #lubridate function
                 predEvent = factor(predEvent, 
                                    level = c('catCaught', 'mongooseCaught', 'ratCaught', 'mouseCaught', 'birdOtherCaught', 'baitLost', 'trapTriggered', 'none'), 
-                                   ordered = TRUE), 
-                Season = derivedFactor(
-                          "offSeason" = Month == 1,
-                          "Pre-laying" = Month >= 2,
-                          "Incubation" = Month >= 5,
-                          "Nestling" = Month >= 7,
-                          "offSeason" = Month >= 11,
-                          .method = "last", 
-                          .default = "offSeason"))
+                                   ordered = TRUE)) 
+#                 Season = derivedFactor(
+#                           "offSeason" = Month == 1,
+#                           "Pre-laying" = Month >= 2,
+#                           "Incubation" = Month >= 5,
+#                           "Nestling" = Month >= 7,
+#                           "offSeason" = Month >= 11,
+#                           .method = "last", 
+#                           .default = "offSeason"))
 
 ## if there are multiple predEvents in a week, choose the most important one 
 weeklyCatches <- catch %>%
-  group_by(Trapline, TrapNum, Year, Week, trap, Season, Month) %>% 
+  group_by(Trapline, TrapNum, Year, Week) %>% #  TrapNum, trap, Season, Month
   summarize(predEvent = min(predEvent))
 
 ## count the number of Trapline events (weeklyCatches) per week (aka number of traps in the trapline)
 trapsPerLineWeek <- weeklyCatches %>%
-  group_by(Trapline, Week) %>%
+  group_by(Trapline, Year, Week) %>%
   summarize(NTraps = n())
 
 # count number of each predEvent per week per trapline
 predEventsPerLineWeek <- weeklyCatches %>% 
-  group_by(Trapline, Week, predEvent) %>% 
+  group_by(Trapline, Year, Week, predEvent) %>% 
   summarize(NEvents = n())
 
 ## number of predEvents per number of traps, for each week on each Trapline
 predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>% 
   mutate(CPUE = NEvents/NTraps) %>% 
-  arrange(Trapline, Week, predEvent) # TrapNum, trap, Season, Year, Month,
+  arrange(Trapline, Year, Week, predEvent) # TrapNum, trap, Season, Year, Month,
 
 ## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
 uniqueTrapsPerWeek <- catch %>% 
@@ -85,6 +85,15 @@ preds <- ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
   theme(axis.text.x = element_text(angle=60, hjust=1)) +
   ylim(0, 0.4)
 preds %+% subset(traplineCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+
+# a historgram of count of different trap event types
+hist <-  qplot(factor(predEvent), data = weeklyCatches, geom = "bar") +
+  labs(x = 'Trap Event Type', y = 'Number of Events (years 2000 - 2015)') 
+  #   theme_bw() + theme(axis.text.x = element_text(angle=25, hjust=1))
+  
+count <- weeklyCatches %>% 
+  group_by(predEvent) %>% 
+  count(weeks)
 
 ## seasonal trends
 # frequency of predEvents per trapline per season
