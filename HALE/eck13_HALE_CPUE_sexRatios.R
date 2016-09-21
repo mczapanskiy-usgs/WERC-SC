@@ -3,6 +3,8 @@
 library(plyr)
 library(dplyr)
 library(MASS)
+library(ggplot2)
+library(grid)
 
 read.csv('~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches.csv',
          stringsAsFactors = FALSE) -> weeklyCatches
@@ -11,11 +13,11 @@ read.csv('~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches.csv'
 ## filter data to relevant values
 weeklyCatches$Sex <- revalue(weeklyCatches$Sex, c("m"="M"))
 # select variables to perfom test on
-sexes <- c("F", "M") #, "NR", "UNK", "Unk")
+sexes <- c("F", "M") 
 preds <- c("catCaught", "ratCaught", "mongooseCaught") # not including mouse data b/c sample size (thus frequencies) are too small
 
 catch_sexRatio <- weeklyCatches %>% 
-  filter(Sex %in% sexes & predEvent %in% preds) %>% 
+  filter(Sex %in% sexes & predEvent %in% preds)
 
 ## create a table of sex ratios for analysis
 sexRatio <- table(catch_sexRatio$predEvent, catch_sexRatio$Sex)
@@ -53,6 +55,32 @@ chisq.test(c_sexRatio)
 chisq.test(r_sexRatio) 
 chisq.test(m_sexRatio) 
 
+### determine what percent of all predators were sexed
+sexValues <- c("F", "M", "NR", "UNK")
+predValues <- c("catCaught", "ratCaught", "mouseCaught", "mongooseCaught") 
+
+all_sexRatio <- weeklyCatches %>% 
+  filter(Sex %in% sexValues & predEvent %in% predValues) 
+sexRatioTab <- table(all_sexRatio$predEvent, all_sexRatio$Sex)
+
 ### graph data
-sex.mat <- data.frame(catch_sexRatio$Sex, catch_sexRatio$predEvent)
+# create data table of values (there must be a better way to do this)
+Input =(
+  
+  "Sex     Cat  Rat  Mongoose
+    Male  15    1220       102
+    Female  19    120       34   
+    ")
+sex.mat  <- as.matrix(read.table(textConnection(Input), header = TRUE, row.names = 1))
+# graph in barplot
+barplot(sex.mat, 
+        beside=TRUE, 
+        legend=TRUE, 
+        space = c(0,0.5),
+        col = c("lightblue", "darkred"),
+        ylim=c(0, 1300),
+        xlab="Predator Species",
+        ylab="Sex Caught"
+)
+
 
