@@ -6,7 +6,7 @@ library("dplyr", lib.loc="~/R/win-library/3.2")
 library(ggplot2)
 library("ez", lib.loc="~/R/win-library/3.2")
 
-read.csv('~/WERC-SC/HALE/TraplinePredEventPUE.csv',
+read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11.csv',
           stringsAsFactors = FALSE) -> predEventPUE
 predEventPUE$Year <- as.character(predEventPUE$Year)
 
@@ -27,6 +27,7 @@ rat <- ezANOVA(ratCaught,
 # aggregate first?
 # friedman.test
 
+friedman.test(CPUE ~ year | Trapline, data = predEventPUE, subset = predEvent)
 
 ## anova using normal stats package
 # ratCaught <- filter(predEvent == "ratCaught")
