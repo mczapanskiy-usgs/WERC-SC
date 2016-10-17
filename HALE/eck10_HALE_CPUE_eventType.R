@@ -8,7 +8,7 @@ library(grid)
 library(gridExtra)
 library(lubridate)
 
-read.csv('~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_edited.csv',
+read.csv('~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_2.csv',
          stringsAsFactors = FALSE) -> catch
 
 catch$otherCaught <- as.character(catch$otherCaught)

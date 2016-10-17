@@ -73,7 +73,7 @@ uniqueTrapsPerWeek <- catch %>%
   arrange(-N)
 
 ## save predEventPUE data file to GitHub file
-write.csv(predEventPUE, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11.csv',
+write.csv(CPUEgrid, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11.csv',
             row.names = FALSE) 
 # weekly catch for each trap
 write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches.csv',
