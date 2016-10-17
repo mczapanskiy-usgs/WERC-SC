@@ -34,7 +34,6 @@ weeklyCatches <- catch %>%
   slice(1) %>% 
   ungroup
 
-
 ## count the number of Trapline events (weeklyCatches) per week (aka number of traps in the trapline)
 trapsPerLineWeek <- weeklyCatches %>%
   group_by(Trapline, Year, Season, Month, Week) %>%
@@ -43,12 +42,27 @@ trapsPerLineWeek <- weeklyCatches %>%
 # count number of each predEvent per week per trapline
 predEventsPerLineWeek <- weeklyCatches %>% 
   group_by(Trapline, Year, Week, Season, Month, predEvent) %>% 
-  summarize(NEvents = n()) 
+  summarise(NEvents = n()) 
 
 ## number of predEvents per number of traps, for each week on each Trapline
 predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>% 
   mutate(CPUE = NEvents/NTraps) %>% 
   arrange(Trapline, Year, Week, predEvent) 
+
+varFill <- group_by(predEventPUE, Trapline, Week) %>% 
+  summarise(Year = first(Year), 
+            Season = first(Season),
+            Month = first(Month),
+            NTraps = first(NTraps))
+
+CPUEgrid <- expand.grid(Trapline = unique(predEventPUE$Trapline), Week = unique(predEventPUE$Week), predEvent = unique(predEventPUE$predEvent)) %>% 
+  mutate(dummyPUE = 0) %>% 
+  merge(predEventPUE, all.x = TRUE) %>% 
+  merge(varFill, all.x = TRUE, by = c('Trapline', 'Week')) %>% 
+  arrange(Trapline, Week, predEvent) %>% 
+  select(Trapline:predEvent, Year = Year.y, Season = Season.y, Month = Month.y, NTraps = NTraps.y, NEvents) %>% 
+  mutate(NEvents = ifelse(is.na(NEvents), 0, NEvents), 
+         CPUE = NEvents/NTraps)
 
 ## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
 uniqueTrapsPerWeek <- catch %>% 
