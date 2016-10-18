@@ -49,12 +49,14 @@ predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>%
   mutate(CPUE = NEvents/NTraps) %>% 
   arrange(Trapline, Year, Week, predEvent) 
 
+## from predEventPUE, need to add back in all predEvents that have a CPUE of 0
+# identify what variables should be consistent for each week
 varFill <- group_by(predEventPUE, Trapline, Week) %>% 
   summarise(Year = first(Year), 
             Season = first(Season),
             Month = first(Month),
             NTraps = first(NTraps))
-
+# make a grid of each trapline, week, predEvent
 CPUEgrid <- expand.grid(Trapline = unique(predEventPUE$Trapline), Week = unique(predEventPUE$Week), predEvent = unique(predEventPUE$predEvent)) %>% 
   mutate(dummyPUE = 0) %>% 
   merge(predEventPUE, all.x = TRUE) %>% 
@@ -64,6 +66,13 @@ CPUEgrid <- expand.grid(Trapline = unique(predEventPUE$Trapline), Week = unique(
   mutate(NEvents = ifelse(is.na(NEvents), 0, NEvents), 
          CPUE = NEvents/NTraps)
 
+## save predEventPUE data file to GitHub file
+write.csv(CPUEgrid, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11.csv',
+          row.names = FALSE) 
+# weekly catch for each trap, with season code
+write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches.csv',
+          row.names = FALSE) 
+
 ## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
 uniqueTrapsPerWeek <- catch %>% 
   filter(!TrapChecked) # first remove dates when trap hadn't been checked in >14 days
@@ -71,13 +80,6 @@ uniqueTrapsPerWeek <- catch %>%
   summarize(N = n()) %>% 
   filter(N > 1) %>% 
   arrange(-N)
-
-## save predEventPUE data file to GitHub file
-write.csv(CPUEgrid, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11.csv',
-            row.names = FALSE) 
-# weekly catch for each trap
-write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches.csv',
-          row.names = FALSE) 
   
 ### summary stats and graphs of predEventPUE
 # frequency of predEvents per trapline per year

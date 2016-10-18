@@ -35,7 +35,6 @@ catch <- mutate(catch, predEvent = is.predEvent(predCaught, birdCaught, otherCau
 write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent.csv',
           row.names = FALSE) 
 
-
 ### summary stats and graphs of predEvent data
 # first remove dates when trap hadn't been checked in >14 days
 catch %>% 
