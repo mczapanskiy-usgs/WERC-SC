@@ -14,20 +14,23 @@ predEventPUE$Year <- as.character(predEventPUE$Year)
 hist(predEventPUE$CPUE)
 sd(predEventPUE$CPUE)
 
-## anova using the car library
-ratCaught <- filter(predEventPUE, predEvent == "ratCaught")
-rat <- ezANOVA(ratCaught, 
-                 dv = CPUE, 
-                 wid = Trapline, 
-                 within_full = c('Trapline'), 
-                 between = c('Year', 'Season'), 
-                 observed = ('Year'), 
-                 type = 2)
+poi <- glm(NEvents ~ offset(log(NTraps)) + Trapline + Year + Season, data = predEventPUE, family=poisson)
 
-# aggregate first?
-# friedman.test
+Qpoi <- glm(NEvents ~ offset(log(NTraps)) + Trapline + Year + Season, data = predEventPUE, family=quasipoisson)
 
-friedman.test(CPUE ~ year | Trapline, data = predEventPUE, subset = predEvent)
+negB <- glm.nb(NEvents ~ offset(log(NTraps)) + Trapline + Year + Season, data = predEventPUE)
+
+# ## anova using the car library
+# ratCaught <- filter(predEventPUE, predEvent == "ratCaught")
+# rat <- ezANOVA(ratCaught, 
+#                  dv = CPUE, 
+#                  wid = Trapline, 
+#                  within_full = c('Trapline'), 
+#                  between = c('Year', 'Season'), 
+#                  observed = ('Year'), 
+#                  type = 2)
+# 
+# friedman.test(CPUE ~ year | Trapline, data = predEventPUE, subset = predEvent)
 
 ## anova using normal stats package
 # ratCaught <- filter(predEvent == "ratCaught")
