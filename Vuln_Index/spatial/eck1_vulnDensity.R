@@ -11,14 +11,22 @@ library("dplyr", lib.loc="~/R/win-library/3.2")
 # read in files
 read.csv('~/WERC-SC/Vuln_Index/spatial/SoCAvulnScores.csv',
          stringsAsFactors = FALSE) -> vulnScores
-vulnScores <- vulnScores[ , complete.cases(vulnScores)] # remove blank observations at bottom of matrix
 read.csv('~/WERC-SC/Vuln_Index/spatial/SoCA5minDensities.csv',
          stringsAsFactors = FALSE) -> densities
-densities <- densities[ , complete.cases(densities)] # remove blank observations at bottom of matrix
 
 # vuln score percent rank
 vulnRanks <- mutate(vulnScores,
                     PCVrank = percent_rank(PCV), 
                     PDVrank = percent_rank(PDV))
 
+# density percent rank
+densityRanks <- mutate_each(densities,
+                         funs(percent_rank))        #, matches("^[A-Z]\\."), ignore.case=FALSE
 
+# rank <- names(vulnRanks$SurveySpp)[1:70]
+# rank <- setNames(rank, paste0(rank, "_rank"))
+
+# write for loop to apply percent rank to all species densities
+for (spp in vulnRanks$SurveySpp) {
+  mutate(densityRanks, spp = funs(.*spp))
+}
