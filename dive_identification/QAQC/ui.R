@@ -28,6 +28,8 @@ shinyUI(fluidPage(
       p(textOutput('site')),
       p(textOutput('nest')),
       p(textOutput('band')),
+      p(textOutput('dive')),
+      p(textOutput('progress')),
       width = 2
     ),
     
