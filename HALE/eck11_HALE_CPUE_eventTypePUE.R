@@ -1,5 +1,8 @@
 ### this script divides the number of pred events by the number of traps in the trapline for each week (CPUE proportion)
 
+## set wd
+setwd("~/WERC-SC/HALE")
+
 ## load libraries
 library("data.table", lib.loc="~/R/win-library/3.2")
 library("dplyr", lib.loc="~/R/win-library/3.2")
@@ -93,6 +96,7 @@ ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
   geom_point() +
   labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort') +
   facet_wrap(~ Trapline, nrow = 4) +
+  scale_y_log10() +
   theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 
@@ -101,9 +105,10 @@ preds <- ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
   geom_point() +
   labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort') +
   facet_wrap(~ Trapline, nrow = 4) +
+  scale_y_log10() +
   theme_bw() + 
-  theme(axis.text.x = element_text(angle=60, hjust=1)) +
-  ylim(0, 0.4)
+  theme(axis.text.x = element_text(angle=60, hjust=1)) 
+  # ylim(0, 0.4)
 preds %+% subset(traplineCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
 
 # a historgram of count of different trap event types
@@ -123,22 +128,27 @@ seasonalTraplineCPUE <- predEventPUE %>%
 # frequency of predEvents per trapline per month
 monthlyTraplineCPUE <- predEventPUE %>%
   group_by(Trapline, Year, Month, predEvent) %>%
-  summarize(monthlyFreq = mean(CPUE)) ## does this make sense?
+  summarize(monthlyFreq = mean(CPUE), monthlyN = n()) 
 
 ## plot of predEvents per trapline per month
-ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq, color=Year)) + # , group = Year)) +
-  geom_point() + # geom_line() +
-  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+monthlyTraplineCPUE$Month  <- factor(monthlyTraplineCPUE$Month, as.character(monthlyTraplineCPUE$Month))
+
+ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq), stat = monthlyN) + # , color = Year)) +
+  geom_boxplot() + # geom_point() 
+  # scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(x = 'Month', y = 'Monthly Frequency') +
   facet_wrap(~ predEvent, nrow = 4) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle=60, hjust=1))
+  scale_y_log10() +
+  theme_bw() 
+  # theme(axis.text.x = element_text(angle=60, hjust=1))
+
 # predEvents per trapline per month, for just predators
 monthlyPreds <- ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq)) +
-  geom_point() +
-  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) + # theme(axis.text.x = element_text(angle=60, hjust=1))
+  geom_boxplot() + 
+  # scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) + # theme(axis.text.x = element_text(angle=60, hjust=1))
   labs(x = 'Month', y = 'Monthly Frequency') +
   facet_wrap(~ predEvent, nrow = 4) +
+  scale_y_log10() +
   theme_bw() 
 monthlyPreds %+% subset(monthlyTraplineCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
 
