@@ -26,7 +26,19 @@ vulnRanks <- mutate(vulnScores,
 densities_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to long format (tidyr)
   mutate(densityRank = percent_rank(dens)) %>% # add percent rank of all survey densities
   merge(vulnRanks, by.x = "species", by.y = "SurveySpp") %>%  # merge with vulnRanks table
-  mutate(rankPCV = densityRank*PCVrank,
-         rankPDV = densityRank*PDVrank)
+  mutate(rankDensPCV = densityRank*PCVrank,
+         rankDensPDV = densityRank*PDVrank)
 
-densityVulnRanks <- spread(densities_long, species, TGRIDALB_I)
+ranksDensityPCV <- select(densities_long, species, TGRIDALB_I, rankDensPCV) %>% 
+  spread(species, rankDensPCV)
+
+ranksDensityPDV <- select(densities_long, species, TGRIDALB_I, rankDensPDV) %>% 
+  spread(species, rankDensPDV)
+
+
+## save ranksDensityPCV and ranksDensityPDV data file to GitHub file
+write.csv(ranksDensityPCV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPCV_soCal.csv',
+          row.names = FALSE) 
+
+write.csv(ranksDensityPDV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPDV_soCal.csv',
+          row.names = FALSE) 

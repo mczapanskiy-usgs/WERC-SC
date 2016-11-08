@@ -138,6 +138,7 @@ ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq), stat = monthlyN) + # , colo
   # scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(x = 'Month', y = 'Monthly Frequency') +
   facet_wrap(~ predEvent, nrow = 4) +
+  # scale_x_discrete(limits=c(2,3,4,5,6,7,8,9,10,11)) +
   scale_y_log10() +
   theme_bw() 
   # theme(axis.text.x = element_text(angle=60, hjust=1))
