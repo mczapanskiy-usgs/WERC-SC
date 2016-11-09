@@ -28,15 +28,12 @@ shinyUI(fluidPage(
       p(textOutput('site')),
       p(textOutput('nest')),
       p(textOutput('band')),
+      p(textOutput('dive')),
+      p(textOutput('progress')),
       width = 2
     ),
     
     # Dive plot
-    mainPanel(
-      tabsetPanel(
-        tabPanel("Dive Plots", imageOutput('divePlot')),
-        tabPanel("Dive Table", DT::dataTableOutput('diveTable'))
-      )
-    )
+    mainPanel(imageOutput('divePlot'))
   )
 ))
