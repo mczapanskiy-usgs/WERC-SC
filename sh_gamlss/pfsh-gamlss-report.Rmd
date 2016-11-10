@@ -1,0 +1,221 @@
+---
+title: "PFSH GAMLSS"
+author: "Max Czapanskiy"
+date: "August 26, 2016"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r set-options, echo = FALSE, cache = FALSE}
+options(width = 120)
+```
+
+Goal: demonstrate improved quality of seabird distribution models by incorporating individual tracking data
+Method: Locations from tracked sooty shearwaters have been aggregated into kernel density estimates. These utilization distributions will be used in conjunction with more commonly used variables to create distribution models. The model of choice is GAMLSS, for its ability to handle non-linear relationships and errors.
+
+1. Load packages
+```{r load_packages, message = FALSE, warning = FALSE}
+library(gamlss)
+library(dplyr)
+library(foreach)
+library(doParallel)
+library(MASS)
+library(ggplot2)
+library(tidyr)
+```
+
+2. Load data
+```{r load_data}
+# Read data
+pfsh.data <- read.csv('TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>% 
+  dplyr::select(PFSHcount, Binarea, Month, 
+                Latitude, DistCoast, Dist200, DepCI,
+                SSTmean, STD_SST, MEAN_Beaufort, L10CHLproxy, STD_CHL_log10, Watermass,
+                L10CHLsurvey, CHLsurvanom, L10CHLsurvclim, FCPI,
+                PFSH0610UD, PFSH0607UD = pfsh0607MN, PFSH0910UD = pfsh0910MN) %>%
+  filter(Month > 2) %>% # exclude tiny January, February surveys
+  mutate(PFSHcount = as.integer(PFSHcount),
+         Month = factor(Month),
+         PFSH0607UD = ifelse(is.na(PFSH0607UD) && Month %in% 9:10, 0, PFSH0607UD),
+         PFSH0910UD = ifelse(is.na(PFSH0910UD) && Month %in% 6:7, 0, PFSH0910UD)) %>% 
+  na.omit
+head(pfsh.data)
+summary(pfsh.data)
+```
+
+3. Set up parallel processing
+```{r register_parallel}
+nCores <- detectCores()
+gamlssCl <- makeCluster(nCores)
+registerDoParallel(gamlssCl)
+```
+
+4. Create geographic and oceanographic models by month using canonical discrete distributions WITHOUT home range variable:
+```{r fit_models, message=FALSE, warning=FALSE, cache=TRUE}
+# Wrapper for gamlss. Error handling and refitting.
+N_REFIT <- 5
+try.fit <- function(formula, data, family, n_refit = N_REFIT) {
+  # Try to fit model
+  model <- try(gamlss(formula, data = data, family = family))
+  fitAttempts <- 1
+  
+  # Keep refitting model until...
+  while(fitAttempts <= n_refit &&             # ... we run out of attempts,
+        class(model) != 'try-error' &&        # get an error,
+        !getElement(model, 'converged')) {    # or model converges
+    model <- try(refit(model))
+    fitAttempts <- fitAttempts + 1
+  }
+  # Return fitting results. Hopefully it's a fitted model, may be a try-error
+  model
+}
+
+# Create models using canonical discrete distributions.
+# PFSHcount as function of FCPI, Dist200, SSTmean (all three cubic splines) with Month as random variable 
+# and log(Binarea) as offset
+# Create models using canonical discrete distributions for each month.
+# Geographic + oceanographic models
+# geo = PFSHcount ~  cs(Latitude)+cs(DistCoast)+cs(Dist200)+cs(DepCI) + offset(log(Binarea))
+# ocean = PFSHcount ~ cs(SSTmean)+cs(STD_SST)+cs(MEAN_Beaufort)+cs(L10CHLproxy)+cs(STD_CHL_log10)+Watermass+cs(L10CHLsurvey)+
+#   cs(CHLsurvanom)+cs(L10CHLsurvclim)+cs(FCPI) + offset(log(Binarea))
+discrete.dist <- c('PO', 'NBI', 'NBII', 'DEL', 'PIG', 'SI', 'SICHEL', 'ZIP', 'ZIP2')
+months <- c(6, 7, 9, 10)
+# For each discrete distribution...
+monthly.geo.ocean.models <- foreach(dist = discrete.dist,
+                                    .packages = c('foreach',
+                                                  'doParallel',
+                                                  'gamlss',
+                                                  'dplyr')) %dopar% {
+  # For each month's survey...
+  foreach(month = months) %do% {
+    print(sprintf('Distribution %s, month %i', dist, month))
+    
+    # Filter PFSH data to the month of interest
+    month.data <- filter(pfsh.data, Month == month)
+    if(nrow(month.data) == 0) stop(sprintf('No data in month %i', month))
+    
+    # Fit geographic model
+    print('Fitting geographic model')
+    geo.model <- try.fit(PFSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                         data = month.data,
+                         family = get('dist'))
+    
+    # Fit oceanographic model
+    print('Fitting oceanographic model')
+    ocean.model <- try.fit(PFSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                                cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                                cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                           data = month.data,
+                           family = get('dist'))
+    
+    list(dist = dist,
+         month = month,
+         geo.model = geo.model,
+         ocean.model = ocean.model)
+  }
+}
+
+stopCluster(gamlssCl)
+```
+
+5. Summarize model results for ranking (parameters, convergence, EDF, AIC)
+```{r summarize_models}
+model.rankings <- foreach(dist.list = monthly.geo.ocean.models, .combine = rbind) %do% {
+  foreach(models = dist.list, .combine = rbind) %do% {
+    data.frame(Distribution = models$dist,
+               Month = models$month,
+               GeoConverged = tryCatch(getElement(models$geo.model, 'converged'), error = function(e) NA),
+               GeoEDF = tryCatch(extractAIC(models$geo.model)[1], error = function(e) NA),
+               GeoAIC = tryCatch(extractAIC(models$geo.model)[2], error = function(e) NA),
+               OceanConverged = tryCatch(getElement(models$ocean.model, 'converged'), error = function(e) NA),
+               OceanEDF = tryCatch(extractAIC(models$ocean.model)[1], error = function(e) NA),
+               OceanAIC = tryCatch(extractAIC(models$ocean.model)[2], error = function(e) NA))
+  }
+}
+model.rankings
+```
+
+6. The PFSH models present a messier picture than the SOSH. No distribution converges for all four months - neither geographic nor oceanographic models. Negative binomial I converges most often (3/4 months geo+ocean) but with a small mean AIC weight (<.1). Poisson converges for 3/4 months in the oceanographic models and 2/4 in the geographic, but with higher mean AIC weight (.58 and .37, respectively). I think this suggests there are too few PFSH sightings to do a month-by-month analysis and we should lump it all together.
+```{r best_fits}
+# Utility function for calculating AIC weight. vAIC is a vector of AIC values
+calcAICw <- function(vAIC) {
+  deltaAIC <- vAIC - min(vAIC, na.rm = TRUE)
+  relLikelihood <- exp(-0.5 * deltaAIC)
+  normalizingFactor <- sum(relLikelihood, na.rm = TRUE)
+  relLikelihood / normalizingFactor
+}
+
+# Sort models by month and quality of fit
+monthly.geo.ranks <- model.rankings %>%
+  group_by(Month) %>%
+  filter(GeoConverged) %>%
+  mutate(GeoDeltaAIC = GeoAIC - min(GeoAIC, na.rm = TRUE),
+         GeoAICw = calcAICw(GeoAIC) %>% round(3)) %>%
+  arrange(-GeoAICw) %>% 
+  slice(1:4) %>% 
+  ungroup %>%
+  select(Distribution:GeoAICw)
+monthly.ocean.ranks <- model.rankings %>%
+  group_by(Month) %>%
+  filter(OceanConverged) %>%
+  mutate(OceanDeltaAIC = OceanAIC - min(OceanAIC, na.rm = TRUE),
+         OceanAICw = calcAICw(OceanAIC) %>% round(3)) %>%
+  arrange(-OceanAICw) %>% 
+  slice(1:4) %>%
+  ungroup %>%
+  select(Distribution, Month, OceanConverged:OceanAICw)
+
+# Identify best available distribution by product of AIC weight across months
+monthly.geo.ranks %>% 
+  group_by(Distribution) %>%
+  summarize(N = n(),
+            meanAICw = mean(GeoAICw)) %>%
+  ungroup %>%
+  arrange(-N, -meanAICw)
+
+monthly.ocean.ranks %>% 
+  group_by(Distribution) %>%
+  summarize(N = n(),
+            meanAICw = mean(OceanAICw)) %>%
+  ungroup %>%
+  arrange(-N, -meanAICw)
+```
+
+7. 
+```{r lumped_model, message=FALSE, warning=FALSE, cache=TRUE}
+nCores <- detectCores()
+gamlssCl <- makeCluster(nCores)
+registerDoParallel(gamlssCl)
+
+discrete.dist <- c('PO', 'NBI', 'NBII', 'DEL', 'PIG', 'SI', 'SICHEL', 'ZIP', 'ZIP2')
+# For each discrete distribution...
+geo.ocean.models <- foreach(dist = discrete.dist,
+                            .packages = c('foreach',
+                                          'doParallel',
+                                          'gamlss',
+                                          'dplyr')) %dopar% {
+    # Fit geographic model
+    print('Fitting geographic model')
+    geo.model <- try.fit(PFSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                         data = pfsh.data,
+                         family = get('dist'))
+    
+    # Fit oceanographic model
+    print('Fitting oceanographic model')
+    ocean.model <- try.fit(PFSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                                cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                                cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                           data = pfsh.data,
+                           family = get('dist'))
+    
+    list(dist = dist,
+         geo.model = geo.model,
+         ocean.model = ocean.model)
+  }
+
+stopCluster(gamlssCl)
+```
+

@@ -1,0 +1,545 @@
+---
+title: "SOSH Distribution Model + UD"
+author: "Max Czapanskiy"
+date: "September 13, 2016"
+output: html_document
+---
+
+```{r set-options, echo = FALSE, cache = FALSE}
+options(width = 120)
+```
+
+## Hypothesis
+Telemetry data can be used to enhance fitness of distribution models by including utilization distributions derived from individual tracks as a predictor.
+
+## Approach
+Create traditional distribution models using environmental variables to predict at-sea counts. Add utilization distributions (UDs) and test if fit quality improved.
+
+## Method
+### Choose response variable distribution
+
+1. We divided our count data into four survey months. 
+2. For each month, we created two models (one using geographic predictors, the other oceanographic) using canonical count distributions: Poisson, Poisson inverse Gaussian, zero-inflated Poisson, negative binomial, Delacorte, and Sichel. 
+3. We found that models using the Sichel distribution converged most frequently with the lowest AIC.
+
+### Identify best model for each month
+
+1. To maximize goodness of fit while reducing model complexity, we used iterative parameter removal and gAIC to discard parameters in each monthly global geographic (4 parameters) model and each monthly global oceanographic (10 parameters) model that did not show appreciable change in model fit (e.g., if removal of a parameter did not change AIC or if AIC increased with a parameter’s removal, it was dropped). 
+2. Resulting “culled geographic”, and “culled oceanographic” models were then combined, and the culling process was repeated[AJ1] . 
+3. The final, “best” model for each month then was determined using model ranking based on gAIC. The parameter culling process allowed us to reduce 14 parameters (plus the offset) to a maximum of 3 – 7 explanatory parameters, thereby reducing the overall complexity of the models. 
+4. The resulting “combined culled” model was selected as the best explanatory model in 3 of 4 months, but in month 7, the “geo culled” also was retained as a competing model (Δ gAIC < 2). In month 9, the global geo model was >35-times more likely, based on gAIC, to be selected than the next highest ranking model. 
+
+```{r load_pkgs_data, message = FALSE, warning = FALSE}
+library(gamlss)
+library(dplyr)
+library(foreach)
+library(iterators)
+library(knitr)
+
+sosh.data <- read.csv('TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>% 
+  dplyr::select(SOSHcount, Binarea, Month, 
+                Latitude, DistCoast, Dist200, DepCI,
+                SSTmean, STD_SST, MEAN_Beaufort, L10CHLproxy, STD_CHL_log10, Watermass,
+                L10CHLsurvey, CHLsurvanom, L10CHLsurvclim, FCPI,
+                SOSH0610UD, SOSH0607UD = sosh0607MN, SOSH0910UD = sosh0910MN) %>%
+  filter(Month > 2) %>% # exclude tiny January, February surveys
+  mutate(SOSHcount = as.integer(SOSHcount),
+         Month = factor(Month),
+         # Replace NAs with 0s in UD columns
+         SOSH0607UD = ifelse(is.na(SOSH0607UD) & Month %in% 9:10, 0, SOSH0607UD),
+         SOSH0910UD = ifelse(is.na(SOSH0910UD) & Month %in% 6:7, 0, SOSH0910UD)) %>% 
+  na.omit
+summary(sosh.data)
+```
+
+```{r base_models_6, message = FALSE, warning = FALSE, cache = TRUE}
+month6 <- filter(sosh.data, Month == 6)
+
+geo6global <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month6,  
+                    control = gamlss.control(n.cyc = 100))
+
+geo6culled <- geo6global
+
+ocean6global <- gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                         cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                         cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month6,  
+                    control = gamlss.control(n.cyc = 100))
+
+ocean6culled <- gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                         as.factor(Watermass) + cs(L10CHLsurvey) + cs(L10CHLsurvclim) + 
+                         cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month6,  
+                    control = gamlss.control(n.cyc = 100))
+
+combined6culled <- gamlss(SOSHcount ~ cs(Latitude) + cs(Dist200) + cs(SSTmean) + cs(STD_SST) + 
+                            cs(MEAN_Beaufort) + cs(L10CHLproxy) + cs(L10CHLsurvey) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month6,  
+                    control = gamlss.control(n.cyc = 100))
+```
+
+```{r base_models_7, message = FALSE, warning = FALSE, cache = TRUE}
+month7 <- filter(sosh.data, Month == 7)
+
+geo7global <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month7,  
+                    control = gamlss.control(n.cyc = 100))
+
+geo7culled <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month7,  
+                    control = gamlss.control(n.cyc = 100))
+
+ocean7global <- gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                         cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                         cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                       family = SI, 
+                       data = month7,  
+                       control = gamlss.control(n.cyc = 100))
+
+ocean7culled <- gamlss(SOSHcount ~ cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                       family = SI, 
+                       data = month7,  
+                       control = gamlss.control(n.cyc = 100))
+
+combined7culled <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(FCPI) + offset(log(Binarea)), 
+                          family = SI, 
+                          data = month7,  
+                          control = gamlss.control(n.cyc = 100))
+```
+
+```{r base_models_9, message = FALSE, warning = FALSE, cache = TRUE}
+month9 <- filter(sosh.data, Month == 9)
+
+# Gamlss fitting for month 9 is buggy. Re-fitting works, n.cyc = 100 does not.
+N_REFIT <- 5
+try.fit <- function(formula, data, family, n_refit = N_REFIT) {
+  # Try to fit model
+  model <- try(gamlss(formula, data = data, family = family))
+  fitAttempts <- 1
+  
+  # Keep refitting model until...
+  while(fitAttempts <= n_refit &&             # ... we run out of attempts,
+        class(model) != 'try-error' &&        # get an error,
+        !getElement(model, 'converged')) {    # or model converges
+    model <- try(refit(model))
+    fitAttempts <- fitAttempts + 1
+  }
+  # Return fitting results. Hopefully it's a fitted model, may be a try-error
+  model
+}
+
+geo9global <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)), 
+                      family = SI, 
+                      data = month9)
+
+geo9culled <- geo9global
+
+ocean9global <- tryCatch(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                                  cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                                  cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                                family = SI, 
+                                data = month9,  
+                                control = gamlss.control(n.cyc = 100)),
+                         error = function(e) NULL)
+
+ocean9culled <- tryCatch(gamlss(SOSHcount ~ cs(SSTmean) + cs(MEAN_Beaufort) + cs(STD_CHL_log10) + cs(CHLsurvanom) + 
+                                  cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                                family = SI, 
+                                data = month9,  
+                                control = gamlss.control(n.cyc = 100)),
+                         error = function(e) NULL)
+
+combined9culled <- NULL
+```
+
+```{r base_models_10, message = FALSE, warning = FALSE, cache = TRUE}
+month10 <- filter(sosh.data, Month == 10)
+
+geo10global <- tryCatch(gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)), 
+                               family = SI, 
+                               data = month10,  
+                               control = gamlss.control(n.cyc = 100)),
+                        error = function(e) NULL)
+
+geo10culled <- tryCatch(gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + offset(log(Binarea)), 
+                               family = SI, 
+                               data = month10,  
+                               control = gamlss.control(n.cyc = 100)),
+                        error = function(e) NULL)
+
+ocean10global <- tryCatch(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                                   cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                                   cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                                 family = SI, 
+                                 data = month10,  
+                                 control = gamlss.control(n.cyc = 100)),
+                          error = function(e) NULL)
+
+ocean10culled <- tryCatch(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(L10CHLproxy) + as.factor(Watermass) + 
+                                   cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                                 family = SI, 
+                                 data = month10,  
+                                 control = gamlss.control(n.cyc = 100)),
+                          error = function(e) NULL)
+
+combined10culled <- tryCatch(gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(SSTmean) + cs(STD_SST) + 
+                                      cs(L10CHLproxy) + cs(L10CHLsurvclim) + offset(log(Binarea)), 
+                                    family = SI, 
+                                    data = month10,  
+                                    control = gamlss.control(n.cyc = 100)),
+                             error = function(e) NULL)
+```
+
+```{r base_summaries, cache = TRUE}
+formula.to.char <- function(model) {
+  model %>% formula %>% terms.formula %>% attr('term.labels') %>% paste(collapse = ' + ')
+}
+
+# Utility function for calculating AIC weight. vAIC is a vector of AIC values
+calcAICw <- function(vAIC) {
+  deltaAIC <- vAIC - min(vAIC, na.rm = TRUE)
+  relLikelihood <- exp(-0.5 * deltaAIC)
+  normalizingFactor <- sum(relLikelihood, na.rm = TRUE)
+  relLikelihood / normalizingFactor
+}
+
+# For all combinations of month, type, and scope...
+model.summary.0 <- expand.grid(Month = c(6, 7, 9, 10),
+                             type = c('geo', 'ocean', 'combined'),
+                             scope = c('global', 'culled'),
+                             stringsAsFactors = FALSE) %>%
+  filter(!(type == 'combined' & scope == 'global')) %>% # There are no combined global models 
+  mutate(Model = paste(type, scope)) %>%
+  arrange(Month, type, scope)
+
+model.summary <- foreach(row = iter(model.summary.0, by = 'row'), .combine = rbind) %do% {
+  with(row, {
+    # Fetch model
+    model <- try(get(sprintf('%s%i%s', type, Month, scope)))
+
+    # Verify model exists
+    if(class(model)[1] == 'try-error' ||
+       is.null(model))
+      return(mutate(row,
+                    Formula = NA,
+                    gAIC = NA,
+                    EDF = NA))
+
+    # Run model diagnostics
+    mutate(row,
+           Formula = formula.to.char(model),
+           gAIC = extractAIC(model)[2],
+           EDF = extractAIC(model)[1])
+  })
+} %>%
+  # Run model group diagnostics
+  group_by(Month) %>%
+  mutate(deltaGAIC = gAIC - min(gAIC, na.rm = TRUE),
+         GAICw = calcAICw(gAIC)) %>%
+  ungroup %>%
+  select(Month, Model, Formula, gAIC, EDF, deltaGAIC, GAICw) %>%
+  arrange(Month, gAIC)
+
+```
+
+### Base Model Comparisons
+```{r base_summaries2, cache = TRUE}
+kable(model.summary, digits = 2)
+```
+
+### Best Models Diagnostics
+### Month 6
+```{r best_diagnostics_6, cache = TRUE}
+model <- combined6culled
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, main = "Normal Q-Q Plot",
+            xlab = "Theoretical Quantiles",
+            ylab = "Sample Quantiles", 
+            plot.it = TRUE, 
+            frame.plot = TRUE, 
+            col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(model)
+
+# Term Plots
+term.plot(model)
+```
+
+### Month 7
+```{r best_diagnostics_7}
+model <- combined7culled
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, main = "Normal Q-Q Plot",
+            xlab = "Theoretical Quantiles",
+            ylab = "Sample Quantiles", 
+            plot.it = TRUE, 
+            frame.plot = TRUE, 
+            col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(model)
+
+# Term Plots
+term.plot(model)
+```
+
+### Month 9
+```{r best_diagnostics_9, cache = TRUE}
+model <- geo9culled
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, main = "Normal Q-Q Plot",
+            xlab = "Theoretical Quantiles",
+            ylab = "Sample Quantiles",
+            plot.it = TRUE,
+            frame.plot = TRUE,
+            col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+# wp(model)
+# Worm plot error in month 9
+ 
+# Term Plots
+# term.plot(model)
+# Term plots error in month 9
+```
+
+### Month 10
+```{r best_diagnostics_10, cache = TRUE}
+model <- combined10culled
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, main = "Normal Q-Q Plot",
+            xlab = "Theoretical Quantiles",
+            ylab = "Sample Quantiles",
+            plot.it = TRUE,
+            frame.plot = TRUE,
+            col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(model)
+
+# Term Plots
+term.plot(model)
+```
+
+### Augment monthly models with UD variable
+
+1. Season specific (6 and 7, or 9 and 10) and full survey period (6 – 10) shearwater BBUDs were added to the top-ranking model in each month to evaluate potential for increasing model fit based on gAIC.
+2. What works best?
+
+```{r add_ud_6, message = FALSE, cache = TRUE}
+month6 <- filter(sosh.data, Month == 6)
+ud6seasonal <- gamlss(SOSHcount ~ cs(Latitude) + cs(Dist200) + cs(SSTmean) + cs(STD_SST) + 
+                        cs(MEAN_Beaufort) + cs(L10CHLproxy) + cs(L10CHLsurvey) + offset(log(Binarea)) +
+                        SOSH0607UD, 
+                      family = SI, 
+                      data = month6,  
+                      control = gamlss.control(n.cyc = 100))
+ud6total <- gamlss(SOSHcount ~ cs(Latitude) + cs(Dist200) + cs(SSTmean) + cs(STD_SST) + 
+                        cs(MEAN_Beaufort) + cs(L10CHLproxy) + cs(L10CHLsurvey) + offset(log(Binarea)) +
+                        SOSH0610UD, 
+                      family = SI, 
+                      data = month6,  
+                      control = gamlss.control(n.cyc = 100))
+```
+```{r add_ud_7, message = FALSE,, cache = TRUE}
+month7 <- filter(sosh.data, Month == 7)
+ud7seasonal <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(FCPI) + offset(log(Binarea)) +
+                        SOSH0607UD, 
+                      family = SI, 
+                      data = month7,  
+                      control = gamlss.control(n.cyc = 100))
+ud7total <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(FCPI) + offset(log(Binarea)) +
+                        SOSH0610UD, 
+                      family = SI, 
+                      data = month7,  
+                      control = gamlss.control(n.cyc = 200))
+```
+```{r add_ud_9, message = FALSE,, cache = TRUE}
+month9 <- filter(sosh.data, Month == 9)
+ud9seasonal <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + 
+                         offset(log(Binarea)) + SOSH0910UD, 
+                       family = SI, 
+                       data = month9)
+ud9total <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + 
+                         offset(log(Binarea)) + SOSH0610UD, 
+                       family = SI, 
+                       data = month9)
+```
+```{r add_ud_10, message = FALSE,, cache = TRUE}
+month10 <- filter(sosh.data, Month == 10)
+ud10seasonal <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(SSTmean) + cs(STD_SST) + 
+                         cs(L10CHLproxy) + cs(L10CHLsurvclim) + offset(log(Binarea)) + SOSH0910UD, 
+                       family = SI, 
+                       data = month10,  
+                       control = gamlss.control(n.cyc = 100))
+ud10total <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(SSTmean) + cs(STD_SST) + 
+                      cs(L10CHLproxy) + cs(L10CHLsurvclim) + offset(log(Binarea)) + SOSH0610UD, 
+                    family = SI, 
+                    data = month10,  
+                    control = gamlss.control(n.cyc = 100))
+```
+
+```{r ud_summaries, cache = TRUE}
+ud.summary.0 <- data.frame(Month = rep(c(6,7,9,10), each = 3),
+                           Model = rep(c('Base', 'UD Seasonal', 'UD Total'), 4)) %>%
+  arrange(Month, Model)
+
+ud.summary <- foreach(row = iter(ud.summary.0, by = 'row'),
+                      model = list(combined6culled, ud6seasonal, ud6total,
+                                   combined7culled, ud7seasonal, ud7total,
+                                   geo9culled, ud9seasonal, ud9total,
+                                   combined10culled, ud10seasonal, ud10total),
+                      .combine = rbind) %do% {
+  with(row, {
+    # Run model diagnostics
+    mutate(row,
+           Formula = formula.to.char(model),
+           gAIC = extractAIC(model)[2],
+           EDF = extractAIC(model)[1],
+           Converged = model$converged)
+  })
+} %>%
+  # Run model group diagnostics
+  group_by(Month) %>%
+  mutate(deltaGAIC = gAIC - min(gAIC, na.rm = TRUE),
+         GAICw = calcAICw(gAIC)) %>%
+  ungroup %>%
+  select(Month, Model, Formula, gAIC, EDF, deltaGAIC, GAICw, Converged) %>%
+  arrange(Month, gAIC)
+```
+
+### UD Model Comparisons
+```{r ud_summaries2}
+kable(ud.summary, digits = 2)
+```
+
+### UD Model Diagnostics
+### Month 6
+```{r ud_diagnostics_6, cache = TRUE}
+model <- ud6total
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, main = "Normal Q-Q Plot",
+            xlab = "Theoretical Quantiles",
+            ylab = "Sample Quantiles", 
+            plot.it = TRUE, 
+            frame.plot = TRUE, 
+            col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(model)
+
+# Term Plots
+term.plot(model)
+```
+
+### Month 7
+```{r ud_diagnostics_7}
+model <- ud7total
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, main = "Normal Q-Q Plot",
+            xlab = "Theoretical Quantiles",
+            ylab = "Sample Quantiles", 
+            plot.it = TRUE, 
+            frame.plot = TRUE, 
+            col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(model)
+
+# Term Plots
+term.plot(model)
+```
+
+### Month 9
+```{r ud_diagnostics_9, cache = TRUE}
+model <- ud9total
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, main = "Normal Q-Q Plot",
+            xlab = "Theoretical Quantiles",
+            ylab = "Sample Quantiles",
+            plot.it = TRUE,
+            frame.plot = TRUE,
+            col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+# wp(model)
+# Worm plot error in month 9
+ 
+# Term Plots
+# term.plot(model)
+# Term plots error in month 9
+```
+
+### Month 10
+```{r ud_diagnostics_10, cache = TRUE}
+model <- ud10seasonal
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, main = "Normal Q-Q Plot",
+            xlab = "Theoretical Quantiles",
+            ylab = "Sample Quantiles",
+            plot.it = TRUE,
+            frame.plot = TRUE,
+            col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(model)
+
+# Term Plots
+term.plot(model)
+```

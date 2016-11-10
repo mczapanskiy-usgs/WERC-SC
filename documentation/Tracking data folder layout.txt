@@ -1,0 +1,39 @@
+root
+
+>RawFiles
+>>EObs
+>>-logger.bin
+>>iGotU
+>>-CSV
+>>-GPX
+>>CEFAS
+>>-*.bin
+
+>TextOutput
+>>EObs
+>>-Movebank CSV
+>>-Movebank ACC?
+>>iGotU
+>>-iGotU CSV (same as above, for completeness)
+>>CEFAS
+>>-Silly CEFAS format CSV
+
+>Tracks 
+>-One standardized format across devices, with trip info. Some combination of TextOutput and TripBreaker. Some points interpolated in, others filtered out, and clipped to deployment.
+
+>Dives 
+>>CleanCSV (row-column format)
+>>CalibratedData
+>>DiveData
+>>QAQC
+
+>TripBreaker
+>>RawData
+>>-iGotU CSVs, corrected for offset as necessary
+>>FilteredData
+>>-Freitas applied
+>>Trips
+>>-TripInfo
+>>-QAQC
+>>Tracks
+>>-Per species trips

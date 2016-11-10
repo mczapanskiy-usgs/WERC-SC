@@ -1,0 +1,606 @@
+library(gamlss)
+library(dplyr)
+library(foreach)
+library(doParallel)
+library(MASS)
+library(ggplot2)
+library(tidyr)
+library(purrr)
+
+# Read data
+sosh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>%
+  dplyr::select(SOSHcount, Binarea, Month, 
+                Latitude, DistCoast, Dist200, DepCI,
+                SSTmean, STD_SST, MEAN_Beaufort, L10CHLproxy, STD_CHL_log10, Watermass,
+                L10CHLsurvey, CHLsurvanom, L10CHLsurvclim, FCPI,
+                SOSH0610UD, SOSH0607UD = sosh0607MN, SOSH0910UD = sosh0910MN) %>%
+  filter(Month > 2) %>% # exclude tiny January, February surveys
+  mutate(SOSHcount = as.integer(SOSHcount),
+         Month = factor(Month),
+         SOSH0607UD = ifelse(is.na(SOSH0607UD) && Month %in% 9:10, 0, SOSH0607UD),
+         SOSH0910UD = ifelse(is.na(SOSH0910UD) && Month %in% 6:7, 0, SOSH0910UD)) %>% 
+  na.omit
+head(sosh.data)
+summary(sosh.data)
+
+# Wrapper for gamlss. Error handling and refitting.
+N_REFIT <- 5
+try.fit <- function(formula, data, family, n_refit = N_REFIT) {
+  # Try to fit model
+  model <- try(gamlss(formula, data = data, family = family))
+  fitAttempts <- 1
+  
+  # Keep refitting model until...
+  while(fitAttempts <= n_refit &&             # ... we run out of attempts,
+        class(model) != 'try-error' &&        # get an error,
+        !getElement(model, 'converged')) {    # or model converges
+    model <- try(refit(model))
+    fitAttempts <- fitAttempts + 1
+  }
+  # Return fitting results. Hopefully it's a fitted model, may be a try-error
+  model
+}
+
+# Let's try split-apply-combine on monthly data with one distribution
+discrete.dist <- list(SI, PIG)#, NBII, DEL, PIG, SI, SICHEL, ZIP, ZIP2)
+models <- expand.grid(month = levels(pfsh.data$Month),
+                      family = list(SI, PIG)) %>%
+  by_row(~try.fit(SOSHcount ~  cs(Latitude)+cs(DistCoast)+cs(Dist200)+cs(DepCI) + offset(log(Binarea)),
+                    data = filter(sosh.data, Month == .$month),
+                    family = .$family[[1]]))
+
+models <- expand.grid(list(PO, NBI))
+
+# Register parallel backend for speed increase
+nCores <- detectCores()
+gamlssCl <- makeCluster(nCores)
+registerDoParallel(gamlssCl)
+
+# Create models using canonical discrete distributions for each month.
+# Geographic + oceanographic models
+# geo = SOSHcount ~  cs(Latitude)+cs(DistCoast)+cs(Dist200)+cs(DepCI) + offset(log(Binarea))
+# ocean = SOSHcount ~ cs(SSTmean)+cs(STD_SST)+cs(MEAN_Beaufort)+cs(L10CHLproxy)+cs(STD_CHL_log10)+Watermass+cs(L10CHLsurvey)+
+#   cs(CHLsurvanom)+cs(L10CHLsurvclim)+cs(FCPI) + offset(log(Binarea))
+discrete.dist <- list(PO, NBI, NBII, DEL, PIG, SI, SICHEL, ZIP, ZIP2)
+dist.names <- sapply(discrete.dist, function(dist) dist()$family[1])
+months <- c(6, 7, 9, 10)
+# For each discrete distribution...
+base.models <- foreach(dist = discrete.dist,
+                       .packages = c('foreach',
+                                     'doParallel',
+                                     'gamlss',
+                                     'dplyr')) %dopar% {
+  # For each month's survey...
+  foreach(month = months) %do% {
+    # Fit geographic model
+    geo.model <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                                 data = filter(sosh.data, Month == month),
+                                 family = dist)
+    
+    # Fit oceanographic model
+    ocean.model <- try.fit(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                             cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                             cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                           data = filter(sosh.data, Month == month),
+                           family = dist)
+
+    list(dist = dist()$family[1],  # This gets the distribution's name
+         month = month,
+         data = month.data,
+         geo.model = geo.model,
+         ocean.model = ocean.model)
+  }
+}
+
+stopCluster(gamlssCl)
+
+# Utility function for accessing models
+get.model <- function(dist = 'SI', month, type) {
+  distIdx <- match(dist, dist.names)
+  if(is.na(dist)) stop(sprintf('Distribution %s not found', dist))
+  monthIdx <- match(month, months)
+  if(is.na(month)) stop(sprintf('Month %i not found', month))
+  if(type == 'geo') {
+    base.models[[distIdx]][[monthIdx]]$geo.model
+  } else if (predictors == 'ocean') {
+    base.models[[distIdx]][[monthIdx]]$ocean.model
+  } else {
+    stop('Parameter predictors must be "geo" or "ocean"')
+  }
+}
+
+# Collect model fit parameters
+
+# Utility function for calculating AIC weight. vAIC is a vector of AIC values
+calcAICw <- function(vAIC) {
+  deltaAIC <- vAIC - min(vAIC, na.rm = TRUE)
+  relLikelihood <- exp(-0.5 * deltaAIC)
+  normalizingFactor <- sum(relLikelihood, na.rm = TRUE)
+  relLikelihood / normalizingFactor
+}
+
+# Utility function for calculating number of estimated parameters (k) 
+## IS THIS RIGHT?
+calcK <- function(model) {
+  model %>% formula %>% terms %>% attr('term.labels') %>% length + 2
+}
+
+model.rankings <- foreach(dist = dist.names, .combine = rbind) %do% {
+  foreach(month = months, .combine = rbind) %do% {
+    foreach(type = c('geo', 'ocean'), .combine = rbind) %do% {
+      model <- get.model(dist, month, type)
+      data.frame(Distribution = dist,
+                 Month = month,
+                 Type = type,
+                 Converged = tryCatch(getElement(model, 'converged'), error = function(e) NA),
+                 EDF = tryCatch(extractAIC(model)[1], error = function(e) NA),
+                 AIC = tryCatch(extractAIC(model)[2], error = function(e) NA),
+                 K = tryCatch(calcK(model), error = function(e) NA),
+                 LogL = tryCatch(logLik(model), error = function(e) NA))
+    }
+  }
+} %>%
+  group_by(Month) %>%
+  mutate(deltaAIC = AIC - min(AIC, na.rm = TRUE),
+         AICw = calcAICw(ifelse(Converged, AIC, NA)))
+
+# Sort models by month and quality of fit
+monthly.geo.ranks <- model.rankings %>%
+  filter(Type == 'geo',
+         Converged == TRUE) %>%
+  group_by(Month) %>%
+  arrange(-AICw) %>% 
+  slice(1:4) %>% 
+  ungroup %>%
+  select(Distribution, Month, K, LogL, AIC, deltaAIC, AICw)
+
+monthly.ocean.ranks <- model.rankings %>%
+  group_by(Month) %>%
+  mutate(OceanDeltaAIC = OceanAIC - min(OceanAIC, na.rm = TRUE),
+         OceanAICw = calcAICw(OceanAIC) %>% round(3)) %>%
+  arrange(-OceanAICw) %>% 
+  slice(1:4) %>%
+  ungroup %>%
+  select(Distribution, Month, OceanConverged:OceanAICw)
+
+# Identify best available distribution by product of AIC weight across months
+monthly.geo.ranks %>% 
+  group_by(Distribution) %>%
+  summarize(N = n(),
+            meanAICw = mean(GeoAICw)) %>%
+  ungroup %>%
+  arrange(-N, -meanAICw)
+
+monthly.ocean.ranks %>% 
+  group_by(Distribution) %>%
+  summarize(N = n(),
+            meanAICw = mean(OceanAICw)) %>%
+  ungroup %>%
+  arrange(-N, -meanAICw)
+
+# We see SI and SICHEL are the only two distributions to show up in both models' top 4 across months
+# SI has the slightly higher mean AIC weight, so we'll go with that.
+
+# Cull models using selected distribution (SI)
+
+# Recursively drop parameters by largest decrease in AIC until model degrades
+cull.model <- function(model) {
+  aic <- extractAIC(model)[2]
+    
+  # Re-fit model to n-1 terms
+  model.terms <- model %>% formula %>% terms
+  term.labels <- attr(model.terms, 'term.labels')
+  submodels <- foreach(i = seq(term.labels)) %do% {
+    dropped <- term.labels[i]
+    submodel <- try(update(model, reformulate(sprintf('. - %s', dropped))))
+    list(dropped = dropped,
+         submodel = submodel)
+  }
+  
+  # Which submodels converged? Which submodel has the greatest decrease in AIC?
+  drop.results <- foreach(i = seq(submodels), .combine = rbind) %do% {
+    tryCatch(with(submodels[[i]], data.frame(dropped = dropped, 
+                                             i = i,
+                                             converged = submodel$converged,
+                                             AIC = extractAIC(submodel)[2],
+                                             deltaAIC = extractAIC(submodel)[2] - aic)),
+             error = function(e) data.frame(dropped = NA,
+                                            i = NA,
+                                            converged = NA,
+                                            AIC = NA,
+                                            deltaAIC = NA))
+  } %>%
+    filter(converged) %>%
+    arrange(deltaAIC)
+  
+  # If no submodels converge or if no submodels are an improvement, return the original model
+  if(nrow(drop.results) == 0 || min(drop.results$deltaAIC, na.rm = TRUE) > 0) {
+    return(model)
+  } else {
+    # Otherwise, repeat the process on the best submodel
+    best.submodel <- submodels[[drop.results$i[1]]]$submodel
+    return(cull.model(best.submodel))
+  }
+}
+
+# Month 6 
+month6 <- filter(sosh.data, Month == 6)
+
+# Geo
+geo6global <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                     data = month6,
+                     family = SI,
+                     control = gamlss.control(n.cyc = 100))
+geo6dropterm <- dropterm(geo6global, test = 'Chisq')
+geo6culled <- cull.model(geo6global)
+geo6dropped <- setdiff(terms(geo6global) %>% attr('term.labels'), terms(geo6culled) %>% attr('term.labels'))
+
+# Ocean
+ocean6global <- gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                         cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                         cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                       data = month6,
+                       family = SI,
+                       control = gamlss.control(n.cyc = 100))
+ocean6dropterm <- dropterm(ocean6global, test = 'Chisq')
+ocean6culled <- cull.model(ocean6global)
+ocean6dropped <- setdiff(terms(ocean6global) %>% attr('term.labels'), terms(ocean6culled) %>% attr('term.labels'))
+
+# Month 7 
+month7 <- filter(sosh.data, Month == 7)
+
+# Geo
+geo7global <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                     data = month7,
+                     family = SI,
+                     control = gamlss.control(n.cyc = 100))
+geo7dropterm <- dropterm(geo7global, test = 'Chisq')
+geo7culled <- cull.model(geo7global)
+geo7dropped <- setdiff(terms(geo7global) %>% attr('term.labels'), terms(geo7culled) %>% attr('term.labels'))
+
+# Ocean
+ocean7global <- try(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                             cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                             cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                           data = month7,
+                           family = SI,
+                           control = gamlss.control(n.cyc = 100)))
+ocean7dropterm <- dropterm(ocean7global, test = 'Chisq')
+ocean7culled <- cull.model(ocean7global)
+ocean7dropped <- setdiff(terms(ocean7global) %>% attr('term.labels'), terms(ocean7culled) %>% attr('term.labels'))
+
+# Month 9 
+month9 <- filter(sosh.data, Month == 9)
+
+# Geo
+# For some reason month 9 geo model doesn't converge reliably
+geo9global <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                      data = month9,
+                      family = SI)
+geo9dropterm <- dropterm(geo9global, test = 'Chisq')
+geo9culled <- cull.model(geo9global)
+geo9dropped <- setdiff(terms(geo9global) %>% attr('term.labels'), terms(geo9culled) %>% attr('term.labels'))
+
+# Ocean
+ocean9global <- gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                         cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                         cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                       data = month9,
+                       family = SI,
+                       control = gamlss.control(n.cyc = 100))
+ocean9dropterm <- dropterm(ocean9global, test = 'Chisq')
+ocean9culled <- cull.model(ocean9global)
+ocean9dropped <- setdiff(terms(ocean9global) %>% attr('term.labels'), terms(ocean9culled) %>% attr('term.labels'))
+
+# Month 10 
+month10 <- filter(sosh.data, Month == 10)
+
+# Geo
+geo10global <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)),
+                     data = month10,
+                     family = SI,
+                     control = gamlss.control(n.cyc = 100))
+geo10dropterm <- dropterm(geo10global, test = 'Chisq')
+geo10culled <- cull.model(geo10global)
+geo10dropped <- setdiff(terms(geo10global) %>% attr('term.labels'), terms(geo10culled) %>% attr('term.labels'))
+
+# Ocean
+ocean10global <- try(gamlss(SOSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                             cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                             cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)),
+                           data = month10,
+                           family = SI,
+                           control = gamlss.control(n.cyc = 100)))
+ocean10dropterm <- dropterm(ocean10global, test = 'Chisq')
+ocean10culled <- cull.model(ocean10global)
+ocean10dropped <- setdiff(terms(ocean10global) %>% attr('term.labels'), terms(ocean10culled) %>% attr('term.labels'))
+
+# Combining culled models
+combined6culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) +
+                      cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                      as.factor(Watermass) + cs(L10CHLsurvey) + cs(L10CHLsurvclim) + 
+                      cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month6,  
+                    control = gamlss.control(n.cyc = 100)) 
+
+combined7culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + 
+                      cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month7,  
+                    control = gamlss.control(n.cyc = 100)) 
+
+combined9culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) +
+                      cs(SSTmean) + cs(MEAN_Beaufort) +  
+                      cs(STD_CHL_log10) + cs(CHLsurvanom) + cs(L10CHLsurvclim) +  
+                      cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month9,  
+                    control = gamlss.control(n.cyc = 100)) 
+
+combined10culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + 
+                       cs(SSTmean) + cs(STD_SST) + cs(L10CHLproxy) +  
+                       as.factor(Watermass) + cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
+                    family = SI, 
+                    data = month10,  
+                    control = gamlss.control(n.cyc = 100)) 
+
+# Model analysis
+model.options <- foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
+  foreach(month = c(6, 7, 9, 10), .combine = rbind) %do% {
+    foreach(scope = c('global', 'culled'), .combine = rbind) %do% {
+      if(type == 'combined' && scope == 'global')
+        return(NULL)
+      model <- try(get(paste(type, month, scope, sep = '')))
+      if(class(model)[1] == 'try-error')
+        return(NULL)
+      aic <- extractAIC(model)[2]
+      predictors <- model %>% formula %>% terms %>% attr('term.labels') %>% paste(collapse = ', ')
+      data.frame(type = type,
+                 month = month,
+                 scope = scope,
+                 AIC = aic,
+                 predictors = predictors)
+    }
+  }
+} %>%
+  group_by(month) %>%
+  mutate(AICw = calcAICw(AIC)) %>%
+  ungroup %>%
+  arrange(month, type, scope)
+
+ggplot(model.options,
+       aes(x = paste(type, scope),
+           y = AICw)) +
+  geom_bar(stat = 'identity') +
+  facet_wrap(~ month,
+             nrow = 4) +
+  scale_x_discrete('Model Option',
+                   limits = c('geo global', 'geo culled',
+                              'ocean global', 'ocean culled',
+                              'combined culled')) +
+  ggtitle('Relative Model Performance')
+
+predictor.comparison <- foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
+  foreach(month = c(6, 7, 9, 10), .combine = rbind) %do% {
+    foreach(scope = c('global', 'culled'), .combine = rbind) %do% {
+      if(type == 'combined' && scope == 'global')
+        return(NULL)
+      model <- try(get(paste(type, month, scope, sep = '')))
+      if(class(model)[1] == 'try-error')
+        return(NULL)
+      predictors <- model %>% formula %>% terms %>% attr('term.labels')
+      data.frame(type = type,
+                 month = month,
+                 scope = scope,
+                 predictor = predictors)
+    }
+  }
+}
+
+geo.predictor.prevalence <- predictor.comparison %>% 
+  filter(type == 'geo',
+         scope == 'culled') %>%
+  group_by(predictor) %>%
+  summarize(N = n()) %>%
+  ungroup() %>%
+  arrange(N, predictor)
+
+predictor.comparison %>%
+  filter(type == 'geo', scope == 'culled') %>%
+  mutate(predictor = factor(predictor, levels = geo.predictor.prevalence$predictor)) %>%
+  ggplot(aes(x = factor(month), 
+             y = predictor)) +
+  geom_tile(fill = '#045a8d') +
+  labs(title = 'Predictor Retention\nGeographic Models',
+       x = 'Month',
+       y = 'Predictor') 
+
+ocean.predictor.prevalence <- predictor.comparison %>% 
+  filter(type == 'ocean',
+         scope == 'culled') %>%
+  group_by(predictor) %>%
+  summarize(N = n()) %>%
+  ungroup() %>%
+  arrange(N, predictor)
+
+predictor.comparison %>%
+  filter(type == 'ocean', scope == 'culled') %>%
+  mutate(predictor = factor(predictor, levels = ocean.predictor.prevalence$predictor)) %>%
+  ggplot(aes(x = factor(month), 
+             y = predictor)) +
+  geom_tile(fill = '#006d2c') +
+  labs(title = 'Predictor Retention\nOceanographic Models',
+       x = 'Month',
+       y = 'Predictor') 
+
+# Adding in UD variable
+
+# Code generator
+foreach(month = c(6:7, 9:10), .combine = c) %do% {
+  foreach(type = c('geo', 'ocean', 'combined'), .combine = c) %do% {
+    foreach(scope = c('global', 'culled'), .combine = c) %do% {
+      foreach(ud = c('all', 'season'), .combine = c) %do% {
+        if(type == 'combined' && scope == 'global')
+          return(NULL)
+        
+        varname <- if(ud == 'all') {
+          '0610'
+        } else if(month %in% 6:7) {
+          '0607'
+        } else {
+          '0910'
+        }
+        
+        sprintf('%s%i%sUD%s <- tryCatch(update(%s%i%s, ~ . + SOSH%sUD), error = function(e) NA)', type, month, scope, ud, type, month, scope, varname)
+      }
+    }
+  }
+} %>% paste(collapse = '\n') %>% cat
+
+# Month 6
+geo6globalUDall <- tryCatch(update(geo6global, ~ . + SOSH0610UD), error = function(e) NA)
+geo6globalUDseason <- tryCatch(update(geo6global, ~ . + SOSH0607UD), error = function(e) NA)
+geo6culledUDall <- tryCatch(update(geo6culled, ~ . + SOSH0610UD), error = function(e) NA)
+geo6culledUDseason <- tryCatch(update(geo6culled, ~ . + SOSH0607UD), error = function(e) NA)
+ocean6globalUDall <- tryCatch(update(ocean6global, ~ . + SOSH0610UD), error = function(e) NA)
+ocean6globalUDseason <- tryCatch(update(ocean6global, ~ . + SOSH0607UD), error = function(e) NA)
+ocean6culledUDall <- tryCatch(update(ocean6culled, ~ . + SOSH0610UD), error = function(e) NA)
+ocean6culledUDseason <- tryCatch(update(ocean6culled, ~ . + SOSH0607UD), error = function(e) NA)
+combined6culledUDall <- tryCatch(update(combined6culled, ~ . + SOSH0610UD), error = function(e) NA)
+combined6culledUDseason <- tryCatch(update(combined6culled, ~ . + SOSH0607UD), error = function(e) NA)
+
+# Month 7
+geo7globalUDall <- tryCatch(update(geo7global, ~ . + SOSH0610UD), error = function(e) NA)
+geo7globalUDseason <- tryCatch(update(geo7global, ~ . + SOSH0607UD), error = function(e) NA)
+geo7culledUDall <- tryCatch(update(geo7culled, ~ . + SOSH0610UD), error = function(e) NA)
+geo7culledUDseason <- tryCatch(update(geo7culled, ~ . + SOSH0607UD), error = function(e) NA)
+ocean7globalUDall <- tryCatch(update(ocean7global, ~ . + SOSH0610UD), error = function(e) NA)
+ocean7globalUDseason <- tryCatch(update(ocean7global, ~ . + SOSH0607UD), error = function(e) NA)
+ocean7culledUDall <- tryCatch(update(ocean7culled, ~ . + SOSH0610UD), error = function(e) NA)
+ocean7culledUDseason <- tryCatch(update(ocean7culled, ~ . + SOSH0607UD), error = function(e) NA)
+combined7culledUDall <- tryCatch(update(combined7culled, ~ . + SOSH0610UD), error = function(e) NA)
+combined7culledUDseason <- tryCatch(update(combined7culled, ~ . + SOSH0607UD), error = function(e) NA)
+
+# Month 9
+geo9globalUDall <- tryCatch(update(geo9global, ~ . + SOSH0610UD), error = function(e) NA)
+geo9globalUDseason <- tryCatch(update(geo9global, ~ . + SOSH0910UD), error = function(e) NA)
+geo9culledUDall <- tryCatch(update(geo9culled, ~ . + SOSH0610UD), error = function(e) NA)
+geo9culledUDseason <- tryCatch(update(geo9culled, ~ . + SOSH0910UD), error = function(e) NA)
+ocean9globalUDall <- tryCatch(update(ocean9global, ~ . + SOSH0610UD), error = function(e) NA)
+ocean9globalUDseason <- tryCatch(update(ocean9global, ~ . + SOSH0910UD), error = function(e) NA)
+ocean9culledUDall <- tryCatch(update(ocean9culled, ~ . + SOSH0610UD), error = function(e) NA)
+ocean9culledUDseason <- tryCatch(update(ocean9culled, ~ . + SOSH0910UD), error = function(e) NA)
+combined9culledUDall <- tryCatch(update(combined9culled, ~ . + SOSH0610UD), error = function(e) NA)
+combined9culledUDseason <- tryCatch(update(combined9culled, ~ . + SOSH0910UD), error = function(e) NA)
+
+# Month 10
+geo10globalUDall <- tryCatch(update(geo10global, ~ . + SOSH0610UD), error = function(e) NA)
+geo10globalUDseason <- tryCatch(update(geo10global, ~ . + SOSH0910UD), error = function(e) NA)
+geo10culledUDall <- tryCatch(update(geo10culled, ~ . + SOSH0610UD), error = function(e) NA)
+geo10culledUDseason <- tryCatch(update(geo10culled, ~ . + SOSH0910UD), error = function(e) NA)
+ocean10globalUDall <- tryCatch(update(ocean10global, ~ . + SOSH0610UD), error = function(e) NA)
+ocean10globalUDseason <- tryCatch(update(ocean10global, ~ . + SOSH0910UD), error = function(e) NA)
+ocean10culledUDall <- tryCatch(update(ocean10culled, ~ . + SOSH0610UD), error = function(e) NA)
+ocean10culledUDseason <- tryCatch(update(ocean10culled, ~ . + SOSH0910UD), error = function(e) NA)
+combined10culledUDall <- tryCatch(update(combined10culled, ~ . + SOSH0610UD), error = function(e) NA)
+combined10culledUDseason <- tryCatch(update(combined10culled, ~ . + SOSH0910UD), error = function(e) NA)
+
+# Check UD models against base 
+UDcomparison <- foreach(month = c(6:7, 9:10), .combine = rbind) %do% {
+  foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
+    foreach(scope = c('global', 'culled'), .combine = rbind) %do% {
+      if(type == 'combined' && scope == 'global')
+        return(NULL)
+      
+      tryCatch({
+        model.name <- sprintf('%s%i%s', type, month, scope) 
+        base <- get(model.name)
+        udall <- get(sprintf('%s%s', model.name, 'UDall'))
+        udseason <- get(sprintf('%s%s', model.name, 'UDseason'))
+        
+        data.frame(model = model.name,
+                   UD = c('base', 'UDall', 'UDseason'),
+                   AIC = c(extractAIC(base)[2],
+                           extractAIC(udall)[2],
+                           extractAIC(udseason)[2])) %>%
+          mutate(AICw = calcAICw(AIC))
+      }, error = function(e) NULL)
+    }
+  }
+}
+
+UDcomparison %>% 
+  select(model, UD, AICw) %>% 
+  spread(UD, AICw)
+
+ggplot(UDcomparison, 
+       aes(x = model,
+           y = AICw, 
+           fill = UD)) + 
+  geom_bar(stat = 'identity') +
+  scale_fill_discrete('UD Usage', labels = c('None', 'All\n(6-10)', 'Season\n(6-7, 9-10)')) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = 'Relative Performance of UD Models',
+       x = 'Base Model')
+
+# Check UD models against base by month
+UDcomparison.monthly <- foreach(month = c(6:7, 9:10), .combine = rbind) %do% {
+  foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
+    foreach(scope = c('global', 'culled'), .combine = rbind) %do% {
+      if(type == 'combined' && scope == 'global')
+        return(NULL)
+      
+      tryCatch({
+        model.name <- sprintf('%s%i%s', type, month, scope) 
+        base <- get(model.name)
+        udall <- get(sprintf('%s%s', model.name, 'UDall'))
+        udseason <- get(sprintf('%s%s', model.name, 'UDseason'))
+        
+        data.frame(type = type,
+                   scope = scope,
+                   month = month,
+                   UD = c('base', 'UDall', 'UDseason'),
+                   AIC = c(extractAIC(base)[2],
+                           extractAIC(udall)[2],
+                           extractAIC(udseason)[2]))
+      }, error = function(e) NULL)
+    }
+  }
+} %>%
+  group_by(month) %>%
+  mutate(AICw = calcAICw(AIC)) %>%
+  ungroup %>%
+  mutate(month = factor(month),
+         model.UD = paste(model, UD, sep = '.'))
+
+UDcomparison.monthly %>%
+  select(-AIC) %>%
+  spread(month, AICw)
+
+UDcomparison.monthly %>%
+  mutate(AICw = AICw + 1) %>%
+  ggplot(aes(x = paste(type, scope, sep = '.'),
+             y = AICw,
+             fill = UD)) +
+  geom_bar(stat = 'identity',
+           position = 'dodge') +
+  facet_wrap(~ month) +
+  scale_y_log10(limits = 1:2,
+                breaks = seq(1, 2, length = 5),
+                labels = function(b) b - 1) +
+  scale_fill_discrete('UD Usage', labels = c('None', 'All\n(6-10)', 'Season\n(6-7, 9-10)')) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = 'Relative Performance of UD Models By Month',
+       x = 'Model Type and Scope',
+       y = 'AIC Weight\n(Modified logarithmic scale, log(AICw + 1)-1')
+
+
+
+foreach(sp = unique(iris$Species)) %do% {
+  foreach(dist = list(GA, EXP, NO)) %do% {
+    gamlss(Petal.Length ~ Petal.Width + Sepal.Length + Sepal.Width, 
+           data = filter(iris, Species == sp), 
+           family = dist)
+  }
+} -> iris.species.models

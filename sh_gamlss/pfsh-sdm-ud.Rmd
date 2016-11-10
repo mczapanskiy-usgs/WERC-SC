@@ -1,0 +1,284 @@
+---
+title: "PFSH Distribution Model + UD"
+author: "Max Czapanskiy"
+date: "September 14, 2016"
+output: html_document
+---
+
+```{r set-options, echo = FALSE, cache = FALSE}
+options(width = 120)
+```
+
+## Alternative Example
+As with SOSH, PFSH. Smaller samples, so only model months 9 and 10 in a combined model with month as a random effect.
+
+## Method
+### Model without UD
+
+1. Run global geographic and oceanographic models.
+2. Cull models.
+3. Combine culled models.
+
+```{r load_pkgs_data, message = FALSE, warning = FALSE}
+library(gamlss)
+library(dplyr)
+library(foreach)
+library(iterators)
+library(knitr)
+
+pfsh.data <- read.csv('TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>% 
+  dplyr::select(PFSHcount, Binarea, Month, 
+                Latitude, DistCoast, Dist200, DepCI,
+                SSTmean, STD_SST, MEAN_Beaufort, L10CHLproxy, STD_CHL_log10, Watermass,
+                L10CHLsurvey, CHLsurvanom, L10CHLsurvclim, FCPI,
+                PFSH0610UD, PFSH0910UD = pfsh0910MN) %>%
+  filter(Month > 7) %>% # Only 9, 10
+  mutate(PFSHcount = as.integer(PFSHcount),
+         Month = factor(Month)) %>% 
+  na.omit
+```
+
+### Run global and oceanographic
+```{r base_models, message = FALSE, warning = FALSE, cache = TRUE}
+geo.global <- gamlss(PFSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + offset(log(Binarea)) + random(Month), 
+                     family = SI, 
+                     data = pfsh.data,  
+                     control = gamlss.control(n.cyc = 100))
+geo.global
+
+ocean.global <- gamlss(PFSHcount ~ cs(SSTmean) + cs(STD_SST) + cs(MEAN_Beaufort) + cs(L10CHLproxy) + 
+                         cs(STD_CHL_log10) + as.factor(Watermass) + cs(L10CHLsurvey) + cs(CHLsurvanom) + 
+                         cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)) + random(Month), 
+                       family = SI, 
+                       data = pfsh.data,  
+                       control = gamlss.control(n.cyc = 100))
+ocean.global
+```
+
+### Cull models
+Variable culling process, as before
+```{r cull_models, message = FALSE, warning = FALSE, cache = TRUE}
+# Recursively drop parameters by largest decrease in AIC until model degrades
+cull.model <- function(model) {
+  aic <- extractAIC(model)[2]
+    
+  # Re-fit model to n-1 terms
+  model.terms <- model %>% formula %>% terms
+  term.labels <- attr(model.terms, 'term.labels')
+  submodels <- foreach(i = seq(term.labels)) %do% {
+    dropped <- term.labels[i]
+    submodel <- try(update(model, reformulate(sprintf('. - %s', dropped))))
+    list(dropped = dropped,
+         submodel = submodel)
+  }
+  
+  # Which submodels converged? Which submodel has the greatest decrease in AIC?
+  drop.results <- foreach(i = seq(submodels), .combine = rbind) %do% {
+    tryCatch(with(submodels[[i]], data.frame(dropped = dropped, 
+                                             i = i,
+                                             converged = submodel$converged,
+                                             AIC = extractAIC(submodel)[2],
+                                             deltaAIC = extractAIC(submodel)[2] - aic)),
+             error = function(e) data.frame(dropped = NA,
+                                            i = NA,
+                                            converged = NA,
+                                            AIC = NA,
+                                            deltaAIC = NA))
+  } %>%
+    filter(converged) %>%
+    arrange(deltaAIC)
+  
+  # If no submodels converge or if no submodels are an improvement, return the original model
+  if(nrow(drop.results) == 0 || min(drop.results$deltaAIC, na.rm = TRUE) > 0) {
+    return(model)
+  } else {
+    # Otherwise, repeat the process on the best submodel
+    best.submodel <- submodels[[drop.results$i[1]]]$submodel
+    return(cull.model(best.submodel))
+  }
+}
+
+geo.culled <- cull.model(geo.global)
+geo.culled
+
+ocean.culled <- cull.model(ocean.global)
+ocean.culled
+```
+
+### Combine
+```{r random_effects, message = FALSE, warning = FALSE, cache = TRUE}
+geo.formula <- geo.culled %>% terms %>% attr('term.labels')
+ocean.formula <- ocean.culled %>% terms %>% attr('term.labels')
+combined.rs <- paste(c(geo.formula, ocean.formula), collapse = ' + ')
+combined.formula <- as.formula(paste("PFSHcount ~", combined.rs))
+combined.culled <- gamlss(combined.formula,
+                          family = SI, 
+                       data = pfsh.data,  
+                       control = gamlss.control(n.cyc = 100))
+combined.culled
+```
+
+## Summarize models
+```{r base_summaries, cache = TRUE}
+formula.to.char <- function(model) {
+  model %>% formula %>% terms.formula %>% attr('term.labels') %>% paste(collapse = ' + ')
+}
+
+# Utility function for calculating AIC weight. vAIC is a vector of AIC values
+calcAICw <- function(vAIC) {
+  deltaAIC <- vAIC - min(vAIC, na.rm = TRUE)
+  relLikelihood <- exp(-0.5 * deltaAIC)
+  normalizingFactor <- sum(relLikelihood, na.rm = TRUE)
+  relLikelihood / normalizingFactor
+}
+
+# For all combinations of month, type, and scope...
+base.summary.0 <- expand.grid(type = c('geo', 'ocean', 'combined'),
+                               scope = c('global', 'culled'),
+                               stringsAsFactors = FALSE) %>%
+  filter(!(type == 'combined' & scope == 'global')) %>% # There are no combined global models 
+  mutate(Model = paste(type, scope)) %>%
+  arrange(type, scope)
+
+base.summary <- foreach(row = iter(base.summary.0, by = 'row'), .combine = rbind) %do% {
+  with(row, {
+    # Fetch model
+    model <- try(get(sprintf('%s.%s', type, scope)))
+    
+    # Verify model exists
+    if(class(model)[1] == 'try-error' ||
+       is.null(model))
+      return(mutate(row,
+                    Formula = NA,
+                    gAIC = NA,
+                    EDF = NA))
+
+    # Run model diagnostics
+    mutate(row,
+           Formula = formula.to.char(model),
+           gAIC = extractAIC(model)[2],
+           EDF = extractAIC(model)[1])
+  })
+} %>%
+  # Run model group diagnostics
+  mutate(deltaGAIC = gAIC - min(gAIC, na.rm = TRUE),
+         GAICw = calcAICw(gAIC)) %>%
+  select(Model, Formula, gAIC, EDF, deltaGAIC, GAICw) %>%
+  arrange(gAIC)
+
+kable(base.summary, digits = 2)
+```
+
+## Best Model Diagnostics
+```{r best_diagnostics, cache = TRUE}
+# "type scope" -> "type.scope"
+model.name <- base.summary$Model[1]
+best.model <- get(sub(' ', '.', model.name))
+
+# Coefficients
+summary(best.model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(best.model)
+qqnorm(residx, 
+       main = "Normal Q-Q Plot",
+       sub = model.name,
+       xlab = "Theoretical Quantiles",
+       ylab = "Sample Quantiles", 
+       plot.it = TRUE, 
+       frame.plot = TRUE, 
+       col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(best.model)
+
+# Term Plots
+term.plot(best.model)
+```
+
+## Augment best model with UD variable
+
+1. Season specific (9 and 10) and full survey period (6 – 10) shearwater BBUDs added to the top-ranking model to evaluate potential for increasing model fit based on gAIC.
+2. What works best?
+
+```{r add_ud, message = FALSE, cache = TRUE}
+ud.seasonal <- update(best.model, ~ . + PFSH0910UD)
+ud.seasonal
+
+ud.total <- update(best.model, ~ . + PFSH0610UD)
+ud.total
+```
+
+```{r ud_summaries, cache = TRUE}
+ud.summary <- foreach(model = list(best.model, ud.seasonal, ud.total),
+                      model.name = c(model.name, 'UD Seasonal', 'UD Total'),
+                      .combine = rbind) %do% {
+  # Run model diagnostics
+  data.frame(Model = model.name,
+             Formula = formula.to.char(model),
+             gAIC = extractAIC(model)[2],
+             EDF = extractAIC(model)[1],
+             Converged = model$converged)
+} %>%
+  # Run model group diagnostics
+  mutate(deltaGAIC = gAIC - min(gAIC, na.rm = TRUE),
+         GAICw = calcAICw(gAIC)) %>%
+  select(Model, Formula, gAIC, EDF, deltaGAIC, GAICw, Converged) %>%
+  arrange(gAIC)
+
+kable(ud.summary, digits = 2)
+```
+
+## UD Model Diagnostics
+### UD Seasonal
+```{r udseasonal_diagnostics, cache = TRUE}
+model <- ud.seasonal
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, 
+       main = "Normal Q-Q Plot",
+       sub = "UD Seasonal",
+       xlab = "Theoretical Quantiles",
+       ylab = "Sample Quantiles", 
+       plot.it = TRUE, 
+       frame.plot = TRUE, 
+       col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(model)
+
+# Term Plots
+term.plot(model)
+```
+
+### UD Total
+```{r udtotal_diagnostics}
+model <- ud.total
+
+# Coefficients
+summary(model)
+
+# QQ Norm plot (Copied from plot.gamlss)
+residx <- resid(model)
+qqnorm(residx, 
+       main = "Normal Q-Q Plot",
+       sub = "UD Total",
+       xlab = "Theoretical Quantiles",
+       ylab = "Sample Quantiles", 
+       plot.it = TRUE, 
+       frame.plot = TRUE, 
+       col="darkgreen")
+lines(residx, residx, col="red" , lwd=.4, cex=.4 )
+
+# Worm Plot
+wp(model)
+
+# Term Plots
+term.plot(model)
+```
