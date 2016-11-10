@@ -46,9 +46,10 @@ sosh.data <- read.csv('TelemetryTransect17May2016_SOSH-PFSH-COMU.csv') %>%
   mutate(SOSHcount = as.integer(SOSHcount),
          Month = factor(Month),
          # Replace NAs with 0s in UD columns
-         SOSH0607UD = ifelse(is.na(SOSH0607UD) && Month %in% 9:10, 0, SOSH0607UD),
-         SOSH0910UD = ifelse(is.na(SOSH0910UD) && Month %in% 6:7, 0, SOSH0910UD)) %>% 
+         SOSH0607UD = ifelse(is.na(SOSH0607UD) & Month %in% 9:10, 0, SOSH0607UD),
+         SOSH0910UD = ifelse(is.na(SOSH0910UD) & Month %in% 6:7, 0, SOSH0910UD)) %>% 
   na.omit
+summary(sosh.data)
 ```
 
 ```{r base_models_6, message = FALSE, warning = FALSE, cache = TRUE}
@@ -357,7 +358,8 @@ term.plot(model)
 1. Season specific (6 and 7, or 9 and 10) and full survey period (6 – 10) shearwater BBUDs were added to the top-ranking model in each month to evaluate potential for increasing model fit based on gAIC.
 2. What works best?
 
-```{r add_ud_6, cache = TRUE}
+```{r add_ud_6, message = FALSE, cache = TRUE}
+month6 <- filter(sosh.data, Month == 6)
 ud6seasonal <- gamlss(SOSHcount ~ cs(Latitude) + cs(Dist200) + cs(SSTmean) + cs(STD_SST) + 
                         cs(MEAN_Beaufort) + cs(L10CHLproxy) + cs(L10CHLsurvey) + offset(log(Binarea)) +
                         SOSH0607UD, 
@@ -371,7 +373,8 @@ ud6total <- gamlss(SOSHcount ~ cs(Latitude) + cs(Dist200) + cs(SSTmean) + cs(STD
                       data = month6,  
                       control = gamlss.control(n.cyc = 100))
 ```
-```{r add_ud_7, cache = TRUE}
+```{r add_ud_7, message = FALSE,, cache = TRUE}
+month7 <- filter(sosh.data, Month == 7)
 ud7seasonal <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(FCPI) + offset(log(Binarea)) +
                         SOSH0607UD, 
                       family = SI, 
@@ -383,7 +386,8 @@ ud7total <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(FCPI) + offset(
                       data = month7,  
                       control = gamlss.control(n.cyc = 200))
 ```
-```{r add_ud_9, cache = TRUE}
+```{r add_ud_9, message = FALSE,, cache = TRUE}
+month9 <- filter(sosh.data, Month == 9)
 ud9seasonal <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(DepCI) + 
                          offset(log(Binarea)) + SOSH0910UD, 
                        family = SI, 
@@ -393,7 +397,8 @@ ud9total <- try.fit(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + cs(
                        family = SI, 
                        data = month9)
 ```
-```{r add_ud_10, cache = TRUE}
+```{r add_ud_10, message = FALSE,, cache = TRUE}
+month10 <- filter(sosh.data, Month == 10)
 ud10seasonal <- gamlss(SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(SSTmean) + cs(STD_SST) + 
                          cs(L10CHLproxy) + cs(L10CHLsurvclim) + offset(log(Binarea)) + SOSH0910UD, 
                        family = SI, 

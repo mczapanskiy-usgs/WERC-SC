@@ -16,8 +16,8 @@ sosh.data <- read.csv('sh_gamlss/TelemetryTransect17May2016_SOSH-PFSH-COMU.csv')
   filter(Month > 2) %>% # exclude tiny January, February surveys
   mutate(SOSHcount = as.integer(SOSHcount),
          Month = factor(Month),
-         SOSH0607UD = ifelse(is.na(SOSH0607UD) && Month %in% 9:10, 0, SOSH0607UD),
-         SOSH0910UD = ifelse(is.na(SOSH0910UD) && Month %in% 6:7, 0, SOSH0910UD)) %>% 
+         SOSH0607UD = ifelse(is.na(SOSH0607UD) & Month %in% 9:10, 0, SOSH0607UD),
+         SOSH0910UD = ifelse(is.na(SOSH0910UD) & Month %in% 6:7, 0, SOSH0910UD)) %>% 
   na.omit
 head(sosh.data)
 summary(sosh.data)
@@ -311,13 +311,15 @@ combined6culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + c
                       cs(FCPI) + offset(log(Binarea)), 
                     family = SI, 
                     data = month6,  
-                    control = gamlss.control(n.cyc = 100)) 
+                    control = gamlss.control(n.cyc = 100)) %>%
+  cull.model
 
 combined7culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + 
                       cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
                     family = SI, 
                     data = month7,  
-                    control = gamlss.control(n.cyc = 100)) 
+                    control = gamlss.control(n.cyc = 100)) %>%
+  cull.model
 
 combined9culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) +
                       cs(SSTmean) + cs(MEAN_Beaufort) +  
@@ -325,14 +327,16 @@ combined9culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + c
                       cs(FCPI) + offset(log(Binarea)), 
                     family = SI, 
                     data = month9,  
-                    control = gamlss.control(n.cyc = 100)) 
+                    control = gamlss.control(n.cyc = 100)) %>%
+  cull.model
 
 combined10culled <- gamlss(formula = SOSHcount ~ cs(Latitude) + cs(DistCoast) + cs(Dist200) + 
                        cs(SSTmean) + cs(STD_SST) + cs(L10CHLproxy) +  
                        as.factor(Watermass) + cs(L10CHLsurvclim) + cs(FCPI) + offset(log(Binarea)), 
                     family = SI, 
                     data = month10,  
-                    control = gamlss.control(n.cyc = 100)) 
+                    control = gamlss.control(n.cyc = 100)) %>%
+  cull.model
 
 # Model analysis
 model.options <- foreach(type = c('geo', 'ocean', 'combined'), .combine = rbind) %do% {
