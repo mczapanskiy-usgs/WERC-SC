@@ -27,7 +27,8 @@ catch <- mutate(raw_catch,
                           "Nestling" = Month >= 7,
                           "offSeason" = Month >= 11,
                           .method = "last", 
-                          .default = "offSeason"))
+                          .default = "offSeason"),
+                moon = lunar.illumination(date, shift = 10))
 
 ## if there are multiple predEvents in a week, choose the most important one 
 ## make "weeklyCatches" a datatable containing all the factors needed for weekly analysis
