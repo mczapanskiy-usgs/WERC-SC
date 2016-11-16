@@ -70,12 +70,22 @@ CPUEgrid <- expand.grid(Trapline = unique(predEventPUE$Trapline), Week = unique(
   mutate(NEvents = ifelse(is.na(NEvents), 0, NEvents), 
          CPUE = NEvents/NTraps)
 
-## save predEventPUE data file to GitHub file
+## save to GitHub folder
+# predEventPUE data file
 write.csv(CPUEgrid, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11.csv',
           row.names = FALSE) 
 # weekly catch for each trap, with season code
 write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches.csv',
           row.names = FALSE) 
+# final datasheets for spatial analysis
+spatialCatch <- weeklyCatches %>% 
+  filter(TrapChecked == "TRUE") %>% 
+  rename(TrapLocStartDate = StartDate) %>% 
+  rename(TrapLocEndDate = EndDate) %>% 
+  select(catchID:Comments, baitType:Season)
+write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_spatialCatches.csv',
+          row.names = FALSE) 
+
 
 ## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
 uniqueTrapsPerWeek <- catch %>% 

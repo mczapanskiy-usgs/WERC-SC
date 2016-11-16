@@ -16,7 +16,7 @@ read.csv('~/WERC-SC/HALE/trap_metadata_20161012.csv',
                                   '2100-01-01', 
                                   paste(EndYear, EndMonth, EndDay, sep = '-')), 
                            format = '%Y-%m-%d')) %>% ## adds new columns "StartDate" and "EndDate" in correct formats
-  select(Trapline, TrapNum, StartDate, EndDate, Trap_Brand, Trap_size, Trap_numDoors, point_X, point_Y) %>% ## Easting, Northing
+  select(Trapline, TrapNum, Filename, StartDate, EndDate, Trap_Brand, Trap_size, Trap_numDoors, point_X, point_Y) %>% ## Easting, Northing
   mutate(TrapNum = as.character(TrapNum)) %>% 
   data.table %>%
   setkeyv(c('Trapline', 'TrapNum', 'StartDate', 'EndDate')) -> trap_metadata ## created datatable of columns selected above, ordered by these variables
@@ -52,7 +52,7 @@ foverlaps(x = trap_catches,
 anti_join(trap_catches, 
           catches_with_traploc_partial,
           by = c('Trapline', 'TrapNum', 'date')) %>% 
-  list(select(catches_with_traploc_partial, date:catchID, StartDate:EndDate, Trapline:TrapNum, Trap_Brand:point_Y, Year:dateStr, duplicate:Dummy), .) %>%  ## StartDate:EndDate, Trapline:TrapNum, Year:Dummy, Trap_Brand:Northing), .) %>% 
+  list(select(catches_with_traploc_partial, date:catchID, Filename, StartDate, Trapline:TrapNum, Trap_Brand:point_Y, Year:Comments, duplicate:Dummy), .) %>%  ## StartDate:EndDate, Trapline:TrapNum, Year:Dummy, Trap_Brand:Northing), .) %>% 
   rbindlist(fill = TRUE) -> catches_with_traploc
 
 write.csv(catches_with_traploc,file = '~/WERC-SC/HALE/catch_5_duplicateID_withtraploc.csv',

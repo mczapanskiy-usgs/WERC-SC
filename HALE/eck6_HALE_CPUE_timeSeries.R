@@ -55,6 +55,9 @@ catch_traploc_weekChecks %>%
          & BaitStatus != "y" & BaitStatus != "n" & BaitStatus != "") -> catch_unkBaitStatus
 write.csv(catch_unkBaitStatus, '~/WERC-SC/HALE/catch_6_unk_BaitStatus.csv',
             row.names = FALSE)
+## save catch output
+write.csv(catch_traploc_weekChecks, file = '~/WERC-SC/HALE/catch_6_traploc_weekChecks.csv',
+          row.names = FALSE) 
 
 ## stats
 # average interval between checks
@@ -69,9 +72,6 @@ write.csv(catch_unkBaitStatus, '~/WERC-SC/HALE/catch_6_unk_BaitStatus.csv',
 ggplot(filter(catch_traploc_weekChecks, TrapChecked), 
        aes(x = CheckInterval)) + 
   geom_bar()
-
-write.csv(catch_traploc_weekChecks, file = '~/WERC-SC/HALE/catch_6_traploc_weekChecks.csv',
-          row.names = FALSE)  
 
 #   setkeyv(c('Trapline', 'TrapNum', 'date')) %>% # sort data by these values, in this order
 #   group_by(Trapline, TrapNum) %>% # distinct trap groups, so that function isn't accidentally associated with any other traplines/numbers
