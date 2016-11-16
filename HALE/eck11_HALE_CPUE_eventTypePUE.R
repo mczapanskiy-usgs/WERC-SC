@@ -27,8 +27,7 @@ catch <- mutate(raw_catch,
                           "Nestling" = Month >= 7,
                           "offSeason" = Month >= 11,
                           .method = "last", 
-                          .default = "offSeason"),
-                moon = lunar.illumination(date, shift = 10))
+                          .default = "offSeason"))
 
 ## if there are multiple predEvents in a week, choose the most important one 
 ## make "weeklyCatches" a datatable containing all the factors needed for weekly analysis
@@ -80,10 +79,8 @@ write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predE
 # final datasheets for spatial analysis
 spatialCatch <- weeklyCatches %>% 
   filter(TrapChecked == "TRUE") %>% 
-  rename(TrapLocStartDate = StartDate) %>% 
-  rename(TrapLocEndDate = EndDate) %>% 
   select(catchID:Comments, baitType:Season)
-write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_spatialCatches.csv',
+write.csv(spatialCatch, file = '~/WERC-SC/HALE/catch_11_spatialCatches.csv',
           row.names = FALSE) 
 
 
