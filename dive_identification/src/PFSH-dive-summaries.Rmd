@@ -1,0 +1,101 @@
+---
+title: "PFSH Diving Behavior"
+author: "Max Czapanskiy"
+date: "November 17, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(data.table)
+library(oce)
+library(mosaic)
+library(ggplot2)
+```
+
+## Load data
+```{r load_data}
+# Just the dive info, no location
+pfsh_dives_tdr <- dir('../4d_pfsh_dive_data', full.names = TRUE) %>%
+  lapply(read.csv, stringsAsFactors = FALSE) %>%
+  bind_rows %>%
+  mutate(Begin = as.POSIXct(Begin, tz = 'UTC'),
+         End = as.POSIXct(End, tz = 'UTC'),
+         join_time = Begin) %>%
+  filter(!Reject) %>%
+  data.table(key = c('DeployID', 'join_time'))
+
+# Location info
+pfsh_locs <- read.csv('../../trackcode/gps/All_tracks/PFSH_2.5_trips_annotated.csv', stringsAsFactors = FALSE) %>%
+  rename(DeployID = Deploy_ID) %>%
+  mutate(UTC = as.POSIXct(UTC, tz = 'UTC'),
+         join_time = UTC) %>%
+  data.table(key = c('DeployID', 'join_time'))
+
+# Join dives and locations by nearest time
+pfsh_dives <- pfsh_locs[pfsh_dives_tdr, roll = 'nearest'] %>%
+  na.omit %>%
+  mutate(UTC = join_time) %>%
+  select(-join_time) %>%
+# Add time of day
+  mutate(SunAngle = sunAngle(UTC, Longitude, Latitude)$altitude,
+         TimeOfDay = derivedFactor(Night = SunAngle < -18,
+                                   Twilight = SunAngle < -6,
+                                   .default = 'Day',
+                                   .method = 'first'))
+
+head(pfsh_dives)
+```
+
+## Deployment Statistics
+
+* Mean and standard deviation for duration and depth
+* As above, broken by time of day
+* Histograms of duration, depth, time of day
+
+```{r dive_stats}
+pfsh_dives %>% 
+  summarize(N = n(),
+            MeanDuration = mean(Duration),
+            StdDevDuration = sd(Duration),
+            MeanDepth = mean(MaxDepth),
+            StdDevDepth = sd(MaxDepth))
+
+pfsh_dives %>%
+  group_by(TimeOfDay) %>%
+  summarize(N = n(),
+            MeanDuration = mean(Duration),
+            StdDevDuration = sd(Duration),
+            MeanDepth = mean(MaxDepth),
+            StdDevDepth = sd(MaxDepth))
+
+ggplot(pfsh_dives,
+       aes(Duration)) +
+  geom_histogram(binwidth = 1) +
+  labs(title = 'Duration Histogram',
+       x = 'Duration (s)',
+       y = 'Frequency')
+
+ggplot(pfsh_dives,
+       aes(MaxDepth)) +
+  geom_histogram(binwidth = .5) +
+  labs(title = 'Depth Histogram',
+       x = 'Depth (m)',
+       y = 'Frequency')
+
+ggplot(pfsh_dives,
+       aes(SunAngle)) +
+  geom_histogram(binwidth = 6,
+             center = 3) +
+  xlim(-60, 60) +
+  geom_vline(aes(xintercept = x),
+             data = data.frame(x = c(-18, -6))) +
+  geom_text(aes(x, y, label = label),
+            data = (data.frame(x = c(-35, -12, 20),
+                               y = rep(80, 3),
+                               label = c('Night', 'Twilight', 'Day')))) +
+  labs(title = 'Time of Day Histogram',
+       x = 'Sun angle (degrees)',
+       y = 'Frequency')
+```
