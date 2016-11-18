@@ -8,15 +8,47 @@
 # graphics.off()
 setwd("~/WERC-SC/Vuln_Index")
 scores <- read.csv("PV.CV.DVscores.csv", header = T) ## matrix of final PV, CV, and DV
-scores$DispBest <- as.numeric(scores$DispBest)
+# scores$DispBest <- as.numeric(scores$DispBest)
+
+# Splining a polygon.
+#   The rows of 'xy' give coordinates of the boundary vertices, in order.
+#   'vertices' is the number of spline vertices to create.(Not all are used: some are clipped from the ends.)
+#   'k' is the number of points to wrap around the ends to obtain a smooth periodic spline.
+#   Returns an array of points. 
+spline.poly <- function(xy, vertices, k=3, ...) {
+  # Assert: xy is an n by 2 matrix with n >= k.
+  # Wrap k vertices around each end.
+  n <- dim(xy)[1]
+  if (k >= 1) {
+    data <- rbind(xy[(n-k+1):n,], xy, xy[1:k, ])
+  } else {
+    data <- xy
+  }
+  # Spline the x and y coordinates.
+  data.spline <- spline(1:(n+2*k), data[,1], n=vertices, ...)
+  x <- data.spline$x
+  x1 <- data.spline$y
+  x2 <- spline(1:(n+2*k), data[,2], n=vertices, ...)$y
+  
+  # Retain only the middle part.
+  cbind(x1, x2)[k < x & x <= n+k, ]
+}
+
+for(i in levels(scores$Taxonomy)){
+  test <- subset(scores, Taxonomy ==i)
+  plot(test$ColBest, test$DipsBest)
+  ploygon(spline.poly(test,100))
+}
+
+plot(NA,xlim=c(0,15),ylim=c(0,15))
+points(test,pch=19)
+polygon(spline.poly(test,100),border="red",lwd=2)
 
 # now loop through the data and calculate the ellipses
 ngroups <- length(unique(scores$Taxonomy))
-
 # split data based on group
 collision <- split(scores$ColBest, scores$Taxonomy)
 displacement <- split(scores$DispBest, scores$Taxonomy)
-
 # create some empty vectors for recording our metrics
 x <- numeric(ngroups)
 y <- numeric(ngroups)
