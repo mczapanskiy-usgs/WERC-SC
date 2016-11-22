@@ -15,7 +15,7 @@ scores <- read.csv("PV.CV.DVscores.csv", header = T) ## matrix of final PV, CV, 
 #   'vertices' is the number of spline vertices to create.(Not all are used: some are clipped from the ends.)
 #   'k' is the number of points to wrap around the ends to obtain a smooth periodic spline.
 #   Returns an array of points. 
-spline.poly <- function(xy, vertices, k=3, ...) {
+spline.poly <- function(xy, vertices, k=2, ...) {
   # Assert: xy is an n by 2 matrix with n >= k.
   # Wrap k vertices around each end.
   n <- dim(xy)[1]
@@ -35,87 +35,92 @@ spline.poly <- function(xy, vertices, k=3, ...) {
 }
 
 for(i in levels(scores$Taxonomy)){
-  test <- subset(scores, Taxonomy ==i)
-  plot(test$ColBest, test$DipsBest)
-  ploygon(spline.poly(test,100))
+  test <- filter(scores, Taxonomy == 1)%>% 
+    select(ColBest, DispBest) 
+  chuld <- lapply(test, "[", chull(test))
+  
+  plot(NA,xlim=c(0,15),ylim=c(0,15))
+  points(test,pch=19)
+  polygon(spline.poly(as.matrix(as.data.frame(chuld)),100),border="red",lwd=2)
 }
 
-plot(NA,xlim=c(0,15),ylim=c(0,15))
-points(test,pch=19)
-polygon(spline.poly(test,100),border="red",lwd=2)
+gulls <- filter(scores, Taxonomy == "Gulls")%>% 
+  select(ColBest, DispBest) 
+cgull <- lapply(gulls, "[", chull(gulls))
 
-# now loop through the data and calculate the ellipses
-ngroups <- length(unique(scores$Taxonomy))
-# split data based on group
-collision <- split(scores$ColBest, scores$Taxonomy)
-displacement <- split(scores$DispBest, scores$Taxonomy)
-# create some empty vectors for recording our metrics
-x <- numeric(ngroups)
-y <- numeric(ngroups)
-z <- numeric(ngroups)
+terns <- filter(scores, Taxonomy == "Terns")%>% 
+  select(ColBest, DispBest) 
+cterns <- lapply(terns, "[", chull(terns))
 
-colorgroup = c(rep("green",length(which(scores$Taxonomy==1))),
-               rep("royalblue",length(which(scores$Taxonomy==2))),
-               rep("skyblue",length(which(scores$Taxonomy==3))),
-               rep("yellow",length(which(scores$Taxonomy==4))),
-               rep("red",length(which(scores$Taxonomy==5))), 
-               rep("black",length(which(scores$Taxonomy==6))),
-               rep("purple",length(which(scores$Taxonomy==7))),
-               rep("darkorange",length(which(scores$Taxonomy==8))),
-               rep("yellowgreen",length(which(scores$Taxonomy==9))),
-               rep("gray48",length(which(scores$Taxonomy==10))),
-               rep("cyan",length(which(scores$Taxonomy==11))))
+jaeg <- filter(scores, Taxonomy == "Jaegers & Skuas")%>% 
+  select(ColBest, DispBest) 
+cjaeg <- lapply(jaeg, "[", chull(jaeg))
 
-pchgroup = c(rep(16,length(which(scores$Taxonomy==1))),
-             rep(16,length(which(scores$Taxonomy==2))),
-             rep(16,length(which(scores$Taxonomy==3))),
-             rep(16,length(which(scores$Taxonomy==4))),
-             rep(16,length(which(scores$Taxonomy==5))), 
-             rep(16,length(which(scores$Taxonomy==6))),
-             rep(16,length(which(scores$Taxonomy==7))),
-             rep(16,length(which(scores$Taxonomy==8))),
-             rep(16,length(which(scores$Taxonomy==9))),
-             rep(16,length(which(scores$Taxonomy==10))),
-             rep(16,length(which(scores$Taxonomy==11))))		
-			
-			
-plot(scores$ColBest,scores$DispBest,
-     col=colorgroup,type="p",axes=F,pch=pchgroup, # cex=1.5, 
-     xlab = "Collision Vulnerability", ylab = "Displacement Vulnerability") # ,xlim=c(-20,-12),ylim=c(14,22)
-box()
-# axis(1,at=seq(-20,-12,2),labels=T)
-# axis(2,at=seq(14,22,2),labels=F)
-# axis(2,at=seq(14,22,2),labels=T)
+alcids <- filter(scores, Taxonomy == "Alcids")%>% 
+  select(ColBest, DispBest) 
+calcids <- lapply(alcids, "[", chull(alcids))
 
-for (j in unique(scores$Taxonomy)){
-  # Fit a standard ellipse to the data
-  SE <- standard.ellipse(collision[[j]],displacement[[j]],steps=1)
-  # Extract the estimated x and y from this object
-  x[j] <- SE$x
-  y[j] <- SE$y
-  # plot the standard ellipse with d.f. = 2 (i.e. y)
-  # These are plotted here as thick solid lines'
-colorgroup = c('green','royalblue','skyblue','yellow','red','black', 'purple', 'darkorange', 'yellowgreen', 'gray48', 'cyan')
-  lines(SE$y,SE$y,lty=1,lwd=3,col=colorgroup[j])
-}  
+corms <- filter(scores, Taxonomy == "Cormorants")%>% 
+  select(ColBest, DispBest) 
+ccorms <- lapply(corms, "[", chull(corms))
+
+proc <- filter(scores, Taxonomy == "Procellariids")%>% 
+  select(ColBest, DispBest) 
+cproc <- lapply(proc, "[", chull(proc))
+
+duck <- filter(scores, Taxonomy == "Sea Ducks")%>% 
+  select(ColBest, DispBest) 
+cduck <- lapply(duck, "[", chull(duck))
+
+loon <- filter(scores, Taxonomy == "Loons")%>% 
+  select(ColBest, DispBest) 
+cloon <- lapply(loon, "[", chull(loon))
+
+phal <- filter(scores, Taxonomy == "Phalaropes")%>% 
+  select(ColBest, DispBest) 
+cphal <- lapply(phal, "[", chull(phal))
+
+pelican <- filter(scores, Taxonomy == "Pelicans")%>% 
+  select(ColBest, DispBest) 
+cpelican <- lapply(pelican, "[", chull(pelican))
+
+grebe <- filter(scores, Taxonomy == "Grebes")%>% 
+  select(ColBest, DispBest) 
+cgrebe <- lapply(grebe, "[", chull(grebe))
 
 
-library(ellipse)
-library(ggplot2)
-scores_hull <- data.frame()
-for(i in levels(scores$Taxonomy)){
-  scores_hull <- rbind(scores_hull, 
-                       cbind(as.data.frame(with(scores[scores$Taxonomy==i, ], 
-                                                ellipse(cor(ColBest, DispBest),
-                                                        scale = c(sd(ColBest), sd(DispBest)),
-                                                        centre = c(mean(ColBest), mean(DispBest)),
-                                                        npoints = length(which(scores$Taxonomy == i))))),
-                             group = i))
-}
+plot(NA,xlim=c(0,20),ylim=c(0,20), xlab = "Collision Vulnerability", ylab = "Displacement Vulnerability")
+points(gulls,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cgull)),100),border="red",lwd=2)
 
-vulnHulls <- ggplot(data=scores, aes(x=ColBest, y=DispBest, colour=Taxonomy)) + 
-  geom_point() +
-  geom_path(data=scores_hull, aes(x=x, y=x, colour=group))
-vulnHulls
+points(terns,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cterns)),100),border="green",lwd=2)
+
+points(jaeg,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cjaeg)),100),border="royalblue",lwd=2)
+
+points(alcids,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(calcids)),100),border="skyblue",lwd=2)
+
+points(corms,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(ccorms)),100),border="yellow",lwd=2)
+
+points(proc,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cproc)),100),border="red",lwd=2)
+
+points(duck,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cduck)),100),border="black",lwd=2)
+
+points(loon,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cloon)),100),border="darkorange",lwd=2)
+
+points(phal,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cphal)),100),border="darkviolet",lwd=2)
+
+points(pelican,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cpelican)),100),border="gray48",lwd=2)
+
+points(grebe,pch=19)
+polygon(spline.poly(as.matrix(as.data.frame(cgrebe)),100),border="magenta",lwd=2)
 
 
