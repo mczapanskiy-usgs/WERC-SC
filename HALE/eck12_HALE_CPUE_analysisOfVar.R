@@ -2,6 +2,7 @@
 
 library(stats)
 library(data.table)
+library(plyr)
 library(dplyr)
 library(ggplot2)
 library(ez)
@@ -9,37 +10,68 @@ library(mlogit)
 
 read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11.csv',
           stringsAsFactors = FALSE) -> predEventPUE
-predEvents <- mlogit.data(predEventPUE, choice = "predEvent", shape = "wide")
-
-## normal distribution? frequency histogram should be ~symetical, SD of most variable sample shoudl be <10x the SD of the least variable sample
+## normal distribution? freq hist should be ~symetical, SD of most variable sample should be <10x the SD of least variable sample
 hist(predEventPUE$CPUE)
 sd(predEventPUE$CPUE)
+## look at data
+summary(predEventPUE)
+dim(predEventPUE)
+with(predEventPUE, table(predEvent))
+with(predEventPUE, table(Trapline, predEvent))
+with(predEventPUE, table(Year, predEvent))
+with(predEventPUE, table(Season, predEvent))
+with(predEventPUE, table(Trapline, predEvent, Season))
 
-## Poisson log-linear model
-predEvents %>% 
-  mutate(chid = as.factor(chid),
-         Year = as.factor(Year)) -> predEvents
+## There are `r length(predEvents)` possible outcomes every time trap was set, & trap was set `r nEvents` times.  
+predEvents <- unique(predEventPUE$predEvent)
+nEvents <- sum(predEventPUE$NEvents)
+## Total rows in data would be the product `r nEvents*length(predEvents)`.  Perform in 2 steps.  
+# First, expand the rows so that each choice situation is on its own unique row.
+data2 <- predEventPUE[rep(row.names(predEventPUE), predEventPUE$NEvents),]
+data2 <- data2 %>%
+  mutate(chid = row.names(data2))
+# Then expand ea. choice situation so that ea. alternative is on its own row. Alternative names stored in column `x`.
+expanded_data <- merge(predEvents, data2)
+expanded_data <- expanded_data %>% 
+  mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) 
+# Now apply the `mlogit.data` function.  
+cpue <- mlogit.data(expanded_data, choice="choice",
+                     alt.var ="x", 
+                     shape="long", chid.var="chid")
 
-glm.test <- system.time(                                     # how much time does it take to run the model
-  cpue1 <- glm(predEvent ~ chid + Year + Season + Trapline,
-               family = poisson,
-               data = predEvents)
-)
-tail(coefficients(summary(cpue1)), 5) # no random effects in this model
+# predEvents <- mlogit.data(predEventPUE, 
+#                           choice = "predEvent", 
+#                           shape = "wide", 
+#                           id = "??")
 
-## mlogit model
-cpue2 <- mlogit(predEvent ~ Year + Season + Trapline, data = predEvents,
-                rpar = c(Year = "n",
-                         Trapline = "n"),
-                panel = TRUE)
-summary(cpue2)
+## create model list
+cpue.models <- list()
 
+# Simple `mlogit` model where Trapline & Season are specific to the choice situation (i.e. "individual"-specific, not alternative-specific.
+cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue)
 
+# Possible problem 0-valued cells?  What happens when data are restricted to traplines where every outcome occurred >= once.
+cpue2 <- mlogit.data(expanded_data %>% 
+                       filter(Trapline %in% c('A','B','C','D','E','F')), 
+                     choice="choice",
+                     alt.var ="x", 
+                     shape="long", chid.var="chid")
+cpue.models[[2]] <- mlogit(choice ~ 0 | Season, data=cpue2)
+
+# ## Poisson log-linear model
+# predEvents %>% 
+#   mutate(chid = as.factor(chid),
+#          Year = as.factor(Year)) -> predEvents
+# 
+# glm.test <- system.time(                                     # how much time does it take to run the model
+#   cpue1 <- glm(predEvent ~ chid + Year + Season + Trapline,
+#                family = poisson,
+#                data = predEvents)
+# )
+# tail(coefficients(summary(cpue1)), 5) # no random effects in this model
 
 # poi <- glm(NEvents ~ offset(log(NTraps)) + Trapline + Year + Season, data = predEventPUE, family=poisson)
-# 
 # Qpoi <- glm(NEvents ~ offset(log(NTraps)) + Trapline + Year + Season, data = predEventPUE, family=quasipoisson)
-# 
 # negB <- glm.nb(NEvents ~ offset(log(NTraps)) + Trapline + Year + Season, data = predEventPUE)
 
 # ## anova using the car library

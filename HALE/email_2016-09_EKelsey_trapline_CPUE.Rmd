@@ -1,0 +1,110 @@
+---
+title: "CPUE"
+author: "by Julie Yee, for Emma Kelsey"
+date: "November 21, 2016"
+output: html_document
+---
+
+##Background
+
+**Aug 15, 2016 email from Emma Kelsey**
+I have a statistical question- I want to do a regression analysis between 5 variables where the dependent variable is categorical (5 categories).  I am working in R.  
+
+**Aug 16, 2016 email from Emma Kelsey**
+I've been looking into multinomial logistic regression models and I have a couple questions:
+First of all, most of the information I've been finding about multinomial logistic regression models is to use them as to generate predictions.  I am just interested in understanding which of my four independent variables best explains the variation in my dependent variable.  Whats the difference?  Or is there one?
+This example (<http://www.ats.ucla.edu/stat/r/dae/mlogit.htm>) is the one that makes the most sense to me, but I'm not sure of it applies to what I'm trying to do.
+Here's a little more about my data set:
+I am looking at 14 years of invasive mammal control data at Haleakala National Park, Maui (2000-2014).  There are 18 trap lines set up within the park with traps to catch invasive predators (cats, rats, mongoose, and mice).  The trap lines have a number of traps alon g them that are checked each week.  When the traps are checked the possible trap status is: cat caught, rat caught, mongoose caught, mouse caught, bait lost (trap empty & open), trap triggered ( trap empty & closed), or none (trap open, bait still there).  I am interested in which variables: month of the year, year (2000-2014), bait type, or trap line best explains the trap status.  
+
+**Sep 26, 2016 email from Emma Kelsey**
+The dataset that I am working has to do with the trapping of invasive predators within a national park.  We are trying to assess the "catch per unit effort" (CPUE, effort = weekly trap checks) of different predators (cat, rat, mongoose, mouse) along 19 transects.  Data was collected 2000 - 2014.
+I am attaching the datasheet here. 
+What I am trying to do is run a repeated-measures ANOVA for the relationship between CPUE (the frequency of "predEvent" per "NTraps" for each week) and Trapline, Year, Season. The data is not normally distributed, so I think I need to run a Friedman's test.  I am not sure how to do this and would love some help.  Please feel free to call me: 253-219-7165
+
+**Oct 21, 2016 email from Emma Kelsey**
+I am (finally) getting back to working on this analysis.  Max helped me add the zeros back into the data and now I am trying to determine the best model to use, based  on your advice.
+I have a couple questions following up on what we discussed:
+What is the best way to add random effects into the glm?  I agree that Trapline (and perhaps Year?) should be random effects.  If I make them random effects, can I still assess their effect on predEvent per unit effort?
+In trying to stay focused on the question I'm trying to ask - ***does the predEvent per unit effort vary between different traplines, years and seasons?***
+I'm realizing I need to incorporate PredEvent into the model in some way, because each type of predEvent might have a different relationship with trapline, year, or season.  At first I was thinking that I could run the model on each predEvent separately, but this would be biased (e.g. - If the trap is triggered, then that excludes to possibility of a cat/rat/mogoose/mouse caught).  Could you help me figure out how to incorporate predEvent into the model this way? 
+
+###Objective
+The question is ***Does the predEvent per unit effort vary between different traplines, years and seasons?***  For these data, there is only one predEvent outcome per trap, since a trap that captures one individual will not be able to capture another.  Another way to ask the same question is ***Does the probability of predEvent vary between different traplines, years and seasons?***
+
+## What is best model for trapline analysis?
+I'd go with the `mlogit` package for its ability to handle random effects, which seem problematic for the Poisson log-linear modeling approach and perhaps impossible for the `multinom` function.  
+
+## Emma Kelsey's catch-per-unit-effort data
+```{r}
+library(XLConnect)
+data <- readWorksheetFromFile("TraplinePredEventPUE_11.xlsx",
+                              sheet="TraplinePredEventPUE_11")
+summary(data)
+dim(data)
+with(data, table(predEvent))
+with(data, table(Trapline, predEvent))
+with(data, table(Year, predEvent))
+with(data, table(Season, predEvent))
+with(data, table(Trapline, predEvent, Season))
+```
+Number of traps range from 1 to 81.  For every trap that is set, there are 8 possible outcomes (baitLost, birdOtherCaught, catCaught, mongooseCaught, mouseCaught, ratCaught, trapTriggered, none).  There are 19 different traplines, 15 different years, and 4 different seasons.  
+
+***Data needs to be reshaped before proceeding...***
+According to vignette, "Data sets can have two different shapes : 
+
++ a wide shape : in this case, there is one row for each choice situation,
++ a long shape : in this case, there is one row for each alternative and, therefore, as many rows as there are alternatives for each choice situation."
+
+Apparently, we need to reshape the data so that there is one row for every option, for every choice situation.  Here are the possible outcomes every time the trap is set:
+```{r}
+(predEvents <- unique(data$predEvent))
+```
+
+And here are the number of choice situations:
+```{r}
+(nEvents <- sum(data$NEvents))
+```
+
+There are `r length(predEvents)` possible outcomes every time trap was set, and trap was set `r nEvents` times.  Total rows in data would be the product `r nEvents*length(predEvents)`.  
+
+Perform in two steps.  First, expand the rows so that each choice situation is on its own unique row.  
+```{r}
+library(plyr)
+library(dplyr)
+data2 <- data[rep(row.names(data), data$NEvents),]
+data2 <- data2 %>%
+  mutate(chid = row.names(data2))
+```
+
+Then expand each choice situation so that each alternative is on its own row.  Do this with the merge function.  The alternative names will be stored in column `x`.
+```{r}
+expanded_data <- merge(predEvents, data2)
+expanded_data <- expanded_data %>% 
+    mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) 
+```
+
+Now apply the `mlogit.data` function.  
+```{r}
+library(mlogit)
+cpue2 <- mlogit.data(expanded_data, choice="choice",
+                     alt.var ="x", 
+                     shape="long", chid.var="chid")
+```
+
+Simple `mlogit` model where Trapline and Season are specific to the choice situation, or "individual"-specific.  I.e. not alternative-specific.      
+```{r, eval=FALSE}
+cpue.models <- list()
+cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue2)
+```
+
+Possible problem zero-valued cells?  See what happens when data are restricted to traplines where every outcome occurred at least once.  
+```{r, eval=FALSE}
+cpue3 <- mlogit.data(expanded_data %>% 
+                       filter(Trapline %in% c('A','B','C','D','E','F')), 
+                     choice="choice",
+                     alt.var ="x", 
+                     shape="long", chid.var="chid")
+cpue.models[[2]] <- mlogit(choice ~ 0 | Season, data=cpue3)
+```
+
