@@ -1,16 +1,11 @@
 
-# rm(list = ls())
-#
-# library(devtools)
-# library(siar)
-# library(SIBER)
-# 
-# graphics.off()
+library(calibrate)
+library(dplyr)
+
 setwd("~/WERC-SC/Vuln_Index")
 scores <- read.csv("PV.CV.DVscores.csv", header = T) ## matrix of final PV, CV, and DV
-# scores$DispBest <- as.numeric(scores$DispBest)
 
-# Splining a polygon.
+# Splining a polygon function (http://gis.stackexchange.com/questions/24827/how-to-smooth-the-polygons-in-a-contour-map/24929#24929).
 #   The rows of 'xy' give coordinates of the boundary vertices, in order.
 #   'vertices' is the number of spline vertices to create.(Not all are used: some are clipped from the ends.)
 #   'k' is the number of points to wrap around the ends to obtain a smooth periodic spline.
@@ -29,21 +24,11 @@ spline.poly <- function(xy, vertices, k=2, ...) {
   x <- data.spline$x
   x1 <- data.spline$y
   x2 <- spline(1:(n+2*k), data[,2], n=vertices, ...)$y
-  
   # Retain only the middle part.
   cbind(x1, x2)[k < x & x <= n+k, ]
 }
 
-for(i in levels(scores$Taxonomy)){
-  test <- filter(scores, Taxonomy == 1)%>% 
-    select(ColBest, DispBest) 
-  chuld <- lapply(test, "[", chull(test))
-  
-  plot(NA,xlim=c(0,15),ylim=c(0,15))
-  points(test,pch=19)
-  polygon(spline.poly(as.matrix(as.data.frame(chuld)),100),border="red",lwd=2)
-}
-
+## ID points and chulls for each species
 gulls <- filter(scores, Taxonomy == "Gulls")%>% 
   select(ColBest, DispBest) 
 cgull <- lapply(gulls, "[", chull(gulls))
@@ -88,39 +73,50 @@ grebe <- filter(scores, Taxonomy == "Grebes")%>%
   select(ColBest, DispBest) 
 cgrebe <- lapply(grebe, "[", chull(grebe))
 
+## trying to set up a for loops that does the above
+tax <- list()
 
+for(i in levels(scores$Taxonomy)){
+  tax[[i]] <- filter(scores, Taxonomy == i)%>% 
+    select(ColBest, DispBest)
+  c[[i]] <- lapply(i, "[", chull(i))
+}
+
+## plotting the points and chulls
 plot(NA,xlim=c(0,20),ylim=c(0,20), xlab = "Collision Vulnerability", ylab = "Displacement Vulnerability")
-points(gulls,pch=19)
-polygon(spline.poly(as.matrix(as.data.frame(cgull)),100),border="red",lwd=2)
+textxy(scores$ColBest, scores$DispBest, scores$Taxonomy)
 
-points(terns,pch=19)
-polygon(spline.poly(as.matrix(as.data.frame(cterns)),100),border="green",lwd=2)
+points(gulls,pch=19, col="darkorange")
+polygon(spline.poly(as.matrix(as.data.frame(cgull)),100),border="darkorange",lwd=2)
 
-points(jaeg,pch=19)
-polygon(spline.poly(as.matrix(as.data.frame(cjaeg)),100),border="royalblue",lwd=2)
+points(terns,pch=19, col="forestgreen")
+polygon(spline.poly(as.matrix(as.data.frame(cterns)),100),border="forestgreen",lwd=2)
 
-points(alcids,pch=19)
-polygon(spline.poly(as.matrix(as.data.frame(calcids)),100),border="skyblue",lwd=2)
+points(jaeg,pch=19, col="darkslateblue")
+polygon(spline.poly(as.matrix(as.data.frame(cjaeg)),100),border="darkslateblue",lwd=2)
 
-points(corms,pch=19)
-polygon(spline.poly(as.matrix(as.data.frame(ccorms)),100),border="yellow",lwd=2)
+points(alcids,pch=19, col="deepskyblue")
+polygon(spline.poly(as.matrix(as.data.frame(calcids)),100),border="deepskyblue",lwd=2)
 
-points(proc,pch=19)
+points(corms,pch=19, col="turquoise")
+polygon(spline.poly(as.matrix(as.data.frame(ccorms)),100),border="turquoise",lwd=2)
+
+points(proc,pch=19, col="red")
 polygon(spline.poly(as.matrix(as.data.frame(cproc)),100),border="red",lwd=2)
 
-points(duck,pch=19)
-polygon(spline.poly(as.matrix(as.data.frame(cduck)),100),border="black",lwd=2)
+points(duck,pch=19, col="gray48")
+polygon(spline.poly(as.matrix(as.data.frame(cduck)),100),border="gray48",lwd=2)
 
-points(loon,pch=19)
-polygon(spline.poly(as.matrix(as.data.frame(cloon)),100),border="darkorange",lwd=2)
+points(loon,pch=19, col="darkgreen")
+polygon(spline.poly(as.matrix(as.data.frame(cloon)),100),border="darkgreen",lwd=2)
 
-points(phal,pch=19)
+points(phal,pch=19, col="darkviolet")
 polygon(spline.poly(as.matrix(as.data.frame(cphal)),100),border="darkviolet",lwd=2)
 
-points(pelican,pch=19)
-polygon(spline.poly(as.matrix(as.data.frame(cpelican)),100),border="gray48",lwd=2)
+points(pelican,pch=19, col="black")
+polygon(spline.poly(as.matrix(as.data.frame(cpelican)),100),border="black",lwd=2)
 
-points(grebe,pch=19)
+points(grebe,pch=19, col="magenta")
 polygon(spline.poly(as.matrix(as.data.frame(cgrebe)),100),border="magenta",lwd=2)
 
 
