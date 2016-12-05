@@ -1,66 +1,60 @@
 library(oce)
-library(lubridate)
 
-lat <- 20.7204
-lon <- -156.1552
-utc <- ymd_hms('2016-11-09 12:00:00', tz = 'UTC')
+# Moon index (Mi) is a proxy for the amount of moonlight experienced overnight.
+# It has units of degree*hours
+# For a given date and location, it is calculated as the product of 
+# disc illumination (%), diameter (degrees), and moon time (hours). 
+# Where moon time is calculated as:
+# min(moonset, sunrise) - max(moonrise, sunset) and rise/set is when the 
+# angle of the sun/moon over the horizon is 0 degrees.
+# Parameters:
+# date = Date object
+# lon = longitude in decimal degrees
+# lat = latitude in decimal degrees
+moonIndex <- function(date, lon, lat) {
+  if(class(date) != 'Date') stop('date must be a Date object')
+  
+  d <- data.frame(t = ISOdate(year(date), month(date), day(date), tz = 'UTC') + seq(0, 24*3600, length = 24*3600),
+                  moonalt = moonAngle(t, lon, lat)$altitude,
+                  sunalt = sunAngle(t, lon, lat)$altitude) %>%
+    mutate(absma = abs(moonalt), 
+           abssa = abs(sunalt),
+           moonslope = sign(lead(moonalt) - moonalt),
+           sunslope = sign(lead(sunalt) - sunalt))
+  
+  moonrise <- d %>%
+    filter(moonslope > 0) %>%
+    arrange(absma) %>%
+    slice(1) %>%
+    select(t) %>%
+    first
+  
+  moonset <- d %>%
+    filter(moonslope < 0) %>%
+    arrange(absma) %>%
+    slice(1) %>%
+    select(t) %>%
+    first
+  
+  sunrise <- d %>%
+    filter(sunslope > 0) %>%
+    arrange(abssa) %>%
+    slice(1) %>%
+    select(t) %>%
+    first
+  
+  sunset <- d %>%
+    filter(sunslope < 0) %>%
+    arrange(abssa) %>%
+    slice(1) %>%
+    select(t) %>%
+    first
+  
+  browser()
+  
+  diameter <- moonAngle(d$t[1], lon, lat)$diameter
+  illumination <- moonAngle(d$t[1], lon, lat)$illuminatedFraction
+  moontime <- difftime(max(moonrise, sunset), min(moonset, sunrise), units = 'hours') %>% as.numeric
 
-
-plot(function(t) moonAngle(t, lon, lat)$altitude, 
-     from = ymd_hms('2016-11-09 22:00:00', tz = 'UTC'), #noon in Hawaii
-     to = ymd_hms('2016-11-10 22:00:00', tz = 'UTC'),
-     col = 'blue',
-     ylim = c(-90, 90),
-     axes = FALSE,
-     main = 'Moon angle at Haleakala Nov. 9-10',
-     xlab = 'Time',
-     ylab = 'Moon angle')
-abline(h = 0, lty = 2)
-# Labels in Hawaii time
-axis(1, 
-     at = seq(from = ymd_hms('2016-11-09 22:00:00', tz = 'UTC'), 
-              to = ymd_hms('2016-11-10 22:00:00', tz = 'UTC'),
-              by = '4 hours'),
-     labels = format(seq(from = ymd_hms('2016-11-09 12:00:00', tz = 'UTC'), 
-                         to = ymd_hms('2016-11-10 12:00:00', tz = 'UTC'),
-                         by = '4 hours'), 
-                     '%m/%d %H:%M'))
-axis(2, at = c(-90, -45, 0, 45, 90))
-
-moonrise <- optimize(function(t) {
-    t <- as.POSIXct(t, origin = ymd_hms('1970-01-01 00:00.00', tz = 'UTC'), tz = 'UTC') 
-    moonAngle(t, lon, lat)$altitude
-  },
-  as.numeric(c(ymd_hms('2016-11-09 22:00:00', tz = 'UTC'), 
-               ymd_hms('2016-11-10 22:00:00', tz = 'UTC'))))$minimum
-
-abline(v = moonrise, col = 'blue')
-
-moonset <- optimize(function(t) {
-  t <- as.POSIXct(t, origin = ymd_hms('1970-01-01 00:00.00', tz = 'UTC'), tz = 'UTC') 
-  moonAngle(t, lon, lat)$altitude
-},
-as.numeric(c(ymd_hms('2016-11-09 22:00:00', tz = 'UTC'), 
-             ymd_hms('2016-11-10 22:00:00', tz = 'UTC'))))$minimum
-
-abline(v = moonset, col = 'blue')
-
-sunrise <- optimize(function(t) {
-  t <- as.POSIXct(t, origin = ymd_hms('1970-01-01 00:00.00', tz = 'UTC'), tz = 'UTC') 
-  -sunAngle(t, lon, lat)$altitude
-},
-as.numeric(c(ymd_hms('2016-11-09 22:00:00', tz = 'UTC'), 
-             ymd_hms('2016-11-10 22:00:00', tz = 'UTC'))))$minimum
-
-abline(v = sunrise, col = 'red')
-
-sunset <- optimize(function(t) {
-  t <- as.POSIXct(t, origin = ymd_hms('1970-01-01 00:00.00', tz = 'UTC'), tz = 'UTC') 
-  sunAngle(t, lon, lat)$altitude
-},
-as.numeric(c(ymd_hms('2016-11-09 22:00:00', tz = 'UTC'), 
-             ymd_hms('2016-11-10 22:00:00', tz = 'UTC'))))$minimum
-
-abline(v = sunset, col = 'red')
-
-curve(sunAngle(x, lon, lat)$altitude, col = 'red', add = TRUE)
+  diameter * illumination * moontime
+}
