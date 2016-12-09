@@ -43,7 +43,8 @@ pfsh_dives <- pfsh_locs[pfsh_dives_tdr, roll = 'nearest'] %>%
          TimeOfDay = derivedFactor(Night = SunAngle < -18,
                                    Twilight = SunAngle < -6,
                                    .default = 'Day',
-                                   .method = 'first'))
+                                   .method = 'first'),
+         DeployID = factor(DeployID))
 
 head(pfsh_dives)
 ```
@@ -71,23 +72,28 @@ pfsh_dives %>%
             StdDevDepth = sd(MaxDepth))
 
 ggplot(pfsh_dives,
-       aes(Duration)) +
+       aes(Duration,
+           fill = DeployID)) +
   geom_histogram(binwidth = 1) +
   labs(title = 'Duration Histogram',
        x = 'Duration (s)',
-       y = 'Frequency')
+       y = 'Frequency') + 
+  theme(legend.position = 'top')
 
 ggplot(pfsh_dives,
-       aes(MaxDepth)) +
+       aes(MaxDepth,
+           fill = DeployID)) +
   geom_histogram(binwidth = .5) +
   labs(title = 'Depth Histogram',
        x = 'Depth (m)',
-       y = 'Frequency')
+       y = 'Frequency') + 
+  theme(legend.position = 'top')
 
 ggplot(pfsh_dives,
        aes(SunAngle)) +
-  geom_histogram(binwidth = 6,
-             center = 3) +
+  geom_histogram(aes(fill = DeployID),
+                 binwidth = 6,
+                 center = 3) +
   xlim(-60, 60) +
   geom_vline(aes(xintercept = x),
              data = data.frame(x = c(-18, -6))) +
@@ -97,5 +103,45 @@ ggplot(pfsh_dives,
                                label = c('Night', 'Twilight', 'Day')))) +
   labs(title = 'Time of Day Histogram',
        x = 'Sun angle (degrees)',
-       y = 'Frequency')
+       y = 'Frequency') + 
+  theme(legend.position = 'top')
+```
+
+## Temporal Distribution
+
+Bullet plot of when dives occurred within deployments
+
+```{r temporality}
+deployments <- pfsh_locs %>%
+  group_by(DeployID) %>%
+  summarize(Deployed = min(UTC),
+            Recovered = max(UTC)) %>%
+  merge(pfsh_dives_tdr %>%
+          group_by(DeployID) %>%
+          summarize(FirstDive = min(Begin),
+                    LastDive = max(Begin))) %>%
+  mutate(DeployID = factor(DeployID))
+deployments
+
+ggplot(pfsh_dives,
+       aes(x = UTC,
+           y = DeployID)) +
+  geom_point(aes(color = DeployID,
+                 shape = '+'),
+             size = 4) + 
+  geom_point(aes(Deployed,
+                 color = DeployID),
+             data = deployments,
+             shape = 15,
+             size = 5) +
+  geom_point(aes(Recovered,
+                 color = DeployID),
+             data = deployments,
+             shape = 15,
+             size = 5) +
+  labs(title = 'Temporal Distribution',
+       x = 'Time (UTC)\nSquares at deployment/recoverty tick marks at dives',
+       y = 'DeployID') +
+  theme(legend.position = 'none') +
+  scale_shape_identity()
 ```

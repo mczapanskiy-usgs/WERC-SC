@@ -1,0 +1,66 @@
+---
+title: "MHI Tracking Report"
+author: "Max Czapanskiy"
+date: "December 8, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(RSQLite)
+library(lubridate)
+library(foreach)
+MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+metadata <- tbl(MHI_db, 'Metadata')
+tracks <- tbl(MHI_db, sql('SELECT * FROM TrackView'))
+dives <- tbl(MHI_db, sql('SELECT * FROM DiveView'))
+
+field.types <- read.csv('../metadata/MHI_DB_FieldType.csv',
+                        stringsAsFactors = FALSE)
+
+POSIX.origin = ymd('1970-01-01', tz = 'UTC')
+```
+
+## Deployment tables
+Summarize by:
+
+ * Species
+ * Island
+ * Year
+ * Site
+ * Deployment session
+
+SQLite doesn't play nice with dates, so all data must be loaded into memory. Too much data to do that all at once, so we'll be splitting it up by species and year.
+
+```{r rttr}
+rttr.track.years <- tracks %>%
+  filter(Species == 'RTTR') %>%
+  group_by(Year) %>%
+  summarize %>%
+  ungroup %>%
+  as.data.frame %>%
+  unlist
+
+foreach(yr = rttr.track.years, .combine = rbind) %do% {
+  tracks %>%
+    filter(Species == 'RTTR',
+           Year == yr) %>%
+    collect %>%
+    summarize(Species = 'RTTR',
+              Year = yr,
+              Individuals = n_distinct(DeployID),
+              Trips = n_distinct(DeployID, TripNumber))
+}
+
+rttr.tracks <- tracks %>%
+  filter(Species == 'RTTR',
+         Year == 2015) %>%
+  collect %>%
+  slice(1:10) %>%
+  mutate(DeployCaptureTime = as.POSIXct(DeployCaptureTime, tz = 'UTC', origin = POSIX.origin)) %>%
+  group_by(Year) %>%
+  summarize(N = n_distinct(DeployID))
+  
+rttr.tracks
+```

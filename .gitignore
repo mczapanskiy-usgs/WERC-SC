@@ -10,4 +10,5 @@ HALE/catch_duplicateID.RData
 schema.ini
 src/wetdry-analysis.R
 Hawaii_data/*
+!Hawaii_data/*.Rmd
 schema.ini
