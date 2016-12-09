@@ -83,8 +83,8 @@ for(i in levels(scores$Taxonomy)){
 }
 
 ## plotting the points and chulls
-plot(NA,xlim=c(0,20),ylim=c(0,20), xlab = "Collision Vulnerability", ylab = "Displacement Vulnerability")
-textxy(scores$ColBest, scores$DispBest, scores$Taxonomy)
+plot(NA,xlim=c(0,14),ylim=c(0,11), xlab = "Collision Vulnerability", ylab = "Displacement Vulnerability")
+# textxy(scores$ColBest, scores$DispBest, scores$Taxonomy)
 
 points(gulls,pch=19, col="darkorange")
 polygon(spline.poly(as.matrix(as.data.frame(cgull)),100),border="darkorange",lwd=2)
@@ -120,3 +120,12 @@ points(grebe,pch=19, col="magenta")
 polygon(spline.poly(as.matrix(as.data.frame(cgrebe)),100),border="magenta",lwd=2)
 
 
+scores %>%
+  mutate(PCV = PopBest * ColBest,
+         PDV = PopBest * DispBest) %>%
+ggplot(aes(y = ColBest,
+           x = DispBest)) +
+  geom_jitter(aes(label = AlphaCode,
+                  color = Taxonomy)) +
+  facet_wrap(~ Taxonomy) +
+  theme_bw()

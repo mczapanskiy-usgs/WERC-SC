@@ -22,7 +22,7 @@ read.csv('~/WERC-SC/HALE/trap_metadata_20161012.csv',
   setkeyv(c('Trapline', 'TrapNum', 'StartDate', 'EndDate')) -> trap_metadata ## created datatable of columns selected above, ordered by these variables
 
 # remove duplicates, create duplicate for "join" command
-read.csv('~/WERC-SC/HALE/catch_4_duplicateID2.csv',
+read.csv('~/WERC-SC/HALE/catch_4_duplicateID_20161209.csv',
          stringsAsFactors = FALSE) %>%
   filter(!is.na(TrapNum),  # remove entries w/o trap number (shouldn't be any left though)
          duplicate %in% 0:1) %>% # select duplicate codes 0 & 1 (leave out unresolved duplicates)
@@ -55,7 +55,7 @@ anti_join(trap_catches,
   list(select(catches_with_traploc_partial, date:catchID, Filename, StartDate, Trapline:TrapNum, Trap_Brand:point_Y, Year:Comments, duplicate:Dummy), .) %>%  ## StartDate:EndDate, Trapline:TrapNum, Year:Dummy, Trap_Brand:Northing), .) %>% 
   rbindlist(fill = TRUE) -> catches_with_traploc
 
-write.csv(catches_with_traploc,file = '~/WERC-SC/HALE/catch_5_duplicateID_withtraploc.csv',
+write.csv(catches_with_traploc,file = '~/WERC-SC/HALE/catch_5_duplicateID_withtraploc_20161209.csv',
             row.names = FALSE)  
 
 

@@ -19,7 +19,7 @@ is.RatInvalid <- function(predCaught, TrapStatus) {
   RatInvalid
 }
 
-read.csv('~/WERC-SC/HALE/catch_5_duplicateID_withtraploc.csv',
+read.csv('~/WERC-SC/HALE/catch_5_duplicateID_withtraploc_20161209.csv',
          stringsAsFactors = FALSE) %>%
   
   # remove entries for traps that are not present/inactive
@@ -47,16 +47,17 @@ read.csv('~/WERC-SC/HALE/catch_5_duplicateID_withtraploc.csv',
            as.numeric %>% 
            floor) %>% # mutate(prevCheckInterval = difftime(lead(date), date, units = 'days') %>% as.numeric %>% floor) %>% 
   ungroup %>%
-  mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14) -> catch_traploc_weekChecks # change the number to adjust the "effort" interval
+  mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14) %>% 
+  filter(TrapChecked = "TRUE") -> catch_traploc_weekChecks # change the number to adjust the "effort" interval
 
 ## remove entries with unknown BaitStatus (for Raina to review)
 catch_traploc_weekChecks %>%
   filter(BaitStatus != "N" & BaitStatus != "Y" & BaitStatus != "NR"
          & BaitStatus != "y" & BaitStatus != "n" & BaitStatus != "") -> catch_unkBaitStatus
-write.csv(catch_unkBaitStatus, '~/WERC-SC/HALE/catch_6_unk_BaitStatus.csv',
+write.csv(catch_unkBaitStatus, '~/WERC-SC/HALE/catch_6_unk_BaitStatus_20161209.csv',
             row.names = FALSE)
 ## save catch output
-write.csv(catch_traploc_weekChecks, file = '~/WERC-SC/HALE/catch_6_traploc_weekChecks.csv',
+write.csv(catch_traploc_weekChecks, file = '~/WERC-SC/HALE/catch_6_traploc_weekChecks_20161209.csv',
           row.names = FALSE) 
 
 ## stats
