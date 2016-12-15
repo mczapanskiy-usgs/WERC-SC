@@ -72,8 +72,20 @@ expanded_data2 <- expanded_data2 %>%
 cpue3 <- mlogit.data(expanded_data2, 
                      choice="choice",
                      alt.var ="x", 
-                     shape="long", chid.var="chid")
+                     shape="long", 
+                     chid.var="chid")
 cpue.models[[3]] <- mlogit(choice ~ 0 | Season, data=cpue3)
+
+# mlogit model with season specific to the choice situation and Year and Trapline as random variables. 
+cpue4 <- mlogit.data(expanded_data2, 
+                     choice="choice",
+                     alt.var ="x",
+                     shape="long", 
+                     chid.var="chid")
+cpue.models[[4]] <- mlogit(choice ~ 0 | Season + Trapline + Year, 
+                           rpar = c(Year = 'n', Trapline = 'n'), 
+                           data=cpue4)
+
 # ## Poisson log-linear model
 # predEvents %>% 
 #   mutate(chid = as.factor(chid),

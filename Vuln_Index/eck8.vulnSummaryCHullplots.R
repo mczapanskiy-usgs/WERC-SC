@@ -5,7 +5,7 @@ library(dplyr)
 setwd("~/WERC-SC/Vuln_Index")
 scores <- read.csv("PV.CV.DVscores.csv", header = T) ## matrix of final PV, CV, and DV
 
-# Splining a polygon function (http://gis.stackexchange.com/questions/24827/how-to-smooth-the-polygons-in-a-contour-map/24929#24929).
+# Splining a polygon function (http://gis.stackexchange.com/questions/24827/how-to-smooth-the-polygons-in-a-contour-map/24929#24929, and http://stackoverflow.com/questions/13577918/r-plotting-a-curve-around-a-set-of-points).
 #   The rows of 'xy' give coordinates of the boundary vertices, in order.
 #   'vertices' is the number of spline vertices to create.(Not all are used: some are clipped from the ends.)
 #   'k' is the number of points to wrap around the ends to obtain a smooth periodic spline.
