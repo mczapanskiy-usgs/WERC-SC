@@ -2,6 +2,7 @@ library(dplyr)
 library(RSQLite)
 library(foreach)
 library(data.table)
+library(lubridate)
 
 ## Create SQLite Database for MHI data
 # Read metadata CSV file
@@ -13,7 +14,8 @@ Metadata <- read.csv('metadata/TrackingMetadata.csv',
          DeployCaptureTime = as.POSIXct(DeployCaptureTime, tz = 'UTC'),
          DeployReleaseTime = as.POSIXct(DeployReleaseTime, tz = 'UTC'),
          RecoverCaptureTime = as.POSIXct(RecoverCaptureTime, tz = 'UTC'),
-         RecoverReleaseTime = as.POSIXct(RecoverReleaseTime, tz = 'UTC'))
+         RecoverReleaseTime = as.POSIXct(RecoverReleaseTime, tz = 'UTC'),
+         Year = year(DeployCaptureTime))
 
 # Read TDR settings from CEFAS files
 # Write to CSV
@@ -170,7 +172,7 @@ Tracks <- c("Hawaii_data/4TripBreaker/Tracks/BRBO_1.5_trips_annotated.csv",
             TripStartStatus = tripStComp,
             TripEndStatus = tripEndComp,
             DeployID = Deploy_ID) %>%
-  merge(GPSTracksQAQC,
+  left_join(GPSTracksQAQC,
         by = c('DeployID', 'TripNumber'))
 
 # DID.lookup <- function(eobs_id) {

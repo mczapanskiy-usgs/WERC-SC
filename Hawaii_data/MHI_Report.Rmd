@@ -11,6 +11,7 @@ library(dplyr)
 library(RSQLite)
 library(lubridate)
 library(foreach)
+library(geosphere)
 MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
 metadata <- tbl(MHI_db, 'Metadata')
 tracks <- tbl(MHI_db, sql('SELECT * FROM TrackView'))
@@ -20,6 +21,9 @@ field.types <- read.csv('../metadata/MHI_DB_FieldType.csv',
                         stringsAsFactors = FALSE)
 
 POSIX.origin = ymd('1970-01-01', tz = 'UTC')
+
+HISpecies <- c('BRBO', 'LAAL', 'RFBO', 'RTTR', 'WTSH')
+HIYears <- 2013:2016
 ```
 
 ## Deployment tables
@@ -33,34 +37,80 @@ Summarize by:
 
 SQLite doesn't play nice with dates, so all data must be loaded into memory. Too much data to do that all at once, so we'll be splitting it up by species and year.
 
-```{r rttr}
-rttr.track.years <- tracks %>%
-  filter(Species == 'RTTR') %>%
-  group_by(Year) %>%
-  summarize %>%
-  ungroup %>%
-  as.data.frame %>%
-  unlist
-
-foreach(yr = rttr.track.years, .combine = rbind) %do% {
-  tracks %>%
-    filter(Species == 'RTTR',
-           Year == yr) %>%
-    collect %>%
-    summarize(Species = 'RTTR',
-              Year = yr,
-              Individuals = n_distinct(DeployID),
-              Trips = n_distinct(DeployID, TripNumber))
+```{r deployments, eval=FALSE}
+getNestStatus <- function(chick, incubate) {
+  cbind(chick, incubate) %>%
+    apply(MARGIN = 1,
+          FUN = function(ci) {
+            paste(c('C', 'I')[ci], collapse = ', ')
+          })
 }
 
-rttr.tracks <- tracks %>%
-  filter(Species == 'RTTR',
-         Year == 2015) %>%
+deploy_summary <- metadata %>%
+  filter(Species %in% HISpecies,
+         (GPS_deployed == 'Y' | TDR_deployed == 'Y')) %>%
+  mutate(duration = (RecoverCaptureTime - DeployCaptureTime) / 3600 / 24) %>%
   collect %>%
-  slice(1:10) %>%
-  mutate(DeployCaptureTime = as.POSIXct(DeployCaptureTime, tz = 'UTC', origin = POSIX.origin)) %>%
-  group_by(Year) %>%
-  summarize(N = n_distinct(DeployID))
-  
-rttr.tracks
+  mutate(Year = year(as.POSIXct(DeployCaptureTime, tz = 'UTC', origin = POSIX.origin))) %>%
+  group_by(Species, Island, Site, Year, DepSess) %>%
+  summarize(NestStatus = getNestStatus(length(intersect(Phenology, c('EC', 'MC', 'LC'))) > 0,
+                                       any(Phenology == 'I')),
+            BirdsTagged = n(),
+            GPSdeployed = sum(GPS_deployed == 'Y'),
+            GPSdatarecov = sum(GPS_recovery %in% c(1, 3, 4)),
+            TDRdeployed = sum(TDR_deployed == 'Y'),
+            TDRdatarecov = sum(TDR_recovery %in% c(1, 3, 4)),
+            meanTrackDur = mean(duration, na.rm = TRUE),
+            sdTrackDur = sd(duration, na.rm = TRUE))
+
+write.csv(deploy_summary, 'DeploymentSummaries.csv', row.names = FALSE)
+```
+
+```{r trips}
+trip_summary <- foreach(sp = HISpecies, .combine = rbind) %:%
+  foreach(yr = HIYears, combine = rbind) %do% {
+    sp_yr_tracks <- tracks %>%
+      filter(Species == sp,
+             Year == yr) %>%
+      collect
+    
+    tryCatch( {
+    if(nrow(sp_yr_tracks) > 0) {
+      sp_yr_tracks %>%
+        mutate(OriginLon = ifelse(!is.na(NestLon), NestLon, ColLon),
+               OriginLat = ifelse(!is.na(NestLat), NestLat, ColLat),
+               Dist2Col = distGeo(cbind(OriginLon, OriginLat), cbind(Longitude, Latitude))) %>%
+        group_by(DeployID, TripNumber) %>%
+        mutate(StepLength = distGeo(cbind(lead(Longitude), lead(Latitude)), cbind(Longitude, Latitude)) %>% 
+                 ifelse(is.nan(.), NA, .)) %>% 
+        summarize(Points = n(),
+                  TripDur = (TripEndUTC[1] - TripStartUTC[1]) / 3600,
+                  TripStartLocal = as.POSIXct(TripStartUTC[1], tz = 'utc', origin = POSIX.origin) %>% with_tz('Etc/GMT-10'),
+                  TripEndLocal = as.POSIXct(TripEndUTC[1], tz = 'utc', origin = POSIX.origin) %>% with_tz('Etc/GMT-10'),
+                  TripRange = max(Dist2Col),
+                  DistTravel = sum(StepLength, na.rm = TRUE),
+                  CentroidLon = mean(Longitude),
+                  CentroidLat = mean(Latitude),
+                  CentroidAzimuth = bearing(c(OriginLon[1], OriginLat[1]), c(CentroidLon, CentroidLat)),
+                  FarthestLon = Longitude[which.max(Dist2Col)],
+                  FarthestLat = Latitude[which.max(Dist2Col)],
+                  FarthestAzimuth = bearing(c(OriginLon[1], OriginLat[1]), c(FarthestLon, FarthestLat))) %>%
+        ungroup
+    } else {
+      NULL
+    } }, error = function(e) browser())
+  }
+
+write.csv(trip_summary, 'TripSummaries.csv', row.names = FALSE)
+
+# Number of birds and trips
+# Trip duration (h) Mean and range and/or SD?
+# Total distance travelled (km) Mean and range and/or SD?
+# Maximum range (km) Mean and range and/or SD?
+# Mean distance from colony
+# Azimuth at trip geom mean (relative to general coastline orientation?)
+# Outbound azimuth (relative to general coastline orientation?)
+# Inbound azimuth (relative to general coastline orientation?)
+# Mean start time (time of day)
+# Mean end time (time of day) 
 ```
