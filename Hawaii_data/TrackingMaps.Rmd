@@ -1,0 +1,133 @@
+---
+title: "TrackingMaps"
+author: "Max Czapanskiy"
+date: "December 20, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(maps)
+library(mapdata)
+library(rgdal)
+library(geosphere)
+library(dplyr)
+library(RSQLite)
+library(foreach)
+library(knitr)
+library(lubridate)
+library(ggplot2)
+
+MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+metadata <- tbl(MHI_db, 'Metadata')
+tracks <- tbl(MHI_db, sql('SELECT * FROM TrackView'))
+```
+
+## RTTR
+
+```{r rttr}
+rttr.tracks <- tracks %>% 
+  filter(Species == 'RTTR',
+         TripFlag == 0) %>%
+  collect(n = Inf)
+
+rttr.trips <- rttr.tracks %>%
+  mutate(OriginLon = ifelse(!is.na(NestLon), NestLon, ColLon),
+         OriginLat = ifelse(!is.na(NestLat), NestLat, ColLat),
+         Dist2Col = distGeo(cbind(OriginLon, OriginLat), cbind(Longitude, Latitude))) %>%
+  group_by(DeployID, 
+           TripNumber,
+           Year,
+           SubCol) %>%
+  summarize(Duration = (max(TimestampUTC) - min(TimestampUTC))/3600,
+            Range = max(Dist2Col)) %>%
+  ungroup %>%
+  filter(Duration > .5)
+
+kable(rttr.trips)
+
+hawaii <- readOGR('Shapefiles/ne_10m_land', 'ne_10m_land') %>%
+  fortify 
+
+minor.islands <- readOGR('Shapefiles/ne_10m_minor_islands', 'ne_10m_minor_islands') %>%
+  fortify
+
+colony.density <- function(tracks) {
+  col.xlim <- range(tracks$Longitude)
+  col.xlim[1] <- floor(col.xlim[1])
+  col.xlim[2] <- ceiling(col.xlim[2])
+  col.ylim <- range(tracks$Latitude)
+  col.ylim[1] <- floor(col.ylim[1])
+  col.ylim[2] <- ceiling(col.ylim[2])
+  
+  map <- tracks %>%
+    ggplot(aes(x = Longitude,
+               y = Latitude)) +
+    geom_density2d() +
+    coord_fixed() +
+    xlim(col.xlim) +
+    ylim(col.ylim) +
+    geom_polygon(data = hawaii,
+                 aes(x = long,
+                     y = lat,
+                     group = group)) +
+    geom_polygon(data = minor.islands,
+                 aes(x = long,
+                     y = lat,
+                     group = group)) +
+    labs(title = sprintf('RTTR %s %i', tracks$SubCol[1], tracks$Year[1]))
+  
+  ggsave(sprintf('Maps/Colonies/RTTR_%s_%i.png', tracks$SubColCode[1], tracks$Year[1]), 
+         map, 
+         width = 10,
+         height = 7.5,
+         units = 'in')
+  
+  data.frame(SubColCode = tracks$SubColCode[1],
+             Year = tracks$Year[1])
+}
+
+rttr.tracks %>%
+  group_by(SubColCode, Year) %>%
+  do(colony.density(.))
+
+map.trip <- function(tracks) {
+  trip.xlim <- range(tracks$Longitude)
+  trip.xlim[1] <- floor(trip.xlim[1])
+  trip.xlim[2] <- ceiling(trip.xlim[2])
+  trip.ylim <- range(tracks$Latitude)
+  trip.ylim[1] <- floor(trip.ylim[1])
+  trip.ylim[2] <- ceiling(trip.ylim[2])
+  
+  map <- tracks %>%
+    ggplot(aes(x = Longitude,
+               y = Latitude)) +
+    geom_point() +
+    coord_fixed() +
+    xlim(trip.xlim) +
+    ylim(trip.ylim) +
+    geom_polygon(data = hawaii,
+                 aes(x = long,
+                     y = lat,
+                     group = group)) +
+    geom_polygon(data = minor.islands,
+                 aes(x = long,
+                     y = lat,
+                     group = group)) +
+    labs(title = sprintf('RTTR DeployID %i Trip %i', tracks$DeployID[1], tracks$TripNumber[1]),
+         subtitle = sprintf('%s %i', tracks$SubCol[1], tracks$Year[1]))
+  
+  ggsave(sprintf('Maps/Trips/RTTR_%i_%i.png', tracks$DeployID[1], tracks$TripNumber[1]), 
+         map, 
+         width = 10,
+         height = 7.5,
+         units = 'in')
+  
+  data.frame(DeployID = tracks$DeployID[1],
+             TripNumber = tracks$TripNumber[1])
+}
+
+rttr.tracks %>%
+  group_by(DeployID, TripNumber) %>%
+  do(map.trip(.))
+```

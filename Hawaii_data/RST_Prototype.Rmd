@@ -1,0 +1,245 @@
+---
+title: "RST Prototype"
+author: "Max Czapanskiy"
+date: "December 21, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(mapproj)
+library(lubridate)
+library(dplyr)
+library(geosphere)
+dyn.load('RST/RST_residenceRadii.dll')
+source('RST/RST_functions_all.R')
+
+MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+metadata <- tbl(MHI_db, 'Metadata')
+tracks <- tbl(MHI_db, sql('SELECT * FROM TrackView'))
+dives <- tbl(MHI_db, sql('SELECT * FROM DiveView'))
+
+POSIX.origin = ymd('1970-01-01', tz = 'UTC')
+```
+
+## Prepare track data
+Need:
+
+ * "band" (unique ID, in this case deploy ID + trip number)
+ * lat and lon
+ * datetime
+ 
+Then project the data to convert lat/lon coordinates to x and y
+ 
+```{r load_tracks, cache = TRUE}
+RST.data <- tracks %>%
+  filter(Species == 'RTTR',
+         TripFlag == 0,
+         Year == 2016) %>%
+  collect %>%
+  transmute(band = as.numeric(sprintf('%i%05i', DeployID, TripNumber)),
+            lat = Latitude,
+            lon = Longitude,
+            datetime = as.POSIXct(TimestampUTC, origin = POSIX.origin, tz = 'UTC')) %>%
+  na.omit
+
+# create grid x- and y- coordinates from the longitude/latitude coordinates
+lambert <- mapproject(RST.data$lon, 
+                      RST.data$lat, 
+                      projection = "lambert", 
+                      parameters = c(mean(RST.data$lon), mean(RST.data$lat)))
+scale <- haversineDist(min(RST.data$lon), min(RST.data$lat), max(RST.data$lon), max(RST.data$lat)) / 
+  projectDist(min(lambert$x), min(lambert$y), max(lambert$x), max(lambert$y), 1)
+RST.data$x <- lambert$x * scale
+RST.data$y <- lambert$y * scale
+```
+
+## Calculate residence values
+
+```{r residence, cache = TRUE}
+time_units <- "secs" # one of "secs", "mins", "hours", "days", "weeks"
+
+# set the desired radius (km) and threshold values
+# make sure this is in sequential order with no duplicate values
+# radius should be chosen around the expected movement scale. Its is also helpful to increase the resolution of radii increments
+# near where the proportion of transit points falls below 0.05. You will probably need to run this a couple of times to refine.
+radius = c(0.001, 0.01, 0.05, seq(.1, .9, by = .1), seq(1, 4.8, by = .2), seq(5, 10, by = .5)) 
+threshold <- rep(0, length(radius))
+
+# determine the different individuals (not really bands, but individual trip ids)
+bandIDs <- unique(RST.data$band)
+
+# for each track, calculate residence values
+# If a track never leaves the chosen radius this will result in NAs for residence time, distance and residuals and an associated warning.
+
+# For residence and residual calculations, NA are assigned to 
+# (1) locations at the beginning of tracks until the animal moves beyond R from the initial point, 
+# and (2) to those locations at the end that are all within R of the last radius built.
+
+all_tracks = data.frame()
+
+for (i in 1:length(bandIDs)) {
+  subdata = RST.data[RST.data$band == bandIDs[i], ]
+  
+  subdata$time_diff = as.numeric(subdata$datetime - subdata$datetime[1], units = time_units)
+  
+  result <- residenceCalc(subdata$x, subdata$y, subdata$time_diff, radius, threshold)
+  subdata = cbind(subdata, result)
+  all_tracks = rbind(all_tracks, subdata)
+}
+```
+
+## Plot results
+
+```{r residuals, cache = TRUE}
+pdf('RST/rttr_2016.pdf')
+scales <- plotMultiScale1(all_tracks, radius, xmax = max(radius), Resti = 1.9)
+dev.off()
+
+#if you don't choose radi large enough for the % transit points to be <0.05 then chooseDynScale will return an error
+dynscale <- chooseDynScale(scales, radius) #animal/track ids must be numeric
+write.csv(x = dynscale, file = 'RST/RTTR2016DynScaleResults.csv')
+```
+
+## Dynamically scale residence values
+
+``` {r dyn.res, cache = TRUE}
+all_tracksD = data.frame()
+
+# for each track, calculate residence values
+for (i in seq(bandIDs)[-32]) {    # trip 32 (1102_6) had NA for radius
+  subdata = RST.data[RST.data$band == bandIDs[i], ]
+  print(bandIDs[i])
+  
+  #dynamically choose radius scale using ouput from plotMultiScale & DynScale
+  radius = as.numeric(dynscale[dynscale[,1]== bandIDs[i],3])
+  threshold = 0 ##MODIFY (optional)
+  
+  # manipulate time to measure time passed from beginning of trip, in minutes (for residence computation)
+  ref_time <- strptime(subdata$datetime[1], "%Y-%m-%d %H:%M:%S")
+  subdata_time <- strptime(subdata$datetime, "%Y-%m-%d %H:%M:%S")
+  subdata$time_diff <- as.numeric(subdata_time - ref_time, units = time_units)
+  
+  subdata$dist_diff = numeric(nrow(subdata))
+  for (j in 2:nrow(subdata)) {
+    subdata$dist_diff[j] = subdata$dist_diff[j - 1] + projectDist(subdata$x[j], subdata$y[j], subdata$x[j - 1], subdata$y[j - 1], 1)
+  }
+  
+  # call residence metric function and obtain residence distance and time	
+  result <- residenceCalc(subdata$x, subdata$y, subdata$time_diff, radius, threshold)
+  colnames(result)<-cbind("rows","RT","RD","nRT","nRD","res") #Use for choosing radius dynamically -rename column names in result so scale independent
+  subdata = cbind(subdata, result)
+  
+  all_tracksD = rbind(all_tracksD, subdata)
+}
+
+all_tracksD <- all_tracksD %>%
+  group_by(band) %>%
+  mutate(t = as.numeric(datetime),
+         dt = lead(t) - t,
+         dd = distGeo(cbind(lon, lat), cbind(lead(lon), lead(lat))),
+         speed = dd / dt,
+         cumdd = cumsum(dd),
+         tortuosity = (lead(cumdd, 4) - lag(cumdd, 4)) / 
+           distGeo(cbind(lag(lon, 5), lag(lat, 5)), cbind(lead(lon, 5), lead(lat, 5)))) %>%
+  ungroup %>%
+  filter(dt < 60 * 5) %>%
+  merge(select(as.data.frame(dynscale), band = id, radius = `radius(km)`)) %>%
+  mutate(state = factor(ifelse(res < 0, 'rest', ifelse(res > 0, 'ars', 'transit'))))
+```
+
+## Plot tracks
+
+```{r plot.tracks, cache = TRUE}
+for (i in 1:length(bandIDs)) {
+  id <- bandIDs[i]
+  windows(10, 7.5) # for Windows users
+  plotTrackResDyn(id, all_tracksD, dynscale, time_units, ps = 2)
+  savePlot(file = sprintf('RST/Output/RTTR_%i.png', id), type = 'png', device = dev.cur()) #for Windows users
+  dev.off()
+}
+```
+
+```{r spd_tor_state}
+all_tracksD %>%
+  filter(!is.na(state)) %>%
+  group_by(band) %>%
+  do({
+    p <- ggplot(., aes(speed, tortuosity, color = state)) +
+      geom_point(alpha = .25) +
+      stat_density2d() +
+      scale_color_manual(values = c('#ffc800', '#ff0051', '#0000ff')) +
+      xlim(-2, 20) +
+      ylim(0, 2) +
+      labs(title = sprintf('RTTR %i', .$band[1]),
+           subtitle = sprintf('%2fkm radius', .$radius[1]))
+    ggsave(sprintf('RST/Output/rttr_%i_sts.png', .$band[1]), p)
+    data.frame(band = .$band[1])
+  })
+```
+
+```{r state_maps}
+df
+```
+
+## Static radius
+
+From Torres et al.: R = (mean transit speed * sampling interval) / 2
+
+```{r static.R, eval=FALSE, cache=TRUE, include=FALSE}
+speed.data <- RST.data %>%
+  group_by(band) %>%
+  mutate(dt = as.numeric(difftime(lead(datetime), datetime, units = 'secs')),
+         dd = distGeo(cbind(lon, lat), cbind(lead(lon), lead(lat))),
+         speed = dd / dt,
+         cumdd = cumsum(dd),
+         tortuosity = (lead(cumdd, 4) - lag(cumdd, 6)) / 
+           distGeo(cbind(lag(lon, 5), lag(lat, 5)), cbind(lead(lon, 5), lead(lat, 5)))) %>%
+  ungroup %>%
+  filter(dt < 60 * 5) # No gaps longer than 5 minutes
+
+mean.transit.spd <- speed.data %>%
+  filter(speed > 5,
+         tortuosity < 2) %>%
+  summarize(mean(speed)) %>% 
+  as.numeric
+
+mean.transit.spd
+
+ggplot(speed.data,
+       aes(speed, 
+           tortuosity)) +
+  geom_point() +
+  geom_density2d() +
+  xlim(5, 20) +
+  ylim(0, 2)
+
+sample.interval <- 180
+
+R <- mean.transit.spd * sample.interval / 2 / 1000 # (convert to km)
+```
+
+```{r static.res, eval=FALSE, cache=TRUE, include=FALSE}
+all_tracks = data.frame()
+
+for (i in 1:length(bandIDs)) {
+	subdata = RST.data[RST.data$band == bandIDs[i], ]
+	
+	subdata$time_diff = as.numeric(subdata$datetime - subdata$datetime[1], units = time_units)
+	
+	result <- residenceCalc(subdata$x, subdata$y, subdata$time_diff, R, threshold)
+	subdata = cbind(subdata, result)
+	all_tracks = rbind(all_tracks, subdata)
+}
+```
+
+```{r plot.static, eval=FALSE, cache=TRUE, include=FALSE}
+# This function plots the track contours, color-coded by both residence time and distance:
+x11()#for Windows users
+plotTrackContour(all_tracks, R, 0)
+
+# This function plots the residual values and the track contour, color-coded by sign of residual:
+x11()#for Windows users
+plotTrackRes(all_tracks, R, 0, time_units)
+```

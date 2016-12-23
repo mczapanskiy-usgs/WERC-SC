@@ -12,6 +12,8 @@ library(RSQLite)
 library(lubridate)
 library(foreach)
 library(geosphere)
+library(doParallel)
+library(xtable)
 MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
 metadata <- tbl(MHI_db, 'Metadata')
 tracks <- tbl(MHI_db, sql('SELECT * FROM TrackView'))
@@ -24,6 +26,12 @@ POSIX.origin = ymd('1970-01-01', tz = 'UTC')
 
 HISpecies <- c('BRBO', 'LAAL', 'RFBO', 'RTTR', 'WTSH')
 HIYears <- 2013:2016
+
+cl <- makeCluster(5)
+registerDoParallel(cl)
+
+summarize <- dplyr::summarize
+no.repeat <- function(x) {x <- as.character(x); ifelse(is.na(lag(x)) | x != lag(x), x, '');}
 ```
 
 ## Deployment tables
@@ -35,9 +43,7 @@ Summarize by:
  * Site
  * Deployment session
 
-SQLite doesn't play nice with dates, so all data must be loaded into memory. Too much data to do that all at once, so we'll be splitting it up by species and year.
-
-```{r deployments, eval=FALSE}
+```{r deployments, results = 'asis', eval=FALSE}
 getNestStatus <- function(chick, incubate) {
   cbind(chick, incubate) %>%
     apply(MARGIN = 1,
@@ -61,21 +67,42 @@ deploy_summary <- metadata %>%
             TDRdeployed = sum(TDR_deployed == 'Y'),
             TDRdatarecov = sum(TDR_recovery %in% c(1, 3, 4)),
             meanTrackDur = mean(duration, na.rm = TRUE),
-            sdTrackDur = sd(duration, na.rm = TRUE))
+            sdTrackDur = sd(duration, na.rm = TRUE)) %>%
+  ungroup
 
-write.csv(deploy_summary, 'DeploymentSummaries.csv', row.names = FALSE)
+sp <- 'RFBO'
+filter(deploy_summary, Species == sp) %>%
+  mutate_at(vars(Species:Year), no.repeat) %>%
+  transmute(Island, Site, Year, `Deploy Session`=DepSess,
+            `Birds Tagged`=BirdsTagged, `GPS Deployed`=sprintf('%i(%i)',GPSdeployed,GPSdatarecov)) %>%
+  xtable(align = c('l', 'l', 'p{2.5cm}', 'l', 'p{1.5cm}',
+                   'p{1.5cm}', 'r')) %>%
+  print(type = 'latex',
+        caption = sprintf('Deployment summary: %s', sp), 
+        caption.placement = 'top', 
+        sanitize.colnames.function = identity,
+        include.rownames = FALSE,
+        comment = FALSE)
 ```
 
 ```{r trips}
-trip_summary <- foreach(sp = HISpecies, .combine = rbind) %:%
-  foreach(yr = HIYears, combine = rbind) %do% {
+HI_time <- function(time_float) {
+  (as.POSIXct(time_float, tz = 'utc', origin = POSIX.origin) - hours(10)) %>%
+    strftime('%H:%M%:%S', tz = 'utc') %>%
+    hms %>%
+    period_to_seconds
+}
+trip_summaries <- 
+  foreach(yr = HIYears, .combine = rbind) %:%
+  foreach(sp = HISpecies, .combine = rbind, .packages=c('dplyr', 'geosphere', 'lubridate')) %dopar% {
+    MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+    tracks <- tbl(MHI_db, sql('SELECT * FROM TrackView'))
     sp_yr_tracks <- tracks %>%
       filter(Species == sp,
              Year == yr) %>%
-      collect
+      collect(n = Inf)
     
-    tryCatch( {
-    if(nrow(sp_yr_tracks) > 0) {
+    trips <- if(nrow(sp_yr_tracks) > 0) {
       sp_yr_tracks %>%
         mutate(OriginLon = ifelse(!is.na(NestLon), NestLon, ColLon),
                OriginLat = ifelse(!is.na(NestLat), NestLat, ColLat),
@@ -85,8 +112,10 @@ trip_summary <- foreach(sp = HISpecies, .combine = rbind) %:%
                  ifelse(is.nan(.), NA, .)) %>% 
         summarize(Points = n(),
                   TripDur = (TripEndUTC[1] - TripStartUTC[1]) / 3600,
-                  TripStartLocal = as.POSIXct(TripStartUTC[1], tz = 'utc', origin = POSIX.origin) %>% with_tz('Etc/GMT-10'),
-                  TripEndLocal = as.POSIXct(TripEndUTC[1], tz = 'utc', origin = POSIX.origin) %>% with_tz('Etc/GMT-10'),
+                  TripStart = TripStartUTC[1],
+                  TripEnd = TripEndUTC[1],
+                  TripStartLocal = HI_time(TripStartUTC[1]),
+                  TripEndLocal = HI_time(TripEndUTC[1]),
                   TripRange = max(Dist2Col),
                   DistTravel = sum(StepLength, na.rm = TRUE),
                   CentroidLon = mean(Longitude),
@@ -98,19 +127,50 @@ trip_summary <- foreach(sp = HISpecies, .combine = rbind) %:%
         ungroup
     } else {
       NULL
-    } }, error = function(e) browser())
-  }
+    }
+  } %>% merge(select(metadata, DeployID, Species, Year, Island, Site, DeployCaptureTime, RecoverCaptureTime))
 
-write.csv(trip_summary, 'TripSummaries.csv', row.names = FALSE)
+write.csv(trip_summaries, 'TripSummaries.csv', row.names = FALSE)
 
-# Number of birds and trips
-# Trip duration (h) Mean and range and/or SD?
-# Total distance travelled (km) Mean and range and/or SD?
-# Maximum range (km) Mean and range and/or SD?
-# Mean distance from colony
-# Azimuth at trip geom mean (relative to general coastline orientation?)
-# Outbound azimuth (relative to general coastline orientation?)
-# Inbound azimuth (relative to general coastline orientation?)
-# Mean start time (time of day)
-# Mean end time (time of day) 
+trips_by_colony1 <- trip_summaries %>%
+  group_by(Species, Year, Island, Site) %>%
+  summarize(Birds = n_distinct(DeployID),
+            Trips = n_distinct(DeployID, TripNumber)) %>%
+  ungroup
+
+format.seconds <- Vectorize(function(seconds) {
+  format(period(seconds, units = 'second') + POSIX.origin, format('%H:%M:%S'))
+})
+
+trips_by_colony2 <- trip_summaries %>%
+  group_by(Species, Year, Island, Site) %>%
+  summarize_at(vars(TripDur, TripStartLocal, TripEndLocal, TripRange, DistTravel, CentroidAzimuth, FarthestAzimuth),
+               funs(min, mean, sd, max)) %>%
+  mutate_at(vars(contains('Local')), format.seconds)  %>%
+  ungroup
+
+trips_by_colony <- merge(trips_by_colony1, trips_by_colony2) %>%
+  select(Species:Trips, 
+         contains('TripDur'), 
+         contains('TripStart'), 
+         contains('TripEnd'), 
+         contains('TripRange'), 
+         contains('DistTravel'), 
+         contains('CentroidAzimuth'), 
+         contains('FarthestAzimuth'))
+
+write.csv(trips_by_colony, 'TripsByColony.csv', row.names = FALSE)
+
+pretty_trips_by_colony <- trips_by_colony %>%
+  transmute(Species:Site,
+            `Birds (Trips)` = sprintf('%i (%i)', Birds, Trips),
+            `Duration (Hours)` = sprintf('%f2 (%f2 - %f2) [%f2]', TripDur_mean, TripDur_min, TripDur_max, TripDur_sd),
+            `Local Start` = sprintf('%f2 (%f2 - %f2)', TripStartLocal_mean, TripStartLocal_min, TripStartLocal_max),
+            `Local End` = sprintf('%f2 (%f2 - %f2)', TripEndLocal_mean, TripEndLocal_min, TripEndLocal_max),
+            `Range (km)` = sprintf('%f2 (%f2 - %f2) [%f2]', TripRange_mean, TripRange_min, TripRange_max, TripRange_sd),
+            `Distance Traveled (km)` = sprintf('%f2 (%f2 - %f2) [%f2]', DistTraveled_mean, DistTraveled_min, DistTraveled_max, DistTraveled_sd),
+            `Centroid Azimuth`= sprintf('%f2 (%f2 - %f2) [%f2]', CentroidAzimuth_mean, CentroidAzimuth_min, CentroidAzimuth_max, CentroidAzimuth_sd),
+            `Farthest Azimuth` = sprintf('%f2 (%f2 - %f2) [%f2]', FarthestAzimuth_mean, FarthestAzimuth_min, FarthestAzimuth_max, FarthestAzimuth_sd))
+
+write.csv(pretty_trips_by_colony, 'PrettyTripsByColony.csv', row.names = FALSE)
 ```
