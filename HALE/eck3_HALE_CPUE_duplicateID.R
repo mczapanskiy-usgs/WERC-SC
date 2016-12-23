@@ -5,7 +5,7 @@
 setwd("~/WERC-SC/HALE") ## setwd("~/PredControl/analysis")
 
 ## import .csv data
-catch <- read.csv("catch.csv")   
+catch <- read.csv("catch_1_2014toappend.csv")   
 
 ## load trap data
 load("traps.RData")
@@ -21,11 +21,12 @@ duplicates <- read.csv("duplicates_sorted.csv")
 
 catch_duplicateID <- rbind(catch_unique, duplicates)
 
-## summary statistics of duplicates
-describe(catch_duplicateID$duplicate)
-stats <- summary(duplicates)
-write.csv(stats, file = "duplicateStats.csv")
-write.csv(catch_duplicateID, file = "catch_duplicateID.csv")  # save all data to run pivot tables on duplicate stats
+# ## summary statistics of duplicates
+# describe(catch_duplicateID$duplicate)
+# stats <- summary(duplicates)
+# write.csv(stats, file = "duplicateStats_20161207.csv")
+
+write.csv(catch_duplicateID, file = "catch_3_2014toappend.csv")  # save all data to run pivot tables on duplicate stats
 
 ## save data
-save(traps, file = "catch_3_duplicateID.RData")
+save(traps, file = "catch_3_2011toappend.RData")

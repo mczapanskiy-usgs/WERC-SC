@@ -10,7 +10,7 @@ library(lubridate)
 library(mosaic)
 
 ## read in file
-read.csv('~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent.csv',
+read.csv('~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent_20161209.csv',
          stringsAsFactors = FALSE) -> raw_catch
 ## add variable IDing the check week so all trapsin a given week are group together by trapline (Jan 1-7, 2000 = week 1...)
 # also rank predEvent by importance (catCaught > mongooseCaught > ratCaught > mouseCaught > birdOtherCaught > baitLost > trapTriggered > none)
@@ -71,16 +71,16 @@ CPUEgrid <- expand.grid(Trapline = unique(predEventPUE$Trapline), Week = unique(
 
 ## save to GitHub folder
 # predEventPUE data file
-write.csv(CPUEgrid, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11.csv',
+write.csv(CPUEgrid, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
           row.names = FALSE) 
 # weekly catch for each trap, with season code
-write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches.csv',
+write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches_20161209.csv',
           row.names = FALSE) 
 # final datasheets for spatial analysis
-spatialCatch <- weeklyCatches %>% 
+spatialCatch <- catch %>% 
   filter(TrapChecked == "TRUE") %>% 
   select(catchID:Comments, baitType:Season)
-write.csv(spatialCatch, file = '~/WERC-SC/HALE/catch_11_spatialCatches.csv',
+write.csv(spatialCatch, file = '~/WERC-SC/HALE/catch_11_spatialCatches_20161209.csv',
           row.names = FALSE) 
 
 

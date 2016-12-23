@@ -8,7 +8,7 @@ library(grid)
 library(gridExtra)
 library(lubridate)
 
-read.csv('~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_edited.csv',
+read.csv('~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_20161209_edited.csv',
          stringsAsFactors = FALSE) -> catch
 
 catch$otherCaught <- as.character(catch$otherCaught)
@@ -32,7 +32,7 @@ catch <- mutate(catch, predEvent = is.predEvent(predCaught, birdCaught, otherCau
 
 
 # save new catch data file with predEvents to GitHub file
-write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent.csv',
+write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent_20161209.csv',
           row.names = FALSE) 
 
 ### summary stats and graphs of predEvent data
