@@ -40,8 +40,7 @@ expanded_data <- expanded_data %>%
 ## In addition, remove the mouse data and group predator events, for rerun of mlogit analysis
 predEventPUE2 <- predEventPUE %>% 
   filter(predEvent != 'mouseCaught') %>% 
-  mutate(predator = (predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'))) ## BaitPresent = !(BaitStatus %in% c('N', 'NR', 'NI')
-
+  mutate(predator = (predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'))) 
 predEvents2 <- unique(predEventPUE2$predEvent)
 nEvents2 <- sum(predEventPUE2$NEvents)
 # Next, re-expand the rows so that each choice situation is on its own unique row.
