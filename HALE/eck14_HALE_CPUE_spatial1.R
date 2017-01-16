@@ -5,6 +5,8 @@ library(stats)
 library(data.table)
 library(plyr)
 library(dplyr)
+library(tidyr)
+library(stringr)
 library(ggplot2)
 library(mosaic)
 
@@ -60,7 +62,17 @@ burrows <- catch_spatial %>%
            "in" = Burrows100 >=1,
            "out" = Burrows100 == 0,
            .method = "last", 
-           .default = "out")) # HOW DO I REMOVE THE NAs?
+           .default = "out"))  # HOW DO I REMOVE THE NAs?
+
+burrows_long <- burrows %>% 
+  select(Trapline, TrapNum, Year_, Month_, predEvent, Week, Burrows10, Burrows50, Burrows100, burFreq10, burFreq50, burFreq100) %>% 
+  gather(buffer, Burrows, starts_with("Burrows")) %>% 
+  mutate(colony = derivedFactor(
+           "in" = Burrows >= 1,
+           "out" = Burrows == 0, 
+           .method = "last", 
+           .default = "out"))
+
 # graph data
 bur100 <- ggplot(burrows, aes(burFreq100)) +
   geom_histogram(binwidth = 0.1) +
@@ -68,11 +80,37 @@ bur100 <- ggplot(burrows, aes(burFreq100)) +
   theme_bw()
 bur100 %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
 
-col <- ggplot(burrows, aes(predEvent, fill=colony50)) +
+col50 <- ggplot(burrows, aes(predEvent, fill=colony50)) +
   geom_bar(position = "fill") +
   theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1)) 
-col %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+col50 %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+
+bur1 <- ggplot(burrows_long, aes(buffer, Burrows)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ predEvent)
+bur1 %+% subset(burrows_long, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+
+bur2 <- ggplot(burrows_long, aes(buffer, fill = colony)) +
+  geom_bar(position = "dodge") +
+  facet_wrap(~ predEvent)
+bur2 %+% subset(burrows_long, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+# bur2 %+% subset(burrows_long, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+
+col1 <- ggplot(burrows_long, aes(buffer, fill = colony)) +
+  geom_bar(position = "fill") +
+  facet_wrap(~ predEvent) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=60, hjust=1)) 
+col1 %+% subset(burrows_long, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+
+col2 <- ggplot(burrows_long, aes(buffer, fill = predEvent)) +
+  geom_bar(position = "fill") +
+  facet_wrap(~ colony) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=60, hjust=1)) 
+col2 %+% subset(burrows_long, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+
 
 ## STRUCTURES
 # get frequency of structure distances

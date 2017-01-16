@@ -16,7 +16,7 @@ read.csv('~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent_20161
 # also rank predEvent by importance (catCaught > mongooseCaught > ratCaught > mouseCaught > birdOtherCaught > baitLost > trapTriggered > none)
 catch <- mutate(raw_catch, 
                 date = mdy(date), # change data from character to POSIXct
-                Week = as.numeric(as.period(lubridate::interval(min(date), date) %/% weeks(1))), #lubridate function
+                Week = as.numeric(as.period(lubridate::interval(min(date), date) %/% weeks(1))),
                 predEvent = factor(predEvent, 
                                    level = c('catCaught', 'mongooseCaught', 'ratCaught', 'mouseCaught', 'birdOtherCaught', 'baitLost', 'trapTriggered', 'none'), 
                                    ordered = TRUE), 
