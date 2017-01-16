@@ -7,6 +7,7 @@ library(dplyr)
 library(ggplot2)
 library(ez)
 library(mlogit)
+library(mosaic)
 
 read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
           stringsAsFactors = FALSE) -> predEventPUE
@@ -40,7 +41,12 @@ expanded_data <- expanded_data %>%
 ## In addition, remove the mouse data and group predator events, for rerun of mlogit analysis
 predEventPUE2 <- predEventPUE %>% 
   filter(predEvent != 'mouseCaught') %>% 
-  mutate(predator = (predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'))) 
+  mutate(event = mosaic::derivedFactor(
+    "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
+    "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
+    "noEvent" = predEvent =="none",
+    .default = "noEvent"))
+  # mutate(predator = (predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'))) 
 predEvents2 <- unique(predEventPUE2$predEvent)
 nEvents2 <- sum(predEventPUE2$NEvents)
 # Next, re-expand the rows so that each choice situation is on its own unique row.
@@ -91,7 +97,7 @@ cpue.models[[4]] <- mlogit(choice ~ 0 | Season + Year,
 
 cpue5 <- mlogit.data(expanded_data2, 
                      choice="choice",
-                     alt.var ="predator",
+                     alt.var ="event",
                      shape="long", 
                      chid.var="chid")
 cpue.models[[5]] <- mlogit(choice ~ 0 | Season  + Year, 
