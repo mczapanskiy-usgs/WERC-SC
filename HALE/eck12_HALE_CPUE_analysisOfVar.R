@@ -59,6 +59,26 @@ expanded_data2 <- expanded_data2 %>%
   mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) 
 expanded_data2$Year <- as.factor(expanded_data2$Year)
 
+## Create yet another version of expanded_data (expanded_data3) using grouped 'event' (predator, other, no) variable.
+# First, aggregate the data by summing the NEvents within each event group.
+predEventPUE3 <- predEventPUE2 %>% 
+  group_by(Trapline, Week, Year, Season, Month, NTraps, event) %>%
+  summarise(NEvents=sum(NEvents)) %>%
+  mutate(CPUE = NEvents/NTraps) %>% # this line optional
+  as.data.frame()
+# There are `r length(event)` possible outcomes every time trap was set, & trap was set `r nEvents` times.
+predEvents3 <- unique(predEventPUE3$event)
+nEvents3 <- sum(predEventPUE3$NEvents)
+# Next, re-expand the rows so that each choice situation is on its own unique row.
+data3 <- predEventPUE3[rep(row.names(predEventPUE3), predEventPUE3$NEvents),]
+data3 <- data3 %>%
+  mutate(chid = row.names(data3))
+# Then expand ea. choice situation so that ea. alternative is on its own row. Alternative names stored in column `x`.
+expanded_data3 <- merge(predEvents3, data3)
+expanded_data3 <- expanded_data3 %>% 
+  mutate(choice = ifelse(x==event, TRUE, FALSE)) 
+expanded_data3$Year <- as.factor(expanded_data3$Year)
+
 
 #### RUN MODELS
 # Now apply the `mlogit.data` function.  
@@ -85,24 +105,28 @@ cpue3 <- mlogit.data(expanded_data2,
                      chid.var="chid")
 cpue.models[[3]] <- mlogit(choice ~ 0 | Season, data=cpue3)
 
-# mlogit model with season specific to the choice situation and Year and Trapline as random variables. 
+# mlogit model with season specific to the choice situation 
+# and Year and Trapline as random variables (although mlogit is choking on this?)
 cpue4 <- mlogit.data(expanded_data2, 
                      choice="choice",
-                     alt.var ="x",
+                     alt.var ="x", # predEvent (7 options)
                      shape="long", 
-                     chid.var="chid")
+                     chid.var="chid")  # reflevel = "none"
 cpue.models[[4]] <- mlogit(choice ~ 0 | Season + Year, 
-                           rpar = c(Year = 'n'), 
+                           # rpar = c(Year = 'n'), 
                            data=cpue4)
 
-cpue5 <- mlogit.data(expanded_data2, 
+# mlogit model with season specific to the choice situation 
+# and choice simplified to 'event'
+cpue5 <- mlogit.data(expanded_data3, 
                      choice="choice",
-                     alt.var ="event",
+                     alt.var ="x", # event: predator, other, or no
                      shape="long", 
-                     chid.var="chid")
+                     chid.var="chid") # reflevel = "noEvent"
 cpue.models[[5]] <- mlogit(choice ~ 0 | Season  + Year, 
-                           rpar = c(Year = 'n'), 
+                           #rpar = c(Year = 'n'), # no random effects for now...
                            data=cpue5)
+
 # ## Poisson log-linear model
 # predEvents %>% 
 #   mutate(chid = as.factor(chid),
