@@ -123,7 +123,7 @@ cpue5 <- mlogit.data(expanded_data3,
                      alt.var ="x", # event: predator, other, or no
                      shape="long", 
                      chid.var="chid") # reflevel = "noEvent"
-cpue.models[[5]] <- mlogit(choice ~ 0 | Season  + Year, 
+cpue.models[[5]] <- mlogit(choice ~ 0 | Season  + Year + Trapline, 
                            #rpar = c(Year = 'n'), # no random effects for now...
                            data=cpue5)
 

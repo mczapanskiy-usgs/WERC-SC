@@ -27,7 +27,7 @@ pctVeg <- ggplot(catch_spatial, aes(predEvent, fill=PctVeg)) +
   geom_bar(position = "fill") +
   theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1)) 
-vegCover %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+pctVeg %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
 
 vegCover <- ggplot(catch_spatial, aes(predEvent, fill=MajCover)) +
   geom_bar(position = "fill") +
@@ -40,6 +40,7 @@ vegType <- ggplot(catch_spatial, aes(predEvent, fill=MajClass)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1)) 
 vegType %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+
 
 ## BURROWS
 # create columns for frequency of burrow counts and for whether or not there are burrows around (e.g.- inside or outside the colony)
