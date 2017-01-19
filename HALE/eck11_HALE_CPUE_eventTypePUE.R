@@ -10,7 +10,7 @@ library(lubridate)
 library(mosaic)
 
 ## read in file
-read.csv('~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent_20161209.csv',
+read.csv('~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches_20161209.csv',
          stringsAsFactors = FALSE) -> raw_catch
 ## add variable IDing the check week so all trapsin a given week are group together by trapline (Jan 1-7, 2000 = week 1...)
 # also rank predEvent by importance (catCaught > mongooseCaught > ratCaught > mouseCaught > birdOtherCaught > baitLost > trapTriggered > none)

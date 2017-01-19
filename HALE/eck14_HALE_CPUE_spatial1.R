@@ -64,7 +64,10 @@ burrows <- catch_spatial %>%
            "out" = Burrows100 == 0,
            .method = "last", 
            .default = "out"))  # HOW DO I REMOVE THE NAs?
+write.csv(burrows, file = '~/WERC-SC/HALE/catch_burrows.csv',
+          row.names = FALSE) 
 
+# recreate burrows matrix with Burrows10, Burrows50, and Burrows100 all in the same column
 burrows_long <- burrows %>% 
   select(Trapline, TrapNum, Year_, Month_, predEvent, Week, Burrows10, Burrows50, Burrows100, burFreq10, burFreq50, burFreq100) %>% 
   gather(buffer, Burrows, starts_with("Burrows")) %>% 
