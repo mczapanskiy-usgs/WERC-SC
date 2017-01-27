@@ -81,24 +81,28 @@ expanded_data3$Year <- as.factor(expanded_data3$Year)
 
 
 #### RUN MODELS
-# Now apply the `mlogit.data` function.  
-cpue <- mlogit.data(expanded_data, choice="choice",
-                     alt.var ="x", 
-                     shape="long", chid.var="chid")
 ## create model list
 cpue.models <- list()
-# Simple `mlogit` model where Trapline & Season are specific to the choice situation (i.e. "individual"-specific, not alternative-specific).
-cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue)
+# Now apply the `mlogit.data` function.  
+cpue <- mlogit.data(expanded_data, 
+                    choice="choice",
+                    alt.var ="x", 
+                    shape="long", 
+                    chid.var="chid")
 
-# # Possible problem 0-valued cells?  What happens when data are restricted to traplines where every outcome occurred >= once.
+# Simple `mlogit` model where Trapline & Season are specific to the choice situation (i.e. "individual"-specific, not alternative-specific).
+cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue) # +0 removes intercept from model?
+
+## Possible problem 0-valued cells?  What happens when data are restricted to traplines where every outcome occurred >= once.
 # cpue2 <- mlogit.data(expanded_data %>% 
 #                        filter(Trapline %in% c('A','B','C','D','E','F')), 
 #                      choice="choice",
 #                      alt.var ="x", 
 #                      shape="long", chid.var="chid")
 # cpue.models[[2]] <- mlogit(choice ~ 0 | Season, data=cpue2)
+
 # mlogit model with season specific to the choice situation. 
-cpue3 <- mlogit.data(expanded_data2, 
+cpue3 <- mlogit.data(expanded_data2, # %>% filter(Trapline %in% c('A','B','C','D','E','F','G','H')), 
                      choice="choice",
                      alt.var ="x", 
                      shape="long", 
@@ -107,13 +111,13 @@ cpue.models[[3]] <- mlogit(choice ~ 0 | Season, data=cpue3)
 
 # mlogit model with season specific to the choice situation 
 # and Year and Trapline as random variables (although mlogit is choking on this?)
-cpue4 <- mlogit.data(expanded_data2, 
+cpue4 <- mlogit.data(expanded_data2, # %>% filter(Trapline %in% c('A','B','C','D','E','F','G','H')), 
                      choice="choice",
                      alt.var ="x", # predEvent (7 options)
                      shape="long", 
                      chid.var="chid")  # reflevel = "none"
-cpue.models[[4]] <- mlogit(choice ~ 0 | Season + Year, 
-                           # rpar = c(Year = 'n'), 
+cpue.models[[4]] <- mlogit(choice ~ 0 | Season | Year + Trapline, 
+                           rpar = c(Year = 'n', Trapline = 'n'), 
                            data=cpue4)
 
 # mlogit model with season specific to the choice situation 
@@ -123,7 +127,7 @@ cpue5 <- mlogit.data(expanded_data3,
                      alt.var ="x", # event: predator, other, or no
                      shape="long", 
                      chid.var="chid") # reflevel = "noEvent"
-cpue.models[[5]] <- mlogit(choice ~ 0 | Season  + Year + Trapline, 
+cpue.models[[5]] <- mlogit(choice ~ 0 | Season  | Year + Trapline, 
                            rpar = c(Year = 'n'), 
                            R=100, halton=NA, # no random effects for now...
                            data=cpue5)
