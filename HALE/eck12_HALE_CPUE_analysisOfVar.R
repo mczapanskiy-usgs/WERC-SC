@@ -124,7 +124,8 @@ cpue5 <- mlogit.data(expanded_data3,
                      shape="long", 
                      chid.var="chid") # reflevel = "noEvent"
 cpue.models[[5]] <- mlogit(choice ~ 0 | Season  + Year + Trapline, 
-                           #rpar = c(Year = 'n'), # no random effects for now...
+                           rpar = c(Year = 'n'), 
+                           R=100, halton=NA, # no random effects for now...
                            data=cpue5)
 
 # ## Poisson log-linear model

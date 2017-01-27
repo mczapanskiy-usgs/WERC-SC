@@ -12,32 +12,37 @@ library(mosaic)
 
 read.csv('~/WERC-SC/HALE/catch_12_spatialCatches_20170109.csv',
          stringsAsFactors = FALSE) -> catch_spatial
-# read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
-#          stringsAsFactors = FALSE) -> catch_EventPUE
+read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
+         stringsAsFactors = FALSE) -> catch_EventPUE
 read.csv('~/WERC-SC/HALE/catch_burrows.csv',
          stringsAsFactors = FALSE) -> burrows
 
-
+seasonalEvents <- catch_EventPUE %>% 
+  group_by(Season, predEvent) %>% 
+  summarise(eventCount = sum(NEvents)) 
 ### SEASONS
 # bar graphs of proportion of events happening in different seasons
+catch_EventPUE$Season <- factor(catch_EventPUE$Season, levels = c("Pre-laying", "Incubation", "Nestling", "offSeason"))
 season_trend <- ggplot(catch_EventPUE, aes(Season, CPUE)) +
-  geom_bar(stat = "identity") +
-  # facet_wrap(~ predEvent) +
+  geom_boxplot() + #geom_bar(stat = "identity") +
+  facet_wrap(~ predEvent) +
   theme_bw() 
   # scale_fill_gradient(low = "green", high = "red")
-season_trend %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+season_trend %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught")) # , "trapTriggered", "baitLost", "none"))
 
-pred_seas <- ggplot(catch_EventPUE, aes(Season, fill = predEvent)) +
-  geom_bar(position = "fill") +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle=60, hjust=1)) 
-pred_seas %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught")) # c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+pred_seas <- ggplot(seasonalEvents) +
+  geom_col(aes(x = Season, y = eventCount, fill = predEvent)) + # , position = "fill") +
+  theme_bw() 
+pred_seas %+% subset(seasonalEvents, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
 
 seas_pred <- ggplot(catch_EventPUE, aes(predEvent, fill = Season)) +
   geom_bar(position = "fill") +
   theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1)) 
 seas_pred %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+
+
+## ggplot(mpg, aes(reorder_size(class))) + geom_bar()
 
 
 

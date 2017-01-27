@@ -129,8 +129,6 @@ eventPUE <- merge(perLineWeek, eventsPerLineWeek) %>%
   mutate(CPUE = NEvents/NTraps) %>% 
   arrange(Trapline, Week, Year_, predEvent) %>% 
   select(Trapline, Week, Year_, predEvent, NTraps, NEvents, CPUE, aveBur10:aveBur100) 
-
- 
 # get percent rank of average burrow densities an also a binary factor for "in" or "out" of HAPE colony
 burrowCPUE <- eventPUE %>% 
   mutate(burFreq10 = percent_rank(aveBur10),
@@ -161,12 +159,11 @@ burrowCPUE_long <- burrowCPUE %>%
     "out" = aveBurrows == 0, 
     .method = "last", 
     .default = "out"))
-
+# group by year by taking the average CPUE for each year both inside and outside the colony
 annualCPUEburrows <- burrowCPUE %>% 
   group_by(Year_, colony100, predEvent) %>% 
   summarise(annCPUE = mean(CPUE)) 
-
-
+# GRAPH annual average CPUE inside and outside the colony
 col_CPUE_yr <- ggplot(annualCPUEburrows, aes(Year_, annCPUE)) +
   geom_point(aes(colour = colony100)) +
   facet_wrap(~ predEvent, nrow = 3) +
