@@ -47,30 +47,50 @@ structures <- catch_spatial %>%
          fenceFreq = percent_rank(DistFence),
          shelterFreq = percent_rank(DistShelter))
 # graph data
-road <- ggplot(structures, aes(roadFreq)) +
+roadHist <- ggplot(structures, aes(roadFreq)) +
   geom_histogram(binwidth = 0.05) +
   facet_wrap(~ predEvent) +
   theme_bw()
-road %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+roadHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
 
-trail <- ggplot(structures, aes(trailFreq)) +
+road <- ggplot(structures, aes(predEvent, DistRoad)) +
+  geom_boxplot() +
+  # facet_wrap((~ predEvent)) +
+  theme_bw()
+road %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+trailHist <- ggplot(structures, aes(trailFreq)) +
   geom_histogram(binwidth = 0.05) +
   facet_wrap(~ predEvent) +
   theme_bw()
-trail %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+trailHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+trail <- ggplot(structures, aes(predEvent, DistTrail)) +
+  geom_boxplot() +
+  # facet_wrap((~ predEvent)) +
+  theme_bw()
+trail %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
-fence <- ggplot(structures, aes(fenceFreq)) +
+fenceHist <- ggplot(structures, aes(fenceFreq)) +
   geom_histogram(binwidth = 0.05) +
   facet_wrap(~ predEvent) +
   theme_bw()
-fence %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+fenceHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+fence <- ggplot(structures, aes(predEvent, DistFence)) +
+  geom_boxplot() +
+  # facet_wrap((~ predEvent)) +
+  theme_bw()
+fence %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
-shelter <- ggplot(structures, aes(shelterFreq)) +
+shelterHist <- ggplot(structures, aes(shelterFreq)) +
   geom_histogram(binwidth = 0.05) +
   facet_wrap(~ predEvent) +
   theme_bw()
-shelter %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
-
+shelterHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+shelter <- ggplot(structures, aes(predEvent, DistShelter)) +
+  geom_boxplot() +
+  # facet_wrap((~ predEvent)) +
+  theme_bw()
+shelter %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
 ## PHYSICAL FEATURES
 # get frequency of features

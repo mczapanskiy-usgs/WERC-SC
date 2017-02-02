@@ -90,8 +90,8 @@ cpue <- mlogit.data(expanded_data,
                     shape="long", 
                     chid.var="chid")
 
-# Simple `mlogit` model where Trapline & Season are specific to the choice situation (i.e. "individual"-specific, not alternative-specific).
-cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue) # +0 removes intercept from model?
+# Simple `mlogit` model where Trapline & Season are specific to the choice situation (i.e. individual-specific, not alternative-specific).
+cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue) # individual specific variables go in "part 2"; can't be random effects
 
 ## Possible problem 0-valued cells?  What happens when data are restricted to traplines where every outcome occurred >= once.
 # cpue2 <- mlogit.data(expanded_data %>% 
@@ -101,36 +101,50 @@ cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue) # +0 remo
 #                      shape="long", chid.var="chid")
 # cpue.models[[2]] <- mlogit(choice ~ 0 | Season, data=cpue2)
 
-# mlogit model with season specific to the choice situation. 
+# mlogit model with season as individual-specific variable. 
 cpue3 <- mlogit.data(expanded_data2, # %>% filter(Trapline %in% c('A','B','C','D','E','F','G','H')), 
                      choice="choice",
                      alt.var ="x", 
                      shape="long", 
                      chid.var="chid")
-cpue.models[[3]] <- mlogit(choice ~ 0 | Season, data=cpue3)
+cpue.models[[3]] <- mlogit(choice ~ 0 | Season, data=cpue3) # simplified model with only season as indiv-specific choice
 
-# mlogit model with season specific to the choice situation 
-# and Year and Trapline as random variables (although mlogit is choking on this?)
-cpue4 <- mlogit.data(expanded_data2, # %>% filter(Trapline %in% c('A','B','C','D','E','F','G','H')), 
+# mlogit model with season as individual-specific variable. 
+# and Year and Trapline as random variables 
+cpue4 <- mlogit.data(expanded_data2 %>% 
+                       filter(Trapline %in% c('A','B','C','D','E','F','G','H')), 
                      choice="choice",
                      alt.var ="x", # predEvent (7 options)
                      shape="long", 
                      chid.var="chid")  # reflevel = "none"
-cpue.models[[4]] <- mlogit(choice ~ 0 | Season | Year + Trapline, 
+cpue.models[[4]] <- mlogit(choice ~ Year + Trapline | Season, 
                            rpar = c(Year = 'n', Trapline = 'n'), 
                            data=cpue4)
 
-# mlogit model with season specific to the choice situation 
+# mlogit model with season as individual-specific variable; Year and Trapline as alternative-specific variables 
 # and choice simplified to 'event'
-cpue5 <- mlogit.data(expanded_data3, 
+cpue5 <- mlogit.data(expanded_data3 %>% 
+                       filter(Trapline %in% c('A','B','C','D','E','F','G','H')),  
                      choice="choice",
                      alt.var ="x", # event: predator, other, or no
                      shape="long", 
                      chid.var="chid") # reflevel = "noEvent"
-cpue.models[[5]] <- mlogit(choice ~ 0 | Season  | Year + Trapline, 
+cpue.models[[5]] <- mlogit(choice ~  Year + Trapline | Season, 
                            rpar = c(Year = 'n'), 
-                           R=100, halton=NA, # no random effects for now...
+                           R=100, 
+                           halton=NA, # no random effects for now...
                            data=cpue5)
+
+# mlogit model with Season, Year and Trapline as alternative-specific variables 
+cpue6 <- mlogit.data(expanded_data2 %>% 
+                       filter(Trapline %in% c('A','B','C','D','E','F')), 
+                     choice="choice",
+                     alt.var ="x", 
+                     shape="long", chid.var="chid")
+cpue.models[[6]] <- mlogit(choice ~ Season + Trapline + Year,
+                           rpar=c(Year='n', Trapline='n'), 
+                           halton=NA,
+                           data=cpue6)
 
 # ## Poisson log-linear model
 # predEvents %>% 
