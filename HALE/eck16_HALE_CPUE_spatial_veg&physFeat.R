@@ -47,45 +47,44 @@ structures <- catch_spatial %>%
          fenceFreq = percent_rank(DistFence),
          shelterFreq = percent_rank(DistShelter))
 # graph data
-roadHist <- ggplot(structures, aes(roadFreq)) +
-  geom_histogram(binwidth = 0.05) +
-  facet_wrap(~ predEvent) +
+roadHist <- ggplot(structures, aes(DistRoad)) +
+  geom_histogram(binwidth = 100) +
+  facet_wrap(~ predEvent, scales = "free") +
   theme_bw()
-roadHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
-
+roadHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 road <- ggplot(structures, aes(predEvent, DistRoad)) +
   geom_boxplot() +
   # facet_wrap((~ predEvent)) +
   theme_bw()
 road %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
-trailHist <- ggplot(structures, aes(trailFreq)) +
-  geom_histogram(binwidth = 0.05) +
-  facet_wrap(~ predEvent) +
+trailHist <- ggplot(structures, aes(DistTrail)) +
+  geom_histogram(binwidth = 100) +
+  facet_wrap(~ predEvent, scales = "free") +
   theme_bw()
-trailHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+trailHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 trail <- ggplot(structures, aes(predEvent, DistTrail)) +
   geom_boxplot() +
   # facet_wrap((~ predEvent)) +
   theme_bw()
 trail %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
-fenceHist <- ggplot(structures, aes(fenceFreq)) +
-  geom_histogram(binwidth = 0.05) +
-  facet_wrap(~ predEvent) +
+fenceHist <- ggplot(structures, aes(DistFence)) +
+  geom_histogram(binwidth = 100) +
+  facet_wrap(~ predEvent, scales = "free") +
   theme_bw()
-fenceHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+fenceHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 fence <- ggplot(structures, aes(predEvent, DistFence)) +
   geom_boxplot() +
   # facet_wrap((~ predEvent)) +
   theme_bw()
 fence %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
-shelterHist <- ggplot(structures, aes(shelterFreq)) +
-  geom_histogram(binwidth = 0.05) +
-  facet_wrap(~ predEvent) +
+shelterHist <- ggplot(structures, aes(DistShelter)) +
+  geom_histogram(binwidth = 100) +
+  facet_wrap(~ predEvent, scales = "free") +
   theme_bw()
-shelterHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+shelterHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 shelter <- ggplot(structures, aes(predEvent, DistShelter)) +
   geom_boxplot() +
   # facet_wrap((~ predEvent)) +
@@ -99,15 +98,24 @@ physFeat <- catch_spatial %>%
   mutate(slopeFreq = percent_rank(MedSlope),
          elevationFreq = percent_rank(Elevation))
 # graph data
-slope <- ggplot(physFeat, aes(slopeFreq)) +
-  geom_histogram(binwidth = 0.05) +
-  facet_wrap(~ predEvent) +
+# slope <- ggplot(physFeat, aes(MedSlope, fill = predEvent)) +
+#   geom_histogram(binwidth = 1) +
+#   facet_wrap(~ predEvent, scales = "free") +
+#   theme_bw()
+# slope %+% subset(physFeat, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+slope <- ggplot(physFeat, aes(MedSlope, colour = predEvent)) +
+  geom_freqpoly(aes(weight = MedSlope), binwidth = 1) +
+  # facet_wrap(~ predEvent, scales = "free") +
   theme_bw()
-slope %+% subset(physFeat, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+slope %+% subset(physFeat, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
-elev <- ggplot(physFeat, aes(elevationFreq)) +
-  geom_histogram(binwidth = 0.05) +
-  facet_wrap(~ predEvent) +
+# elev <- ggplot(physFeat, aes(Elevation)) +
+#   geom_histogram(binwidth = 50) +
+#   facet_wrap(~ predEvent, scales = "free") +
+#   theme_bw()
+# elev %+% subset(physFeat, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+elev <- ggplot(physFeat, aes(Elevation, colour = predEvent)) +
+  geom_freqpoly(binwidth = 50) +
   theme_bw()
-elev %+% subset(physFeat, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+elev %+% subset(physFeat, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
