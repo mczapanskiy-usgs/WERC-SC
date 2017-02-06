@@ -103,8 +103,8 @@ col_yr <- ggplot(annualBurrows, aes(Year_, eventCount)) +
 col_yr_preds <- col_yr %+% subset(annualBurrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 
 
-## CPUE ANALYSIS
-# use same analysis from eck11 but calc. "catch per trapline YEAR", & also ave. burrow density "per trapline YEAR" 
+### CPUE ANALYSIS
+## use same analysis from eck11 but calc. "catch per trapline YEAR", & also ave. burrow density "per trapline YEAR"
 # make "weekly" a datatable containing all the factors needed for weekly analysis
 weekly <- catch_spatial %>%
   group_by(Trapline, TrapNum, Year_, Week) %>%
@@ -159,6 +159,30 @@ burrowCPUE_long <- burrowCPUE %>%
     "out" = aveBurrows == 0, 
     .method = "last", 
     .default = "out"))
+# group CPUE by year
+annualCPUE <- burrowCPUE %>% 
+  group_by(Year_, predEvent) %>% 
+  summarise(annCPUE = mean(CPUE), 
+            sdCPUE = sd(CPUE))
+# GRAPH annual average CPUE and SD
+CPUE_yr <- ggplot(annualCPUE, aes(Year_, annCPUE)) +
+  geom_errorbar(aes(ymin=annCPUE-sdCPUE, ymax=annCPUE+sdCPUE), colour="black", width=.1) +
+  geom_line() +
+  geom_point() + 
+  facet_wrap(~ predEvent) +
+  theme_bw() +
+  labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort')
+CPUE_yr %+% subset(annualCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+CPUE_yr_preds <- ggplot(annualCPUE, aes(Year_, annCPUE)) +
+  geom_errorbar(aes(ymin=annCPUE-sdCPUE, ymax=annCPUE+sdCPUE), colour="black", width=.1) +
+  geom_line() +
+  geom_point() + 
+  facet_wrap(~ predEvent, nrow = 3) +
+  ylim(NA, 1) +
+  theme_bw() +
+  labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort')
+CPUE_yr_preds %+% subset(annualCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+
 # group by year by taking the average CPUE for each year both inside and outside the colony
 annualCPUEburrows <- burrowCPUE %>% 
   group_by(Year_, colony100, predEvent) %>% 
@@ -170,3 +194,5 @@ col_CPUE_yr <- ggplot(annualCPUEburrows, aes(Year_, annCPUE)) +
   theme_bw() +
   labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort')
 col_CPUE_yr_preds <- col_CPUE_yr %+% subset(annualCPUEburrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+
+
