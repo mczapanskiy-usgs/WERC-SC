@@ -10,146 +10,211 @@ library(mlogit)
 library(mosaic)
 
 read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
-          stringsAsFactors = FALSE) -> predEventPUE
+          stringsAsFactors = FALSE) -> CPUEdata
 
 ## normal distribution? freq hist should be ~symetical, SD of most variable sample should be <10x the SD of least variable sample
-hist(predEventPUE$CPUE)
-sd(predEventPUE$CPUE)
+hist(CPUEdata$CPUE)
+sd(CPUEdata$CPUE)
 ## look at data
-summary(predEventPUE)
-dim(predEventPUE)
-with(predEventPUE, table(predEvent))
-with(predEventPUE, table(Trapline, predEvent))
-with(predEventPUE, table(Year, predEvent))
-with(predEventPUE, table(Season, predEvent))
-with(predEventPUE, table(Trapline, predEvent, Season))
+summary(CPUEdata)
+dim(CPUEdata)
+with(CPUEdata, table(predEvent))
+with(CPUEdata, table(Trapline, predEvent))
+with(CPUEdata, table(Year, predEvent))
+with(CPUEdata, table(Season, predEvent))
+with(CPUEdata, table(Trapline, predEvent, Season))
 
-#### RESTRUCTURE DATA
-## There are `r length(predEvents)` possible outcomes every time trap was set, & trap was set `r nEvents` times.  
-predEvents <- unique(predEventPUE$predEvent)
-nEvents <- sum(predEventPUE$NEvents)
-## Total rows in data would be the product `r nEvents*length(predEvents)`.  Perform in 2 steps.  
-# First, expand the rows so that each choice situation is on its own unique row.
-data2 <- predEventPUE[rep(row.names(predEventPUE), predEventPUE$NEvents),]
-data2 <- data2 %>%
-  mutate(chid = row.names(data2))
-# Then expand ea. choice situation so that ea. alternative is on its own row. Alternative names stored in column `x`.
-expanded_data <- merge(predEvents, data2)
-expanded_data <- expanded_data %>% 
-  mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) 
-
-## In addition: remove the mouse data, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
-predEventPUE2 <- predEventPUE %>% 
+#### EDIT DATA: remove the mouse events, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
+data_rev <- CPUEdata %>% 
   filter(predEvent != 'mouseCaught') %>% 
-  mutate(event = mosaic::derivedFactor(
+  mutate(eventType = mosaic::derivedFactor(
     "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
     "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
     "noEvent" = predEvent =="none",
     .default = "noEvent"),
-      loc = mosaic::derivedFactor(
-        front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
-        back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
-        .default = "back")) # unique(predEventPUE$Trapline)
-  # mutate(predator = (predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'))) 
-predEvents2 <- unique(predEventPUE2$predEvent)
-nEvents2 <- sum(predEventPUE2$NEvents)
-# Next, re-expand the rows so that each choice situation is on its own unique row.
-data3 <- predEventPUE2[rep(row.names(predEventPUE2), predEventPUE2$NEvents),]
-data3 <- data3 %>%
-  mutate(chid = row.names(data3))
-# Then expand ea. choice situation so that ea. alternative is on its own row. Alternative names stored in column `x`.
-expanded_data2 <- merge(predEvents2, data3)
-expanded_data2 <- expanded_data2 %>% 
-  mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) 
-expanded_data2$Year <- as.factor(expanded_data2$Year)
+    loc = mosaic::derivedFactor(
+      front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
+      back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
+      .default = "back")) # unique(data$Trapline)
 
-## Create yet another version of expanded_data (expanded_data3) using grouped 'event' (predator, other, no) variable.
-# First, aggregate the data by summing the NEvents within each event group.
-predEventPUE3 <- predEventPUE2 %>% 
-  group_by(Trapline, Week, Year, Season, Month, NTraps, loc, event) %>%
-  summarise(NEvents=sum(NEvents)) %>%
-  mutate(CPUE = NEvents/NTraps) %>% # this line optional
-  as.data.frame()
-# There are `r length(event)` possible outcomes every time trap was set, & trap was set `r nEvents` times.
-predEvents3 <- unique(predEventPUE3$event)
-nEvents3 <- sum(predEventPUE3$NEvents)
-# Next, re-expand the rows so that each choice situation is on its own unique row.
-data3 <- predEventPUE3[rep(row.names(predEventPUE3), predEventPUE3$NEvents),]
-data3 <- data3 %>%
-  mutate(chid = row.names(data3))
-# Then expand ea. choice situation so that ea. alternative is on its own row. Alternative names stored in column `x`.
-expanded_data3 <- merge(predEvents3, data3)
-expanded_data3 <- expanded_data3 %>% 
-  mutate(choice = ifelse(x==event, TRUE, FALSE)) 
-expanded_data3$Year <- as.factor(expanded_data3$Year)
+#### RESTRUCTURE DATA FUNCTION
+  formatData <- function(data){
+    # Reshape data so that there is one row for every option, for every choice situation. 
+    # Here are the possible outcomes every time the trap is set:
+    events <- unique(data$predEvent) # events <- unique(data$e) # 
+    # And here are the number of choice situations:
+    nEvents <- sum(data$NEvents)
+    
+    # Replicate the rows according to number of events:
+    data2 <- data[rep(row.names(data), data$NEvents),]
+    data2 <- data2 %>%
+      mutate(chid = row.names(data2))
+    
+    # Expand each choice situation so that each alternative is on its own row.  
+    # Do this with the merge function.  The alternative names will be stored in column `x`.
+    expanded_data <- merge(events, data2)
+    expanded_data <- expanded_data %>% 
+      mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) # mutate(choice = ifelse(x==e, TRUE, FALSE))
+    expanded_data$Year <- as.factor(expanded_data$Year)
+    return(expanded_data)
+    remove(e)
+  }
 
+#### CREATE DATA TABLES
+# e <- "predEvent"
+expanded_data <- formatData(data_rev)
 
-#### RUN MODELS
+# filter out predators caught
+data.Caughts_only <- data_rev %>% 
+  filter(eventType == "predatorEvent")
+# e <- "predEvent" 
+expanded_data.Caughts_only <- formatData(data.Caughts_only)
+with(expanded_data.Caughts_only %>% 
+       filter(choice==TRUE), # filter(choice==TRUE & Trapline=='A'),
+     table(predEvent, Year))
+
+# # run function using grouped 'event' (predator, other, no) variable.
+# # First, aggregate the data by summing the NEvents within each event group.
+# data_events <- data_rev %>% 
+#   group_by(Trapline, Week, Year, Season, Month, NTraps, loc, eventType) %>%
+#   summarise(NEvents=sum(NEvents)) %>%
+#   mutate(CPUE = NEvents/NTraps) %>% # this line optional
+#   as.data.frame()
+# e = "eventType"
+# expanded_data.events <- formatData(data_events)
+# with(expanded_data.events %>% 
+#        filter(choice==TRUE),
+#      table(predEvent, Year))
+
+#### RUN mlogt MODELS
 ## create model list
 cpue.models <- list()
-# Now apply the `mlogit.data` function.  
+# Simple `mlogit` model where Trapline & Season = individual-specific variables (i.e. specific to the choice situation, not alternative-specific).
+# first apply the `mlogit.data` function.  
 cpue <- mlogit.data(expanded_data, 
                     choice="choice",
                     alt.var ="x", 
                     shape="long", 
                     chid.var="chid")
-
-# Simple `mlogit` model where Trapline & Season are specific to the choice situation (i.e. individual-specific, not alternative-specific).
 cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue) # individual specific variables go in "part 2"; can't be random effects
 
-## Possible problem 0-valued cells?  What happens when data are restricted to traplines where every outcome occurred >= once.
-# cpue2 <- mlogit.data(expanded_data %>% 
-#                        filter(Trapline %in% c('A','B','C','D','E','F')), 
-#                      choice="choice",
-#                      alt.var ="x", 
-#                      shape="long", chid.var="chid")
-# cpue.models[[2]] <- mlogit(choice ~ 0 | Season, data=cpue2)
+# Possible problem 0-valued cells?  Restrict data to traplines where every outcome occurred >= once (e.g. only front country traps).
+cpue2 <- mlogit.data(expanded_data %>%
+                       filter(loc == "front"),
+                     choice="choice",
+                     alt.var ="x",
+                     shape="long", 
+                     chid.var="chid")
+cpue.models[[2]] <- mlogit(choice ~ 0 | Trapline + Season, data=cpue2)
 
-# mlogit model with season as individual-specific variable. 
+# season = individual-specific variable (simplified model with only season)
 cpue3 <- mlogit.data(expanded_data2, # %>% filter(loc == "front"),  
                      choice="choice",
                      alt.var ="x", 
                      shape="long", 
                      chid.var="chid")
-cpue.models[[3]] <- mlogit(choice ~ 0 | Season, data=cpue3) # simplified model with only season as indiv-specific choice
+cpue.models[[3]] <- mlogit(choice ~ 0 | Season, data=cpue3) # 
 
-# mlogit model with season as individual-specific variable. 
-# and Year and Trapline as random variables 
+# season = individual-specific variable. Year = ??
 cpue4 <- mlogit.data(expanded_data2 %>% 
                        filter(loc == "front"),  
                      choice="choice",
                      alt.var ="x", # predEvent (7 options)
+                     # id.var = "Year",
                      shape="long", 
                      chid.var="chid")  # reflevel = "none"
-cpue.models[[4]] <- mlogit(choice ~ Year + Trapline | Season, 
-                           rpar = c(Year = 'n', Trapline = 'n'), 
+cpue.models[[4]] <- mlogit(choice ~ Year | Season, 
+                           # rpar = c(Year = 'n') # rpar = c(Year = 'n', Trapline = 'n'), 
                            data=cpue4)
 
-# mlogit model with season as individual-specific variable; Year and Trapline as alternative-specific variables 
+# season = individual-specific variable; Year = alternative-specific variable 
 # and choice simplified to 'event'
-cpue5 <- mlogit.data(expanded_data3 %>% 
+cpue5 <- mlogit.data(expanded_data.events %>% 
                        filter(loc == "front"),  
                      choice="choice",
                      alt.var ="x", # event: predator, other, or no
+                     id.var = "Year",
                      shape="long", 
                      chid.var="chid") # reflevel = "noEvent"
 cpue.models[[5]] <- mlogit(choice ~  Year + Trapline | Season, 
                            rpar = c(Year = 'n'), 
                            R=100, 
                            halton=NA, # no random effects for now...
-                           data=cpue5)
+                           data=cpue5) # error: system is exactly singular
 
-# mlogit model with Season, Year and Trapline as alternative-specific variables 
-cpue6 <- mlogit.data(expanded_data2 %>% 
+# Season, Year and Trapline = alternative-specific variables 
+cpue6 <- mlogit.data(expanded_data %>% 
                        filter(loc == "front"), 
                      choice="choice",
                      alt.var ="x", 
                      shape="long", 
                      chid.var="chid")
 cpue.models[[6]] <- mlogit(choice ~ Season + Trapline + Year,
-                           rpar=c(Year='n', Trapline='n'), 
-                           halton=NA,
-                           data=cpue6)
+                           # rpar=c(Year='n', Trapline='n'), 
+                           # halton=NA,
+                           data=cpue6) # error: system is compuatationally singular
+
+# season = individual-specific variable, year = random variable
+cpue.Year <- mlogit.data(expanded_data.Caughts_only, # %>% filter(Trapline %in% c('A')) [ = too many zeros]
+              choice="choice",
+              alt.var ="x", 
+              id.var = "Year",
+              shape="long", 
+              chid.var="chid")
+cpue.models[[7]] <- mlogit(choice ~ 0 | Season,
+         # rpar=c('birdOtherCaught:(intercept)'='n'), R=50, halton=NA,
+         # panel=TRUE,
+         iterlim=1, print.level=1,
+         data=cpue.Year)
+summary(cpue.models[[7]])
+
+cpue.models[[8]] <- mlogit(choice ~ 0 | Season,
+         rpar=c('catCaught:(intercept)'='n',
+                'mongooseCaught:(intercept)'='n'), R=50, halton=NA,
+         panel=TRUE,
+         #iterlim=1, print.level=1,
+         data=cpue.Year)
+summary(cpue.models[[8]])
+AIC(cpue.models[[8]])
+
+# season = individual-specific variable. Year and Trapline = random variable (combined into one variable)
+cpue.trap <- mlogit.data(expanded_data %>% 
+                filter(loc == "front"), 
+              choice="choice",
+              alt.var ="x", 
+              id.var = "Trapline",
+              shape="long", 
+              chid.var="chid")
+cpue.trapyr <- mlogit.data(expanded_data %>% 
+                filter(loc == "front") %>%
+                mutate(trapyr=paste0(Trapline,'-',Year)),
+              choice="choice",
+              alt.var ="x", 
+              id.var = "trapyr",
+              shape="long", 
+              chid.var="chid")
+cpue.models[[9]] <- mlogit(choice ~ 0 | Season,
+                           rpar=c('catCaught:(intercept)'='n',
+                                  'mongooseCaught:(intercept)'='n'), R=50, halton=NA,
+                           panel=TRUE,
+                           #iterlim=1, print.level=1,
+                           data=cpue.Year)
+summary(cpue.models[[9]])
+AIC(cpue.models[[9]])
+
+
+# ## There are `r length(predEvents)` possible outcomes every time trap was set, & trap was set `r nEvents` times.  
+# predEvents <- unique(predEventPUE$predEvent)
+# nEvents <- sum(predEventPUE$NEvents)
+# ## Total rows in data would be the product `r nEvents*length(predEvents)`.  Perform in 2 steps.  
+# # First, expand the rows so that each choice situation is on its own unique row.
+# data2 <- predEventPUE[rep(row.names(predEventPUE), predEventPUE$NEvents),]
+# data2 <- data2 %>%
+#   mutate(chid = row.names(data2))
+# # Then expand ea. choice situation so that ea. alternative is on its own row. Alternative names stored in column `x`
+# expanded_data <- merge(predEvents, data2)
+# expanded_data <- expanded_data %>% 
+#   mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) 
 
 # ## Poisson log-linear model
 # predEvents %>% 
