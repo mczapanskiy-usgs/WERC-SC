@@ -22,10 +22,10 @@ veg <- catch_spatial %>%
   select(Trapline, TrapNum, Year_, Month_, predEvent, Week, PctVeg, MajCover, MajClass) %>% 
   mutate(allVeg = "allVeg")
 vegColors <- c("#333333", 
-               "#663333", "#993333", "#CC3333",
-               "#CC9900", "#CCCCC00", "#CCCCC33", "#CCCC66", "#CCCC99",
-               "#99CC99", "#99CC33", "#99CC00", "#669900",  "#666600", "#006600", "#336600", "#336633",
-               "#0000FF", "#0000CC", "#000099", "#000066")
+               "#663333", "#993300", "#993333",  
+               "#CC9900", "#CCCC00", "#CCCC33", "#CCCC66", "#99CC66",
+               "#99CC66", "#339966", "#669966", "#006600", "#006666", "#336666", "#003300", "#003333",
+               "#0000CC", "#000099", "#000066", "#000033")
     
 ## vegetation (bar fills)
 pctVeg <- ggplot(catch_spatial, aes(predEvent, fill=PctVeg)) +
@@ -33,12 +33,12 @@ pctVeg <- ggplot(catch_spatial, aes(predEvent, fill=PctVeg)) +
   theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1)) 
 pctVeg %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
 
-vegCover <- ggplot(veg, aes(predEvent, fill=MajCover)) +
+vegCover <- ggplot(arrange(veg, MajCover), aes(predEvent, fill=MajCover)) +
   geom_bar(position = "fill") +
-  theme_bw() + ## + theme(axis.text.x = element_text(angle=60, hjust=1)) 
-  scale_fill_manual(values = vegColors)
+  theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1)) 
+  # + scale_fill_manual(values = vegColors)
 vegCover %+% subset(veg, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
-allVegCover  <- ggplot(veg, aes(allVeg, fill=MajCover)) +
+allVegCover  <- ggplot(arrange(veg, MajCover), aes(allVeg, fill=MajCover)) +
   geom_bar(position = "fill") +
   guides(fill = FALSE) +
   theme_bw()

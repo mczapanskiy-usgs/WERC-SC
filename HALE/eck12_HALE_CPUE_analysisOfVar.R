@@ -38,14 +38,18 @@ expanded_data <- merge(predEvents, data2)
 expanded_data <- expanded_data %>% 
   mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) 
 
-## In addition, remove the mouse data and group predator events, for rerun of mlogit analysis
+## In addition: remove the mouse data, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
 predEventPUE2 <- predEventPUE %>% 
   filter(predEvent != 'mouseCaught') %>% 
   mutate(event = mosaic::derivedFactor(
     "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
     "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
     "noEvent" = predEvent =="none",
-    .default = "noEvent"))
+    .default = "noEvent"),
+      loc = mosaic::derivedFactor(
+        front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
+        back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
+        .default = "back")) # unique(predEventPUE$Trapline)
   # mutate(predator = (predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'))) 
 predEvents2 <- unique(predEventPUE2$predEvent)
 nEvents2 <- sum(predEventPUE2$NEvents)
@@ -62,7 +66,7 @@ expanded_data2$Year <- as.factor(expanded_data2$Year)
 ## Create yet another version of expanded_data (expanded_data3) using grouped 'event' (predator, other, no) variable.
 # First, aggregate the data by summing the NEvents within each event group.
 predEventPUE3 <- predEventPUE2 %>% 
-  group_by(Trapline, Week, Year, Season, Month, NTraps, event) %>%
+  group_by(Trapline, Week, Year, Season, Month, NTraps, loc, event) %>%
   summarise(NEvents=sum(NEvents)) %>%
   mutate(CPUE = NEvents/NTraps) %>% # this line optional
   as.data.frame()
@@ -102,7 +106,7 @@ cpue.models[[1]] <- mlogit(choice ~ 0 | Trapline + Season , data=cpue) # individ
 # cpue.models[[2]] <- mlogit(choice ~ 0 | Season, data=cpue2)
 
 # mlogit model with season as individual-specific variable. 
-cpue3 <- mlogit.data(expanded_data2, # %>% filter(Trapline %in% c('A','B','C','D','E','F','G','H')), 
+cpue3 <- mlogit.data(expanded_data2, # %>% filter(loc == "front"),  
                      choice="choice",
                      alt.var ="x", 
                      shape="long", 
@@ -112,7 +116,7 @@ cpue.models[[3]] <- mlogit(choice ~ 0 | Season, data=cpue3) # simplified model w
 # mlogit model with season as individual-specific variable. 
 # and Year and Trapline as random variables 
 cpue4 <- mlogit.data(expanded_data2 %>% 
-                       filter(Trapline %in% c('A','B','C','D','E','F','G','H')), 
+                       filter(loc == "front"),  
                      choice="choice",
                      alt.var ="x", # predEvent (7 options)
                      shape="long", 
@@ -124,7 +128,7 @@ cpue.models[[4]] <- mlogit(choice ~ Year + Trapline | Season,
 # mlogit model with season as individual-specific variable; Year and Trapline as alternative-specific variables 
 # and choice simplified to 'event'
 cpue5 <- mlogit.data(expanded_data3 %>% 
-                       filter(Trapline %in% c('A','B','C','D','E','F','G','H')),  
+                       filter(loc == "front"),  
                      choice="choice",
                      alt.var ="x", # event: predator, other, or no
                      shape="long", 
@@ -137,10 +141,11 @@ cpue.models[[5]] <- mlogit(choice ~  Year + Trapline | Season,
 
 # mlogit model with Season, Year and Trapline as alternative-specific variables 
 cpue6 <- mlogit.data(expanded_data2 %>% 
-                       filter(Trapline %in% c('A','B','C','D','E','F')), 
+                       filter(loc == "front"), 
                      choice="choice",
                      alt.var ="x", 
-                     shape="long", chid.var="chid")
+                     shape="long", 
+                     chid.var="chid")
 cpue.models[[6]] <- mlogit(choice ~ Season + Trapline + Year,
                            rpar=c(Year='n', Trapline='n'), 
                            halton=NA,
