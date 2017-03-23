@@ -41,7 +41,7 @@ data_rev <- CPUEdata %>%
   formatData <- function(data){
     # Reshape data so that there is one row for every option, for every choice situation. 
     # Here are the possible outcomes every time the trap is set:
-    events <- unique(data$predEvent) # events <- unique(data$e)
+    events <- unique(data$predEvent) # events <- unique(data$eventType) # 
     # And here are the number of choice situations:
     nEvents <- sum(data$NEvents)
     
@@ -54,7 +54,7 @@ data_rev <- CPUEdata %>%
     # Do this with the merge function.  The alternative names will be stored in column `x`.
     expanded_data <- merge(events, data2)
     expanded_data <- expanded_data %>% 
-      mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) # mutate(choice = ifelse(x==e, TRUE, FALSE))
+      mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) # mutate(choice = ifelse(x==eventType, TRUE, FALSE)) # 
     # expanded_data$Year <- as.factor(expanded_data$Year)
     return(expanded_data)
   }
@@ -72,22 +72,45 @@ with(expanded_data.Caughts_only %>%
        filter(choice==TRUE), # filter(choice==TRUE & Trapline=='A'),
      table(predEvent, Year))
 
-# ## run function using grouped 'event' (predator, other, no) variable.
-# # First, aggregate the data by summing the NEvents within each event group.
-# data_events <- data_rev %>% 
-#   group_by(Trapline, Week, Year, Season, Month, NTraps, loc, eventType) %>%
-#   summarise(NEvents=sum(NEvents)) %>%
-#   mutate(CPUE = NEvents/NTraps) %>% # this line optional
-#   as.data.frame()
+## run function using grouped 'event' (predator, other, no) variable.
+# First, aggregate the data by summing the NEvents within each event group.
+data_events <- data_rev %>%
+  group_by(Trapline, Week, Year, Season, Month, NTraps, loc, eventType) %>%
+  summarise(NEvents=sum(NEvents)) %>%
+  mutate(CPUE = NEvents/NTraps) %>% # this line optional
+  as.data.frame()
 # e = "eventType"
-# expanded_data.events <- formatData(data_events)
-# with(expanded_data.events %>% 
-#        filter(choice==TRUE),
-#      table(predEvent, Year))
+expanded_data.events <- formatData(data_events)
+
 
 #### RUN mlogt MODELS
 ## create model list
 cpue.models <- list()
+## dependent var = predator, other, none (events)
+## Trapline & Season = individual-specific variables
+cpue3events <- mlogit.data(expanded_data.events %>% 
+                             # filter(loc == "front") %>% 
+                             mutate(trapyr=paste0(Trapline,'-',Year)), 
+                    choice="choice",
+                    alt.var ="x", 
+                    id.var = "trapyr",
+                    shape="long", 
+                    chid.var="chid")
+cpue.models[[10]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
+                            # rpar=c('otherEvent:(intercept)'='n',
+                            #        'noEvent:(intercept)'='n',
+                            #        'otherEvent:SeasonNestling' ='n',
+                            #        'noEvent:SeasonNestling' ='n',
+                            #        'otherEvent:SeasonoffSeason' ='n',
+                            #        'noEvent:SeasonoffSeason' ='n',
+                            #        'otherEvent:SeasonPre-laying' ='n',
+                            #        'noEvent:SeasonPre-laying' ='n'), R=50, halton=NA,
+                            # panel=TRUE,
+                            iterlim=1, print.level=1,
+                            data=cpue3events)
+summary(cpue.models[[10]])
+AIC(cpue.models[[10]])
+
 ## Trapline & Season = individual-specific variables (i.e. specific to the choice situation, not alternative-specific).
 # first apply the `mlogit.data` function.  
 cpue <- mlogit.data(expanded_data, # %>% filter(loc == "front"),
@@ -145,46 +168,53 @@ cpue.models[[5]] <- mlogit(choice ~ Season + Trapline + Year,
                            data=cpue5) # Error in solve.default(H, g[!fixed]): system is computationally singular: reciprocal condition number = 8.832e-34
 
 ## season = individual-specific variable, year = random variable
-cpue.year <- mlogit.data(expanded_data, # %>% filter(Trapline %in% c('A')) # >>> too many zeros
+cpue.year <- mlogit.data(expanded_data%>% 
+                           filter(loc == "front"), # %>% filter(Trapline %in% c('A')) # >>> too many zeros
               choice="choice",
               alt.var ="x", 
               id.var = "Year",
               shape="long", 
               chid.var="chid")
-# only predators caught data
-cpue.year.caughts <- mlogit.data(expanded_data.Caughts_only%>% 
+# only predators caught data in front country
+cpue.year.caughts <- mlogit.data(expanded_data.Caughts_only %>% 
                                    filter(loc == "front"), # %>% filter(Trapline %in% c('A')) # >>> too many zeros
              choice="choice",
              alt.var ="x", 
              id.var = "Year",
              shape="long", 
              chid.var="chid")
-cpue.models[[6]] <- mlogit(choice ~ 0 | Season,
-         # rpar=c('ratCaught:(intercept)'='n'), R=50, halton=NA,
-         # panel=TRUE,
-         iterlim=1, print.level=1,
-         data=cpue.year.caughts)
-summary(cpue.models[[6]])
 
-cpue.models[[7]] <- mlogit(choice ~ 0 | Season,
-         rpar=c('catCaught:(intercept)'='n',
-                'mongooseCaught:(intercept)'='n',
-                'ratCaught:(intercept)'='n'), R=50, halton=NA,
+# season = indiv-sp, year = random variable; front country traps
+cpue.models[[6]] <- mlogit(choice ~ 0 | Season,
+         rpar=c('ratCaught:(intercept)'='n',
+                'mongooseCaught:(intercept)'='n'), R=50, halton=NA,
          panel=TRUE,
          iterlim=1, print.level=1,
-         data=cpue.year.caughts) # all data creates an error
-summary(cpue.models[[7]])
+         data=cpue.year.caughts) # all data is too big for model
+# summary(cpue.models[[6]])
+AIC(cpue.models[[6]])
+
+# season and year = indiv-sp, year = random; front country traps
+cpue.models[[7]] <- 
+  mlogit(choice ~ 0 | Season + Year,
+         rpar=c('ratCaught:(intercept)'='n',
+                'mongooseCaught:(intercept)'='n'), R=50, halton=NA,
+         panel=TRUE,
+         #iterlim=1, print.level=1,
+         data=cpue.year.caughts) # all data is too big for model
+# summary(cpue.models[[7]])
 AIC(cpue.models[[7]])
+
 
 ## season = individual-specific variable. Trapline = random variable
 cpue.trap <- mlogit.data(expanded_data %>% 
-                           filter(loc == "front"), 
+                         filter(loc == "front"), 
                          choice="choice",
                          alt.var ="x", 
                          id.var = "Trapline",
                          shape="long", 
                          chid.var="chid")
-# only predators caught data
+# only predators caught data in front country
 cpue.trap.caughts <- mlogit.data(expanded_data.Caughts_only %>% 
                 filter(loc == "front"), 
               choice="choice",
@@ -192,38 +222,45 @@ cpue.trap.caughts <- mlogit.data(expanded_data.Caughts_only %>%
               id.var = "Trapline",
               shape="long", 
               chid.var="chid")
-cpue.models[[8]] <- mlogit(choice ~ 0 | Season,
-                           rpar=c('ratCaught:(intercept)'='n'), R=50, halton=NA,
+# season and year = indiv-sp, year = random; front country traps
+cpue.models[[8]] <- mlogit(choice ~ 0 | Season + Year +Trapline,
+                           rpar=c('ratCaught:(intercept)'='n',
+                                  'mongooseCaught:(intercept)'='n',
+                                  'mongooseCaught:SeasonNestling' ='n',
+                                  'ratCaught:SeasonNestling' ='n',
+                                  'mongooseCaught:SeasonoffSeason' ='n',
+                                  'ratCaught:SeasonoffSeason' ='n',
+                                  'mongooseCaught:SeasonPre-laying' ='n',
+                                  'ratCaught:SeasonPre-laying' ='n'), R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
                            data=cpue.trap.caughts) # all data creates an error
 summary(cpue.models[[8]])
 AIC(cpue.models[[8]])
+
 ## season = individual-specific variable. Year and Trapline = random variable (combined into one variable)
-cpue.trapyr <- mlogit.data(expanded_data %>% 
-                filter(loc == "front") %>%
+cpue.trapyr <- mlogit.data(expanded_data %>% # filter(loc == "front") %>%
                 mutate(trapyr=paste0(Trapline,'-',Year)),
               choice="choice",
               alt.var ="x", 
               id.var = "trapyr",
               shape="long", 
               chid.var="chid")
-cpue.models[[8]] <- mlogit(choice ~ 0 | Season,
-                           rpar=c('ratCaught:(intercept)'='n'), R=50, halton=NA,
+cpue.models[[9]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
+                           rpar=c('ratCaught:(intercept)'='n',
+                                  'mongooseCaught:(intercept)'='n',
+                                  'mongooseCaught:SeasonNestling' ='n',
+                                  'ratCaught:SeasonNestling' ='n',
+                                  'mongooseCaught:SeasonoffSeason' ='n',
+                                  'ratCaught:SeasonoffSeason' ='n',
+                                  'mongooseCaught:SeasonPre-laying' ='n',
+                                  'ratCaught:SeasonPre-laying' ='n'), R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
                            data=cpue.trapyr)
-summary(cpue.models[[8]])
-AIC(cpue.models[[8]])
-## with year as 
-cpue.models[[9]] <- mlogit(choice ~ 0 | Season + Year,
-                           rpar=c('catCaught:(intercept)'='n',
-                                  'mongooseCaught:(intercept)'='n'), R=50, halton=NA,
-                           panel=TRUE,
-                           # iterlim=1, print.level=1,
-                           data=cpue.year.caughts)
 summary(cpue.models[[9]])
 AIC(cpue.models[[9]])
+
 
 
 
