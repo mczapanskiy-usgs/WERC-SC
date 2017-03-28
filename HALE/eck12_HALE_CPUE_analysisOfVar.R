@@ -41,7 +41,7 @@ data_rev <- CPUEdata %>%
   formatData <- function(data){
     # Reshape data so that there is one row for every option, for every choice situation. 
     # Here are the possible outcomes every time the trap is set:
-    events <- unique(data$predEvent) # events <- unique(data$eventType) # 
+    events <- unique(data$eventType) # events <- unique(data$predEvent) # 
     # And here are the number of choice situations:
     nEvents <- sum(data$NEvents)
     
@@ -54,7 +54,7 @@ data_rev <- CPUEdata %>%
     # Do this with the merge function.  The alternative names will be stored in column `x`.
     expanded_data <- merge(events, data2)
     expanded_data <- expanded_data %>% 
-      mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) # mutate(choice = ifelse(x==eventType, TRUE, FALSE)) # 
+      mutate(choice = ifelse(x==eventType, TRUE, FALSE)) # mutate(choice = ifelse(x==predEvent, TRUE, FALSE)) # 
     # expanded_data$Year <- as.factor(expanded_data$Year)
     return(expanded_data)
   }
@@ -89,23 +89,17 @@ cpue.models <- list()
 ## dependent var = predator, other, none (events)
 ## Trapline & Season = individual-specific variables
 cpue3events <- mlogit.data(expanded_data.events %>% 
-                             filter(loc = "front") %>%
+                             # filter(loc == "front") %>%
                              mutate(trapyr=paste0(Trapline,'-',Year)), 
                     choice="choice",
                     alt.var ="x", 
-                    id.var = "Year",
+                    id.var = "trapyr",
                     shape="long", 
                     chid.var="chid")
 cpue.models[[10]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
-                            # rpar=c('noEvent:(intercept)'='n',
-                                   # 'otherEvent:(intercept)'='n',
-                                   # 'otherEvent:SeasonNestling' ='n',
-                                   # 'noEvent:SeasonNestling' ='n',
-                                   # 'otherEvent:SeasonoffSeason' ='n',
-                                   # 'noEvent:SeasonoffSeason' ='n',
-                                   # 'otherEvent:SeasonPre-laying' ='n',
-                                   # 'noEvent:SeasonPre-laying' ='n'),
-                            # R=50, halton=NA,
+                            rpar=c('noEvent:(intercept)'='n',
+                            'otherEvent:(intercept)'='n'),
+                            R=50, halton=NA,
                             panel=TRUE, # correlation = TRUE,
                             iterlim=1, print.level=1,
                             data=cpue3events)
@@ -249,16 +243,16 @@ cpue.trapyr <- mlogit.data(expanded_data.Caughts_only %>%
               shape="long", 
               chid.var="chid")
 cpue.models[[9]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
-                           # rpar=c('ratCaught:(intercept)'='n',
-                           #        'mongooseCaught:(intercept)'='n'),
+                           rpar=c('ratCaught:(intercept)'='n',
+                                  'mongooseCaught:(intercept)'='n'),
                            #        # 'mongooseCaught:SeasonNestling' ='n',
                            #        # 'ratCaught:SeasonNestling' ='n',
                            #        # 'mongooseCaught:SeasonoffSeason' ='n',
                            #        # 'ratCaught:SeasonoffSeason' ='n',
                            #        # 'mongooseCaught:SeasonPre-laying' ='n',
                            #        # 'ratCaught:SeasonPre-laying' ='n'), 
-                           # R=50, halton=NA,
-                           # panel=TRUE,
+                           R=50, halton=NA,
+                           panel=TRUE,
                            iterlim=1, print.level=1,
                            data=cpue.trapyr)
 summary(cpue.models[[9]])
