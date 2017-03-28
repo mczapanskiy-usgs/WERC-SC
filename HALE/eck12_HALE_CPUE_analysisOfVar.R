@@ -81,7 +81,7 @@ data_events <- data_rev %>%
   as.data.frame()
 # e = "eventType"
 expanded_data.events <- formatData(data_events)
-
+expanded_data.events$Year <- as.numeric(expanded_data.events$Year)
 
 #### RUN mlogt MODELS
 ## create model list
@@ -89,23 +89,24 @@ cpue.models <- list()
 ## dependent var = predator, other, none (events)
 ## Trapline & Season = individual-specific variables
 cpue3events <- mlogit.data(expanded_data.events %>% 
-                             # filter(loc == "front") %>% 
+                             filter(loc = "front") %>%
                              mutate(trapyr=paste0(Trapline,'-',Year)), 
                     choice="choice",
                     alt.var ="x", 
-                    id.var = "trapyr",
+                    id.var = "Year",
                     shape="long", 
                     chid.var="chid")
 cpue.models[[10]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
-                            # rpar=c('otherEvent:(intercept)'='n',
-                            #        'noEvent:(intercept)'='n',
-                            #        'otherEvent:SeasonNestling' ='n',
-                            #        'noEvent:SeasonNestling' ='n',
-                            #        'otherEvent:SeasonoffSeason' ='n',
-                            #        'noEvent:SeasonoffSeason' ='n',
-                            #        'otherEvent:SeasonPre-laying' ='n',
-                            #        'noEvent:SeasonPre-laying' ='n'), R=50, halton=NA,
-                            # panel=TRUE,
+                            # rpar=c('noEvent:(intercept)'='n',
+                                   # 'otherEvent:(intercept)'='n',
+                                   # 'otherEvent:SeasonNestling' ='n',
+                                   # 'noEvent:SeasonNestling' ='n',
+                                   # 'otherEvent:SeasonoffSeason' ='n',
+                                   # 'noEvent:SeasonoffSeason' ='n',
+                                   # 'otherEvent:SeasonPre-laying' ='n',
+                                   # 'noEvent:SeasonPre-laying' ='n'),
+                            # R=50, halton=NA,
+                            panel=TRUE, # correlation = TRUE,
                             iterlim=1, print.level=1,
                             data=cpue3events)
 summary(cpue.models[[10]])
@@ -239,23 +240,25 @@ summary(cpue.models[[8]])
 AIC(cpue.models[[8]])
 
 ## season = individual-specific variable. Year and Trapline = random variable (combined into one variable)
-cpue.trapyr <- mlogit.data(expanded_data %>% # filter(loc == "front") %>%
-                mutate(trapyr=paste0(Trapline,'-',Year)),
+cpue.trapyr <- mlogit.data(expanded_data.Caughts_only %>% 
+                             # filter(loc == "front") %>%
+                             mutate(trapyr=paste0(Trapline,'-',Year)),
               choice="choice",
               alt.var ="x", 
               id.var = "trapyr",
               shape="long", 
               chid.var="chid")
 cpue.models[[9]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
-                           rpar=c('ratCaught:(intercept)'='n',
-                                  'mongooseCaught:(intercept)'='n',
-                                  'mongooseCaught:SeasonNestling' ='n',
-                                  'ratCaught:SeasonNestling' ='n',
-                                  'mongooseCaught:SeasonoffSeason' ='n',
-                                  'ratCaught:SeasonoffSeason' ='n',
-                                  'mongooseCaught:SeasonPre-laying' ='n',
-                                  'ratCaught:SeasonPre-laying' ='n'), R=50, halton=NA,
-                           panel=TRUE,
+                           # rpar=c('ratCaught:(intercept)'='n',
+                           #        'mongooseCaught:(intercept)'='n'),
+                           #        # 'mongooseCaught:SeasonNestling' ='n',
+                           #        # 'ratCaught:SeasonNestling' ='n',
+                           #        # 'mongooseCaught:SeasonoffSeason' ='n',
+                           #        # 'ratCaught:SeasonoffSeason' ='n',
+                           #        # 'mongooseCaught:SeasonPre-laying' ='n',
+                           #        # 'ratCaught:SeasonPre-laying' ='n'), 
+                           # R=50, halton=NA,
+                           # panel=TRUE,
                            iterlim=1, print.level=1,
                            data=cpue.trapyr)
 summary(cpue.models[[9]])
