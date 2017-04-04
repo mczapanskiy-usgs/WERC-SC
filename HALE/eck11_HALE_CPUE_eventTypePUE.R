@@ -73,7 +73,7 @@ CPUEgrid <- expand.grid(Trapline = unique(predEventPUE$Trapline), Week = unique(
 # predEventPUE data file
 write.csv(predEventPUE, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
           row.names = FALSE) 
-# CPUEgrid data file
+# CPUEgrid data file, contains rows for events that didn't happen (zeros)
 write.csv(CPUEgrid, file = '~/WERC-SC/HALE/TraplinePredEventPUE_zeros_11_20161209.csv',
           row.names = FALSE) 
 # weekly catch for each trap, with season code
@@ -83,7 +83,7 @@ write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predE
 spatialCatch <- catch %>% 
   filter(TrapChecked == "TRUE") %>% 
   select(catchID:Comments, baitType:Season)
-write.csv(spatialCatch, file = '~/WERC-SC/HALE/catch_11_spatialCatches_20161209.csv',
+write.csv(spatialCatch, file = '~/WERC-SC/HALE/catch_11_forSpatialCatches_20161209.csv',
           row.names = FALSE) 
 
 
