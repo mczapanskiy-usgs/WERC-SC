@@ -40,12 +40,12 @@ weeklyCatches <- catch %>%
 ## count the number of Trapline events (weeklyCatches) per week (aka number of traps in the trapline)
 trapsPerLineWeek <- weeklyCatches %>%
   group_by(Trapline, Year, Season, Month, Week) %>%
-  summarize(NTraps = n())
+  dplyr::summarize(NTraps = n())
 
 # count number of each predEvent per week per trapline
 predEventsPerLineWeek <- weeklyCatches %>% 
   group_by(Trapline, Year, Week, Season, Month, predEvent) %>% 
-  summarise(NEvents = n()) 
+  dplyr::summarise(NEvents = n()) 
 
 ## number of predEvents per number of traps, for each week on each Trapline
 predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>% 

@@ -22,10 +22,6 @@ trapData <- read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv',
 
 
 #### WEATHER DATA ANALYSIS
-# trapData2 <- trapData %>%
-#   mutate(TrapDate = lubridate::ymd(Date),
-#          DummyTrapDate = TrapDate) %>%
-#   data.table(key = c('WeatherSta', 'DummyTrapDate'))
 # load weather data
 weatherData <- read.csv('~/WERC-SC/HALE/haleNet_data_9.csv', 
                         stringsAsFactors = FALSE) %>%
@@ -33,7 +29,7 @@ weatherData <- read.csv('~/WERC-SC/HALE/haleNet_data_9.csv',
          DummyWeatherDate = WeatherDate) %>%
   data.table(key = c('Sta_ID', 'DummyWeatherDate'))
 
-cWeekWeather <- trapData2[weatherData, roll = -6] %>%
+cWeekWeather <- trapData[weatherData, roll = -6] %>%
   select(-DummyTrapDate) %>%
   filter(!is.na(catchID)) %>%
   group_by(catchID) %>%
@@ -44,7 +40,7 @@ cWeekWeather <- trapData2[weatherData, roll = -6] %>%
             soilMois = mean(SoilMoisture, na.rm = TRUE),
             solRad = mean(SolarRadiation, na.rm = TRUE))
 
-catchWeather <- left_join(trapData2, cWeekWeather) %>%
+catchWeather <- left_join(trapData, cWeekWeather) %>%
   select(-DummyTrapDate)
 
 
@@ -96,6 +92,7 @@ moonIndex <- function(startDay, endDay, interval = 60, longitude = -156.1552, la
   result
 }
 
+  
 # average hours of moonlight/week using moonlight function
 startDay <- ISOdate(catchWeather$Year_, catchWeather$Month_, catchWeather$Day_, 
                      hour = 12, min = 0, sec = 0, 
@@ -104,67 +101,58 @@ endDay <- ISOdate(catchWeather$Year_, catchWeather$Month_, catchWeather$Day_,
                   hour = 12, min = 0, sec = 0, 
                   tz = 'US/Hawaii')
 
-catchWeather2 <- catchWeather %>% 
+catchLunarWeather <- catchWeather %>% 
   mutate(startDay = as.POSIXct(startDay, format = '%Y-%m-%d %H:%M:%S'),
-         endDay = as.POSIXct(endDay, format = '%Y-%m-%d %H:%M:%S')) %>% 
-  slice(1:500)
-
-catchLunarWeather <- catchWeather2 %>%
+         endDay = as.POSIXct(endDay, format = '%Y-%m-%d %H:%M:%S')) %>%
   mutate(moonIndex = moonIndex(startDay, endDay))
 
-ptm1 <- proc.time()
-catchLunarWeather <- mutate(catchWeather2, moonIndex = moonIndex(startDay, endDay))
-ptm1 <- proc.time() - ptm1
-ptm1
-
-# # final datasheets for spatial analysis
-# spatialCatch <- catch %>% 
-#   filter(TrapChecked == "TRUE") %>% 
-#   select(catchID:Comments, baitType:Season)
-# write.csv(spatialCatch, file = '~/WERC-SC/HALE/catch_11_spatialCatches_20161209.csv',
-#           row.names = FALSE) 
-
 #### RUN CPUE ANALYSIS ON SPATIAL DATA WITH WEATHER AND LUNAR DATA
+# load weather data
+weatherIndex <- catchWeather %>% 
+  select(Trapline, TrapNum, Year_, Month_, Day_, predEvent, Week, Season, WeatherSta, TotalRain:solRad) %>% 
+  # group_by(Trapline, Year_, Month_, Day_) %>% 
+  mutate(PeriodEnding = ISOdatetime(Year_, Month_, Day_, 12, 0, 0, tz = 'US/Hawaii'))
+         # TotalRain = Mode(TotalRain),
+         # Tmin = Mode(Tmin),
+         # Tmax = Mode(Tmax),
+         # relHum = Mode(relHum),
+         # soilMois = Mode(soilMois),
+         # solRad = Mode(solRad))
+# load lunar data
+moonIndex <- read.csv('~/WERC-SC/HALE/catch_11.5_moonIndex.csv', 
+                      stringsAsFactors = FALSE) %>% 
+  mutate(PeriodEnding = ymd_hms(PeriodEnding, tz = 'US/Hawaii'))
 ## if there are multiple predEvents in a week, choose the most important one
-## make "weeklyCatches" a datatable containing all the factors needed for weekly analysis
-weeklyCatches_s <- trapData %>%
+# make "weeklyCatches" a datatable containing all the factors needed for weekly analysis
+weeklyCatches_WL <- trapData %>%
   group_by(Trapline, TrapNum, Year_, Week) %>%
   filter(predEvent == min(predEvent)) %>%
   slice(1) %>%
   ungroup
 
-## count the number of Trapline events (weeklyCatches) and number of each predEvent per week (aka number of traps in the trapline)
-trapsPerLineWeek_s <- weeklyCatches_s %>%
+# count the number of Trapline events (weeklyCatches) and number of each predEvent per week (aka number of traps in the trapline)
+trapsPerLineWeek_WL <- weeklyCatches_WL %>%
   group_by(Trapline, Year_, Season, Month_, Week) %>%
-  dplyr::summarize(NTraps = n(),
-            endDay = max(Date),
-            startDay = endDay - days(6)) %>% 
-  transmute(startDay = ymd(startDay))
+  dplyr::summarize(NTraps = n()) # 
 
 # count number of each predEvent per week per trapline
-predEventsPerLineWeek_s <- weeklyCatches_s %>%
+predEventsPerLineWeek_WL <- weeklyCatches_WL %>%
   group_by(Trapline, Year_, Week, Season, Month_, predEvent) %>%
   dplyr::summarise(NEvents = n(),
                    WeatherSta = Mode(WeatherSta)) 
 
 ## number of predEvents per number of traps, for each week on each Trapline
-predEventPUE_spatial <- merge(trapsPerLineWeek_s, predEventsPerLineWeek_s) %>%
+predEventPUE_L <- merge(trapsPerLineWeek_WL, predEventsPerLineWeek_WL) %>%
+  # transmute(Year_ = as.numeric(Year_)) %>% 
   mutate(CPUE = NEvents/NTraps,
-         cpueID = paste(Trapline, Week,predEvent, sep = "_")) %>% 
-  arrange(Trapline, Year_, Week, predEvent)
+         # cpueID = paste(Trapline, Week, predEvent, sep = "_"),
+         PeriodEnding = ISOdatetime(Year_, 1, 1, 12, 0, 0, 'US/Hawaii') + weeks(Week)) %>% 
+  arrange(Trapline, Year_, Week, predEvent) %>% 
+  left_join(select(moonIndex, PeriodEnding, MoonTime1wk, MoonIllum1wk), by = 'PeriodEnding') 
 
-cpueWeekWeather <- predEventPUE_spatial[weatherData, roll = -6] %>%
-  filter(!is.na(cpueID)) %>%
-  group_by(cpueID) %>%
-  summarize(TotalRain = sum(Rainfall, na.rm = TRUE),
-            Tmin = mean(Tmin, na.rm = TRUE),
-            Tmax = mean(Tmax, na.rm = TRUE),
-            relHum = mean(RelativeHumidity, na.rm = TRUE),
-            soilMois = mean(SoilMoisture, na.rm = TRUE),
-            solRad = mean(SolarRadiation, na.rm = TRUE))
+predEventPUE_WL <- predEventPUE_L %>% 
+  left_join(select(weatherIndex, by = c("x" = "PeriodEnding", "y" = "WeatherSta"), TotalRain, Tmin, Tmax, relHum, soilMois, solRad), by = 'PeriodEnding')
 
-predEventPUE_spatial_weather <- left_join(predEventPUE_spatial, cWeekWeather) %>%
-  select(-DummyTrapDate)
 
 # 
 # ## save to GitHub folder

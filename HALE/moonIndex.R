@@ -57,6 +57,35 @@ moonIndex3 <- function(startDay, endDay, interval = 60, longitude = -156.1552, l
   result
 }
 
+moonIndex4 <- function(startDay, endDay, interval = 60, longitude = -156.1552, latitude = 20.7204) {
+  startDay <- with_tz(startDay, 'UTC')
+  endDay <- with_tz(endDay, 'UTC')
+  interval <- first(interval)
+  cl <- makeCluster(detectCores())
+  registerDoParallel(cl)
+  result <- foreach(s = startDay, e = endDay, 
+                    .combine = rbind, 
+                    .packages = c('oce')) %dopar% {
+    t <- seq(from = s, to = e, by = interval)
+    period = difftime(e, s, units = 'days') %>% as.numeric
+    sunAlt <- sunAngle(t, longitude, latitude)$altitude
+    moon <- moonAngle(t, longitude, latitude)
+    moonAlt <- moon$altitude
+    moonOnly <- moonAlt > 0 & sunAlt < 0
+    moonIllum <- mean(moon$illuminatedFraction[moonOnly])
+    moonTime = sum(moonOnly) * interval / period
+    data.frame(moonTime = moonTime, moonIllum = moonIllum)
+  }
+  stopCluster(cl)
+  result
+}
+
+endDates = seq(from = ymd_hm('2000-01-01 12:00', tz = 'US/Hawaii'),
+               to = ymd_hm('2014-12-31 12:00', tz = 'US/Hawaii'),
+               by = '1 days')
+startDates1wk = endDates - days(6)
+startDates2wk
+
 catch <- read.csv('catchLunarWeather_slice.csv', stringsAsFactors = FALSE) %>%
   mutate(startDay = ymd_hms(startDay, tz = 'US/Hawaii'),
          endDay = ymd_hms(endDay, tz = 'US/Hawaii')) %>%

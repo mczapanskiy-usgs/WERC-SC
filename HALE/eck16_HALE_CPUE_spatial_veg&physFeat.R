@@ -10,7 +10,7 @@ library(stringr)
 library(ggplot2)
 library(mosaic)
 
-read.csv('~/WERC-SC/HALE/catch_12_spatialCatches_20170109.csv',
+read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv',
          stringsAsFactors = FALSE) -> catch_spatial
 
 ## look at data
@@ -58,6 +58,14 @@ structures <- catch_spatial %>%
          trailFreq = percent_rank(DistTrail),
          fenceFreq = percent_rank(DistFence),
          shelterFreq = percent_rank(DistShelter))
+
+ann_structures <- structures %>% 
+  group_by(Year_) %>% 
+  summarize(distRoad = ave(DistRoad),
+            distTrail = ave(DistTrail),
+            distFence = ave(DistFence),
+            distShelter = ave(DistShelter))
+
 # graph data
 roadHist <- ggplot(structures, aes(DistRoad)) +
   geom_histogram(binwidth = 100) +
