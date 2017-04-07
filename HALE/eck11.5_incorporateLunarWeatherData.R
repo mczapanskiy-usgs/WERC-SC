@@ -106,18 +106,39 @@ catchLunarWeather <- catchWeather %>%
          endDay = as.POSIXct(endDay, format = '%Y-%m-%d %H:%M:%S')) %>%
   mutate(moonIndex = moonIndex(startDay, endDay))
 
+
 #### RUN CPUE ANALYSIS ON SPATIAL DATA WITH WEATHER AND LUNAR DATA
 # load weather data
-weatherIndex <- catchWeather %>% 
-  select(Trapline, TrapNum, Year_, Month_, Day_, predEvent, Week, Season, WeatherSta, TotalRain:solRad) %>% 
-  # group_by(Trapline, Year_, Month_, Day_) %>% 
-  mutate(PeriodEnding = ISOdatetime(Year_, Month_, Day_, 12, 0, 0, tz = 'US/Hawaii'))
-         # TotalRain = Mode(TotalRain),
-         # Tmin = Mode(Tmin),
-         # Tmax = Mode(Tmax),
-         # relHum = Mode(relHum),
-         # soilMois = Mode(soilMois),
-         # solRad = Mode(solRad))
+weatherIndex <- read.csv('~/WERC-SC/HALE/haleNet_data_9.csv', 
+                         stringsAsFactors = FALSE) %>%
+  mutate(WeatherDate = ymd(Date),
+         Week = as.numeric(as.period(lubridate::interval(min(WeatherDate), WeatherDate) %/% weeks(1)))) %>% 
+  group_by(Year, Week, Sta_ID) %>%
+  summarize(TotalRain = sum(Rainfall, na.rm = TRUE),
+            Tmin = mean(Tmin, na.rm = TRUE),
+            Tmax = mean(Tmax, na.rm = TRUE),
+            relHum = mean(RelativeHumidity, na.rm = TRUE),
+            soilMois = mean(SoilMoisture, na.rm = TRUE),
+            solRad = mean(SolarRadiation, na.rm = TRUE)) %>% 
+  mutate(PeriodEnding = ISOdatetime(Year, 1, 1, 12, 0, 0, tz = 'US/Hawaii') + weeks(Week))
+  
+  # select(Trapline, TrapNum, Year_, Month_, Day_, predEvent, Week, Season, WeatherSta, TotalRain:solRad) %>% 
+  # mutate(PeriodEnding = ISOdatetime(Year_, Month_, Day_, 12, 0, 0, tz = 'US/Hawaii')) %>% 
+  # group_by(Trapline, PeriodEnding) %>%
+  # dplyr::summarise(TotalRain = Mode(TotalRain),
+  #                  Tmin = Mode(Tmin),
+  #                  Tmax = Mode(Tmax),
+  #                  relHum = Mode(relHum),
+  #                  soilMois = Mode(soilMois),
+  #                  solRad = Mode(solRad)) %>% 
+  # ungroup
+
+trapData_WeatherSta <- trapData %>% 
+  select(Trapline, TrapNum, Year_, Month_, Day_, predEvent, Week, Season, WeatherSta) %>% 
+  mutate(PeriodEnding = ISOdatetime(Year_, Month_, Day_, 12, 0, 0, tz = 'US/Hawaii')) %>% 
+  group_by(Trapline, PeriodEnding) %>% 
+  dplyr::summarise(WeatherSta = Mode(WeatherSta))
+
 # load lunar data
 moonIndex <- read.csv('~/WERC-SC/HALE/catch_11.5_moonIndex.csv', 
                       stringsAsFactors = FALSE) %>% 
@@ -142,16 +163,15 @@ predEventsPerLineWeek_WL <- weeklyCatches_WL %>%
                    WeatherSta = Mode(WeatherSta)) 
 
 ## number of predEvents per number of traps, for each week on each Trapline
-predEventPUE_L <- merge(trapsPerLineWeek_WL, predEventsPerLineWeek_WL) %>%
+predEventPUE_WL <- merge(trapsPerLineWeek_WL, predEventsPerLineWeek_WL) %>%
   # transmute(Year_ = as.numeric(Year_)) %>% 
   mutate(CPUE = NEvents/NTraps,
          # cpueID = paste(Trapline, Week, predEvent, sep = "_"),
          PeriodEnding = ISOdatetime(Year_, 1, 1, 12, 0, 0, 'US/Hawaii') + weeks(Week)) %>% 
   arrange(Trapline, Year_, Week, predEvent) %>% 
-  left_join(select(moonIndex, PeriodEnding, MoonTime1wk, MoonIllum1wk), by = 'PeriodEnding') 
-
-predEventPUE_WL <- predEventPUE_L %>% 
-  left_join(select(weatherIndex, by = c("x" = "PeriodEnding", "y" = "WeatherSta"), TotalRain, Tmin, Tmax, relHum, soilMois, solRad), by = 'PeriodEnding')
+  left_join(select(moonIndex, PeriodEnding, MoonTime1wk, MoonIllum1wk), by = 'PeriodEnding') %>% 
+  left_join(select(weatherIndex, TotalRain, Tmin, Tmax, relHum, soilMois, solRad), 
+                   by = c('PeriodEnding' = 'PeriodEnding', 'WeatherSta' = 'Sta_ID'))
 
 
 # 
@@ -160,8 +180,7 @@ predEventPUE_WL <- predEventPUE_L %>%
 # write.csv(predEventPUE, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
 #           row.names = FALSE) 
 # # weekly catch for each trap, with season code
-# write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches_20161209.csv',
-#           row.names = FALSE) 
+# write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches_20161209.csv', row.names = FALSE) 
 
 
 
