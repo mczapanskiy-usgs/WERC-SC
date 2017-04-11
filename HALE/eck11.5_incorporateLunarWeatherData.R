@@ -5,6 +5,8 @@ library(oce)
 library(ggplot2)
 library(foreach)
 library(doParallel)
+library(zoo)
+
 
 #### FUNCTION TO GET THE STATISTICAL MODE
 Mode <- function(x) {
@@ -25,11 +27,13 @@ trapData <- read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv',
 # load weather data
 weatherData <- read.csv('~/WERC-SC/HALE/haleNet_data_9.csv', 
                         stringsAsFactors = FALSE) %>%
-  mutate(WeatherDate = ymd(Date),
-         DummyWeatherDate = WeatherDate) %>%
+  mutate(WeatherDate = ymd(Date, tz = 'US/Hawaii'))
+
+weatherData.dt <- weatherData %>% 
+  mutate(DummyWeatherDate = WeatherDate) %>%
   data.table(key = c('Sta_ID', 'DummyWeatherDate'))
 
-cWeekWeather <- trapData[weatherData, roll = -6] %>%
+cWeekWeather <- trapData[weatherData.dt, roll = -6] %>%
   select(-DummyTrapDate) %>%
   filter(!is.na(catchID)) %>%
   group_by(catchID) %>%
@@ -109,30 +113,16 @@ catchLunarWeather <- catchWeather %>%
 
 #### RUN CPUE ANALYSIS ON SPATIAL DATA WITH WEATHER AND LUNAR DATA
 # load weather data
-weatherIndex <- read.csv('~/WERC-SC/HALE/haleNet_data_9.csv', 
-                         stringsAsFactors = FALSE) %>%
-  mutate(WeatherDate = ymd(Date),
-         Week = as.numeric(as.period(lubridate::interval(min(WeatherDate), WeatherDate) %/% weeks(1)))) %>% 
-  group_by(Year, Week, Sta_ID) %>%
-  summarize(TotalRain = sum(Rainfall, na.rm = TRUE),
-            Tmin = mean(Tmin, na.rm = TRUE),
-            Tmax = mean(Tmax, na.rm = TRUE),
-            relHum = mean(RelativeHumidity, na.rm = TRUE),
-            soilMois = mean(SoilMoisture, na.rm = TRUE),
-            solRad = mean(SolarRadiation, na.rm = TRUE)) %>% 
-  mutate(PeriodEnding = ISOdatetime(Year, 1, 1, 12, 0, 0, tz = 'US/Hawaii') + weeks(Week))
+weatherIndex <- weatherData %>%
+  group_by(Sta_ID) %>%
+  mutate(TotalRain = rollapply(Rainfall, 7, sum, na.rm =TRUE, fill = NA, align = 'right'),
+         meanRelHum = rollapply(RelativeHumidity, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
+         meanSoilMois = rollapply(SoilMoisture, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
+         meanSolRad = rollapply(SolarRadiation, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
+         meanTmax = rollapply(Tmax, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
+         meanTmin = rollapply(Tmin, 7, mean, na.rm = TRUE, fill = NA, align = 'right'))
   
-  # select(Trapline, TrapNum, Year_, Month_, Day_, predEvent, Week, Season, WeatherSta, TotalRain:solRad) %>% 
-  # mutate(PeriodEnding = ISOdatetime(Year_, Month_, Day_, 12, 0, 0, tz = 'US/Hawaii')) %>% 
-  # group_by(Trapline, PeriodEnding) %>%
-  # dplyr::summarise(TotalRain = Mode(TotalRain),
-  #                  Tmin = Mode(Tmin),
-  #                  Tmax = Mode(Tmax),
-  #                  relHum = Mode(relHum),
-  #                  soilMois = Mode(soilMois),
-  #                  solRad = Mode(solRad)) %>% 
-  # ungroup
-
+# test of data is being pulled from the right weather station for each trapline
 trapData_WeatherSta <- trapData %>% 
   select(Trapline, TrapNum, Year_, Month_, Day_, predEvent, Week, Season, WeatherSta) %>% 
   mutate(PeriodEnding = ISOdatetime(Year_, Month_, Day_, 12, 0, 0, tz = 'US/Hawaii')) %>% 
@@ -170,8 +160,8 @@ predEventPUE_WL <- merge(trapsPerLineWeek_WL, predEventsPerLineWeek_WL) %>%
          PeriodEnding = ISOdatetime(Year_, 1, 1, 12, 0, 0, 'US/Hawaii') + weeks(Week)) %>% 
   arrange(Trapline, Year_, Week, predEvent) %>% 
   left_join(select(moonIndex, PeriodEnding, MoonTime1wk, MoonIllum1wk), by = 'PeriodEnding') %>% 
-  left_join(select(weatherIndex, TotalRain, Tmin, Tmax, relHum, soilMois, solRad), 
-                   by = c('PeriodEnding' = 'PeriodEnding', 'WeatherSta' = 'Sta_ID'))
+  left_join(select(weatherIndex, WeatherDate, Sta_ID, TotalRain, meanRelHum, meanSoilMois, meanSolRad, meanTmin, meanTmax), 
+                   by = c('PeriodEnding' = 'WeatherDate', 'WeatherSta' = 'Sta_ID'))
 
 
 # 

@@ -35,13 +35,18 @@ data_rev <- CPUEdata %>%
     loc = mosaic::derivedFactor(
       front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
       back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
-      .default = "back")) 
+      .default = "back"),
+    eventCnoC = mosaic::derivedFactor(
+      "event" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught', 'birdOtherCaught', 'trapTriggered', 'baitLost'),
+      "none" = predEvent == "none", 
+      .default = "none")
+    ) 
 
 #### RESTRUCTURE DATA FUNCTION
   formatData <- function(data){
     # Reshape data so that there is one row for every option, for every choice situation. 
     # Here are the possible outcomes every time the trap is set:
-    events <- unique(data$predEvent) # events <- unique(data$eventType) # 
+    events <- unique(data$eventCnoC) # events <- unique(data$predEvent) # events <- unique(data$eventType) # 
     # And here are the number of choice situations:
     nEvents <- sum(data$NEvents)
     
@@ -54,7 +59,7 @@ data_rev <- CPUEdata %>%
     # Do this with the merge function.  The alternative names will be stored in column `x`.
     expanded_data <- merge(events, data2)
     expanded_data <- expanded_data %>% 
-      mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # mutate(choice = ifelse(x==eventType, TRUE, FALSE), # 
+      mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE),  # mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # mutate(choice = ifelse(x==eventType, TRUE, FALSE), # 
              YearCat = as.factor(Year),
              YearCts = as.numeric(Year))
     return(expanded_data)
@@ -80,9 +85,13 @@ data_events <- data_rev %>%
   dplyr::summarise(NEvents=sum(NEvents)) %>%
   mutate(CPUE = NEvents/NTraps) %>% # this line optional
   as.data.frame()
-# e = "eventType"
 expanded_data.events <- formatData(data_events)
-# expanded_data.events$Year <- as.numeric(expanded_data.events$Year)
+# also run for 2 event types: event, no event
+data_CnoC <- data_rev %>%
+  group_by(Trapline, Week, Year, Season, Month, NTraps, loc, eventCnoC) %>%
+  dplyr::summarise(NEvents=sum(NEvents)) %>%
+  as.data.frame()
+expanded_data.CnoC<- formatData(data_CnoC)
 
 #### RUN mlogt MODELS
 ## create model list
@@ -255,6 +264,7 @@ cpue3events <- mlogit.data(expanded_data.events %>%
                            id.var = "trapyr",
                            shape="long", 
                            chid.var="chid")
+                 
 cpue.models[[11]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
@@ -274,14 +284,27 @@ summary(cpue.models[[12]])
 # compare AIC
 AIC(cpue.models[[11]])
 AIC(cpue.models[[12]])
-
-## Trapline & Season = individual-specific variables
+## REMOVED TRAPLINE AS INDIV-SPP EFFECT
+# Year & Season = individual-specific variables
 cpue.models[[13]] <- mlogit(choice ~ 0 | Season + YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events)
 summary(cpue.models[[13]]) # runs
-
+## run on 2 events: event, no event
+cpue2events <- mlogit.data(expanded_data.CnoC %>% 
+                             # filter(loc == "front") %>%
+                             mutate(trapyr=paste0(Trapline,'-',YearCat)), # mutate(trapyr=paste0(Trapline,'-',Year)), 
+                           choice="choice",
+                           alt.var ="x", 
+                           id.var = "trapyr",
+                           shape="long", 
+                           chid.var="chid")
+cpue.models[[13.1]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            reflevel = "none",
+                            iterlim=1, print.level=1,
+                            data=cpue2events)
+summary(cpue.models[[13.1]]) # runs
 # and random effects
 cpue.models[[14]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
@@ -292,10 +315,18 @@ cpue.models[[14]] <- mlogit(choice ~ 1 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue3events)
 summary(cpue.models[[14]]) # "missing value where TRUE/FALSE needed"
-
+## run on 2 events: event, no event
+cpue.models[[14.1]] <- mlogit(choice ~ 1 | Season + YearCts,
+                            rpar=c('event:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE, # correlation = TRUE,
+                            reflevel = "none",
+                            iterlim=1, print.level=1,
+                            data=cpue2events)
+summary(cpue.models[[14.1]]) # "missing value where TRUE/FALSE needed"
 
 #### RANDOM EFFECTS 
-## year = random variable
+## year = random variable, year + season = indiv. spp.
 cpue.year2 <- mlogit.data(expanded_data,
                          # %>% filter(loc == "front"), # %>% filter(Trapline %in% c('A')) # >>> too many zeros
                          choice="choice",
@@ -303,21 +334,21 @@ cpue.year2 <- mlogit.data(expanded_data,
                          id.var = "YearCat",
                          shape="long", 
                          chid.var="chid")
-cpue.models[[15]] <- mlogit(choice ~ 0 | Season + Year,
+cpue.models[[15]] <- mlogit(choice ~ 0 | Season + YearCts,
                            rpar=c('ratCaught:(intercept)'='n',
                                   'mongooseCaught:(intercept)'='n'),
                            R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
                            data=cpue.year2) # "missing value where TRUE/FALSE needed"
-## Trapline = random variable 
+## Trapline = random variable, year + season = indiv. spp. 
 cpue.trap2 <- mlogit.data(expanded_data, # %>% filter(loc == "front"), 
                          choice="choice",
                          alt.var ="x", 
                          id.var = "Trapline",
                          shape="long", 
                          chid.var="chid")
-cpue.models[[16]] <- mlogit(choice ~ 0 | Season + Year,
+cpue.models[[16]] <- mlogit(choice ~ 0 | Season + YearCts,
                            rpar=c('ratCaught:(intercept)'='n',
                                   'mongooseCaught:(intercept)'='n'),
                            R=50, halton=NA,
@@ -325,21 +356,21 @@ cpue.models[[16]] <- mlogit(choice ~ 0 | Season + Year,
                            iterlim=1, print.level=1,
                            data=cpue.trap2) # "missing value where TRUE/FALSE needed"
 ## Trapline and Year = random variable 
-cpue.trapyr2 <- mlogit.data(expanded_data, # %>% 
-                             # filter(loc == "back") %>% # filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))) %>% # 
+cpue.trapyr2 <- mlogit.data(expanded_data %>% 
+                             # %>% filter(loc == "back") %>% # filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))) %>% # 
                              mutate(trapyr=paste0(Trapline,'-',YearCat)),
                            choice="choice",
                            alt.var ="x", 
                            id.var = "trapyr",
                            shape="long", 
                            chid.var="chid")
-cpue.models[[17]] <- mlogit(choice ~ 0 | Season + Year,
+cpue.models[[17]] <- mlogit(choice ~ 0 | Season + YearCts,
                            rpar=c('ratCaught:(intercept)'='n',
                                   'mongooseCaught:(intercept)'='n'),
                            R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
-                           data=cpue.trapyr2) 
+                           data=cpue.trapyr2) # "missing value where TRUE/FALSE needed"
 
 ### PREDS ONLY ANALYSIS: compare 3 random effect options
 # Year = random variable, Trapline, Season, Year = individual-specific variables
