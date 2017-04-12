@@ -12,6 +12,11 @@ library(mosaic)
 read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
           stringsAsFactors = FALSE) -> CPUEdata
 
+read.csv('~/WERC-SC/HALE/predEventPUE_climate_11.5.csv',
+         stringsAsFactors = FALSE) -> CPUEdata_WL
+
+
+
 ## normal distribution? freq hist should be ~symetical, SD of most variable sample should be <10x the SD of least variable sample
 hist(CPUEdata$CPUE)
 sd(CPUEdata$CPUE)
@@ -25,7 +30,7 @@ with(CPUEdata, table(Season, predEvent))
 with(CPUEdata, table(Trapline, predEvent, Season))
 
 #### EDIT DATA: remove the mouse events, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
-data_rev <- CPUEdata %>% 
+data_rev <- CPUEdata_WL %>% 
   filter(predEvent != 'mouseCaught') %>% 
   mutate(eventType = mosaic::derivedFactor(
     "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
@@ -46,7 +51,7 @@ data_rev <- CPUEdata %>%
   formatData <- function(data){
     # Reshape data so that there is one row for every option, for every choice situation. 
     # Here are the possible outcomes every time the trap is set:
-    events <- unique(data$eventCnoC) # events <- unique(data$predEvent) # events <- unique(data$eventType) # 
+    events <- unique(data$predEvent) # events <- unique(data$eventType) # events <- unique(data$eventCnoC) # 
     # And here are the number of choice situations:
     nEvents <- sum(data$NEvents)
     
@@ -59,7 +64,7 @@ data_rev <- CPUEdata %>%
     # Do this with the merge function.  The alternative names will be stored in column `x`.
     expanded_data <- merge(events, data2)
     expanded_data <- expanded_data %>% 
-      mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE),  # mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # mutate(choice = ifelse(x==eventType, TRUE, FALSE), # 
+      mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # mutate(choice = ifelse(x==eventType, TRUE, FALSE), # mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE),  
              YearCat = as.factor(Year),
              YearCts = as.numeric(Year))
     return(expanded_data)
@@ -293,7 +298,7 @@ cpue.models[[13]] <- mlogit(choice ~ 0 | Season + YearCts,
 summary(cpue.models[[13]]) # runs
 ## run on 2 events: event, no event
 cpue2events <- mlogit.data(expanded_data.CnoC %>% 
-                             # filter(loc == "front") %>%
+                             filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))) %>%# filter(loc == "front") %>%
                              mutate(trapyr=paste0(Trapline,'-',YearCat)), # mutate(trapyr=paste0(Trapline,'-',Year)), 
                            choice="choice",
                            alt.var ="x", 

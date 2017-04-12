@@ -115,19 +115,20 @@ catchLunarWeather <- catchWeather %>%
 # load weather data
 weatherIndex <- weatherData %>%
   group_by(Sta_ID) %>%
-  mutate(TotalRain = rollapply(Rainfall, 7, sum, na.rm =TRUE, fill = NA, align = 'right'),
+  mutate(total3monRain = rollapply(Rainfall, 89, sum, na.rm =TRUE, fill = NA, align = 'right'), # wet season (Oct-Mar) and dry season (Apr-Sept) last 6 months, half of that (KRUSHELNYCKY, et al. 2013)
+         totalWeekRain = rollapply(Rainfall, 7, sum, na.rm =TRUE, fill = NA, align = 'right'),
          meanRelHum = rollapply(RelativeHumidity, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
          meanSoilMois = rollapply(SoilMoisture, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
          meanSolRad = rollapply(SolarRadiation, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
          meanTmax = rollapply(Tmax, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
          meanTmin = rollapply(Tmin, 7, mean, na.rm = TRUE, fill = NA, align = 'right'))
   
-# test of data is being pulled from the right weather station for each trapline
-trapData_WeatherSta <- trapData %>% 
-  select(Trapline, TrapNum, Year_, Month_, Day_, predEvent, Week, Season, WeatherSta) %>% 
-  mutate(PeriodEnding = ISOdatetime(Year_, Month_, Day_, 12, 0, 0, tz = 'US/Hawaii')) %>% 
-  group_by(Trapline, PeriodEnding) %>% 
-  dplyr::summarise(WeatherSta = Mode(WeatherSta))
+# # test of data is being pulled from the right weather station for each trapline
+# trapData_WeatherSta <- trapData %>% 
+#   select(Trapline, TrapNum, Year_, Month_, Day_, predEvent, Week, Season, WeatherSta) %>% 
+#   mutate(PeriodEnding = ISOdatetime(Year_, Month_, Day_, 12, 0, 0, tz = 'US/Hawaii')) %>% 
+#   group_by(Trapline, PeriodEnding) %>% 
+#   dplyr::summarise(WeatherSta = Mode(WeatherSta))
 
 # load lunar data
 moonIndex <- read.csv('~/WERC-SC/HALE/catch_11.5_moonIndex.csv', 
@@ -154,23 +155,18 @@ predEventsPerLineWeek_WL <- weeklyCatches_WL %>%
 
 ## number of predEvents per number of traps, for each week on each Trapline
 predEventPUE_WL <- merge(trapsPerLineWeek_WL, predEventsPerLineWeek_WL) %>%
-  # transmute(Year_ = as.numeric(Year_)) %>% 
   mutate(CPUE = NEvents/NTraps,
-         # cpueID = paste(Trapline, Week, predEvent, sep = "_"),
          PeriodEnding = ISOdatetime(Year_, 1, 1, 12, 0, 0, 'US/Hawaii') + weeks(Week)) %>% 
   arrange(Trapline, Year_, Week, predEvent) %>% 
   left_join(select(moonIndex, PeriodEnding, MoonTime1wk, MoonIllum1wk), by = 'PeriodEnding') %>% 
-  left_join(select(weatherIndex, WeatherDate, Sta_ID, TotalRain, meanRelHum, meanSoilMois, meanSolRad, meanTmin, meanTmax), 
+  left_join(select(weatherIndex, WeatherDate, Sta_ID, total3monRain, totalWeekRain, meanRelHum, meanSoilMois, meanSolRad, meanTmin, meanTmax), 
                    by = c('PeriodEnding' = 'WeatherDate', 'WeatherSta' = 'Sta_ID'))
 
 
-# 
-# ## save to GitHub folder
-# # predEventPUE data file
-# write.csv(predEventPUE, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
-#           row.names = FALSE) 
-# # weekly catch for each trap, with season code
-# write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches_20161209.csv', row.names = FALSE) 
+## save predEventPUE_WL data file to GitHub folder
+write.csv(predEventPUE_WL, file = '~/WERC-SC/HALE/predEventPUE_climate_11.5.csv',
+          row.names = FALSE)
+
 
 
 

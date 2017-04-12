@@ -58,15 +58,15 @@ structures <- catch_spatial %>%
          trailFreq = percent_rank(DistTrail),
          fenceFreq = percent_rank(DistFence),
          shelterFreq = percent_rank(DistShelter))
+# ann_structures <- structures %>% 
+#   group_by(Year_) %>% 
+#   summarize(distRoad = ave(DistRoad),
+#             distTrail = ave(DistTrail),
+#             distFence = ave(DistFence),
+#             distShelter = ave(DistShelter))
 
-ann_structures <- structures %>% 
-  group_by(Year_) %>% 
-  summarize(distRoad = ave(DistRoad),
-            distTrail = ave(DistTrail),
-            distFence = ave(DistFence),
-            distShelter = ave(DistShelter))
-
-# graph data
+##### graph data
+#road
 roadHist <- ggplot(structures, aes(DistRoad)) +
   geom_histogram(binwidth = 100) +
   facet_wrap(~ predEvent, scales = "free") +
@@ -78,6 +78,19 @@ road <- ggplot(structures, aes(predEvent, DistRoad)) +
   theme_bw()
 road %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
+roadFreq <- ggplot(structures, aes(DistRoad, colour = predEvent)) +
+  geom_freqpoly(binwidth = 100) +
+  ylim(0, 60000) +
+  theme_bw()
+roadFreq %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+roadFreq_all <- ggplot(structures, aes(DistRoad)) +
+  geom_freqpoly(binwidth = 100) +
+  theme_bw()
+roadFreq_all %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+
+# trail
 trailHist <- ggplot(structures, aes(DistTrail)) +
   geom_histogram(binwidth = 100) +
   facet_wrap(~ predEvent, scales = "free") +
@@ -89,6 +102,19 @@ trail <- ggplot(structures, aes(predEvent, DistTrail)) +
   theme_bw()
 trail %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
+trailFreq <- ggplot(structures, aes(DistTrail, colour = predEvent)) +
+  geom_freqpoly(binwidth = 100) +
+  ylim(0, 80000) +
+  theme_bw()
+trailFreq %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+trailFreq_all <- ggplot(structures, aes(DistTrail)) +
+  geom_freqpoly(binwidth = 100) +
+  theme_bw()
+trailFreq_all %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+
+# fence
 fenceHist <- ggplot(structures, aes(DistFence)) +
   geom_histogram(binwidth = 100) +
   facet_wrap(~ predEvent, scales = "free") +
@@ -100,6 +126,19 @@ fence <- ggplot(structures, aes(predEvent, DistFence)) +
   theme_bw()
 fence %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
+fenceFreq <- ggplot(structures, aes(DistFence, colour = predEvent)) +
+  geom_freqpoly(binwidth = 100) +
+  ylim(0, 63000) +
+  theme_bw()
+fenceFreq %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+fenceFreq_all <- ggplot(structures, aes(DistFence)) +
+  geom_freqpoly(binwidth = 100) +
+  theme_bw()
+fenceFreq_all %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+
+# shelter
 shelterHist <- ggplot(structures, aes(DistShelter)) +
   geom_histogram(binwidth = 100) +
   facet_wrap(~ predEvent, scales = "free") +
@@ -110,6 +149,19 @@ shelter <- ggplot(structures, aes(predEvent, DistShelter)) +
   # facet_wrap((~ predEvent)) +
   theme_bw()
 shelter %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+shelterFreq <- ggplot(structures, aes(DistShelter, colour = predEvent)) +
+  geom_freqpoly(binwidth = 100) +
+  ylim(0, 34000) +
+  theme_bw()
+shelterFreq %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+shelterFreq_all <- ggplot(structures, aes(DistShelter)) +
+  geom_freqpoly(binwidth = 100) +
+  theme_bw()
+shelterFreq_all %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+
 
 ## PHYSICAL FEATURES
 # get frequency of features

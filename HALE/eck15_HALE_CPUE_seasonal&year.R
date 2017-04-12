@@ -41,6 +41,25 @@ seas_pred <- ggplot(catch_EventPUE, aes(predEvent, fill = Season)) +
   theme(axis.text.x = element_text(angle=60, hjust=1)) 
 seas_pred %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
 
+### YEAR
+# GRAPH annual average CPUE and SD
+CPUE_yr <- ggplot(annualCPUE, aes(Year_, annCPUE)) +
+  geom_errorbar(aes(ymin=annCPUE-sdCPUE, ymax=annCPUE+sdCPUE), colour="black", width=.1) +
+  geom_line() +
+  geom_point() + 
+  facet_wrap(~ predEvent) +
+  theme_bw() +
+  labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort')
+CPUE_yr %+% subset(annualCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+CPUE_yr_preds <- ggplot(annualCPUE, aes(Year_, annCPUE)) +
+  geom_errorbar(aes(ymin=annCPUE-sdCPUE, ymax=annCPUE+sdCPUE), colour="black", width=.1) +
+  geom_line() +
+  geom_point() + 
+  facet_wrap(~ predEvent, nrow = 3) +
+  ylim(NA, 1) +
+  theme_bw() +
+  labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort')
+CPUE_yr_preds %+% subset(annualCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 
 ## ggplot(mpg, aes(reorder_size(class))) + geom_bar()
 
