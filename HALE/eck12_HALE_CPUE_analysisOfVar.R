@@ -430,7 +430,7 @@ cpue.models[[20]] <- mlogit(choice ~ 0 | Season + YearCts,
                            data=cpue.trapyr.caughts2)
 # without any random effects, Trapline, Season, Year = individual-specific variables
 cpue.caughts2 <- mlogit.data(expanded_data.Caughts_only,
-                            # %>% filter(loc == "front"),  
+                            # %>% filter(loc == "front"),
                             choice="choice",
                             alt.var ="x", 
                             shape="long", 
@@ -447,7 +447,7 @@ cpue.trap.caughts3 <- mlogit.data(expanded_data.Caughts_none %>%
                                   id.var = "Trapline",
                                   shape="long", 
                                   chid.var="chid")
-cpue.models[[21]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[21.1]] <- mlogit(choice ~ 0 | Season + YearCts,
                             rpar=c('catCaught:(intercept)'='n',
                                    'ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
@@ -457,16 +457,50 @@ cpue.models[[21]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.trap.caughts3) # "missing value where TRUE/FALSE needed"
 
-
-summary(cpue.models[[18]])
-summary(cpue.models[[19]])
-summary(cpue.models[[20]])
-summary(cpue.models[[21]])
-
 # now compare AIC models between models 4 - 7
 AIC(cpue.models[[18]])
 AIC(cpue.models[[19]])
 AIC(cpue.models[[20]])
 AIC(cpue.models[[21]])
 
-apply(fitted)
+# view model summaries
+summary(cpue.models[[19]])
+
+### analyze results for model 19 (the best fit for the "caughts_only" data)
+## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
+myfitted <- fitted(cpue.models[[19]], outcome=FALSE)
+# head(myfitted)
+# dim(myfitted)
+# dim(expanded_data.Caughts_only)
+
+## select year, season, and trapline data for the fitted values
+# Copy data and thin it down to one row per chid (i.e. 33543 rows becomes 11181; because myfitted (above) is already thinned to 11181 rows)
+fitted_cpue <- expanded_data.Caughts_only %>%
+  select(chid, Trapline, Year, Season) %>%
+  unique()
+# then `cbind` the data in `fitted_cpue` with the fitted values in `myfitted`
+fitted_cpue <- cbind(fitted_cpue, myfitted) %>%
+  # thin the fitted values further (i.e. remove replicates and keep the unique combos of Trapline, Year, & Season)
+  select(-chid) %>%
+  unique()
+
+cSeason <- ggplot(fitted_cpue, aes(Season, catCaught))
+cSeason + geom_boxplot()
+
+rSeason <- ggplot(fitted_cpue, aes(Season, ratCaught))
+rSeason + geom_boxplot()
+
+mSeason <- ggplot(fitted_cpue, aes(Season, mongooseCaught))
+mSeason + geom_boxplot()
+
+cTrapline <- ggplot(fitted_cpue, aes(Trapline, catCaught))
+cTrapline + geom_boxplot()
+
+rTrapline <- ggplot(fitted_cpue, aes(Trapline, ratCaught))
+rTrapline + geom_boxplot()
+
+mTrapline <- ggplot(fitted_cpue, aes(Trapline, mongooseCaught))
+mTrapline + geom_boxplot()
+
+
+# apply(fitted)

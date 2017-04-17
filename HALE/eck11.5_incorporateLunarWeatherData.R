@@ -164,7 +164,7 @@ predEventPUE_WL <- merge(trapsPerLineWeek_WL, predEventsPerLineWeek_WL) %>%
 
 
 ## save predEventPUE_WL data file to GitHub folder
-write.csv(predEventPUE_WL, file = '~/WERC-SC/HALE/predEventPUE_climate_11.5.csv',
+write.csv(predEventPUE_WL, file = '~/WERC-SC/HALE/predEventPUE_WL_11.5.csv',
           row.names = FALSE)
 
 
