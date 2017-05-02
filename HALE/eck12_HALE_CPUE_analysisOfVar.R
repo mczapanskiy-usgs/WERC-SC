@@ -79,6 +79,9 @@ expanded_data.Caughts_only <- formatData(data.Caughts_only)
 #        filter(choice==TRUE), # filter(choice==TRUE & Trapline=='A'),
 #      table(predEvent, Trapline))
 
+data.test <- data_rev %>% 
+  filter(predEvent %in% c("baitLost", "trapTriggered"))
+expanded_data.test <- formatData(data.test)
 
 ## with predator + nothing caught data
 data.Caughts_none <- data_rev %>% 
@@ -440,7 +443,7 @@ cpue.models[[21]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
                             data=cpue.caughts2) 
 
 # Trapline = random variable, Trapline, Season, Year = individual-specific variables
-cpue.trap.caughts3 <- mlogit.data(expanded_data.Caughts_none %>%
+cpue.trap.caughts3 <- mlogit.data(expanded_data.Caughts_none %>% 
                                   filter(loc == "front"), # filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), # 
                                   choice="choice",
                                   alt.var ="x", 
@@ -465,6 +468,24 @@ AIC(cpue.models[[21]])
 
 # view model summaries
 summary(cpue.models[[19]])
+
+
+# Trapline = random variable, Trapline, Season, Year = individual-specific variables
+cpue.test <- mlogit.data(expanded_data.test, # %>%
+                                  # filter(loc == "front"), 
+                                  choice="choice",
+                                  alt.var ="x", 
+                                  id.var = "Trapline",
+                                  shape="long", 
+                                  chid.var="chid")
+cpue.models[[22]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('trapTriggered:(intercept)'='n')
+                            #        'trapTriggered:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            # reflevel = "ratCaught",
+                            iterlim=1, print.level=1,
+                            data=cpue.test)
 
 ### analyze results for model 19 (the best fit for the "caughts_only" data)
 ## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season

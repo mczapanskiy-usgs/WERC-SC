@@ -83,9 +83,7 @@ expanded_data.CnoC_WL<- formatData(data_CnoC_WL)
 ## create model list
 cpue_WL.models <- list()
 ### PREDS ONLY ANALYSIS: compare 3 random effect options
-
-cpue.caughts.WL <- mlogit.data(expanded_data.Caughts_only_WL,
-                                  # %>% filter(loc == "front"), # %>% filter(Trapline %in% c('A')) # >>> too many zeros
+cpue.caughts.WL <- mlogit.data(expanded_data.Caughts_only_WL, # %>% filter(loc == "front"), 
                                   choice="choice",
                                   alt.var ="x", 
                                   id.var = "Trapline",
@@ -98,24 +96,130 @@ cpue_WL.models[[1]] <- mlogit(choice ~ 0 | Season + MoonTime1wk + MoonIllum1wk,
                             R=50, halton=NA,
                             panel=TRUE,
                             iterlim=1, print.level=1,
-                            data=cpue.caughts.WL) 
-# WEATHER
-cpue_WL.models[[2]] <- mlogit(choice ~ 0 | Season + total3monRain + totalWeekRain,
+                            data=cpue.caughts.WL)
+cpue_WL.models[[2]] <- mlogit(choice ~ 0 | Season + MoonTime1wk,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+cpue_WL.models[[3]] <- mlogit(choice ~ 0 | Season + MoonIllum1wk,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+# now compare AIC models between models
+AIC(cpue_WL.models[[1]])
+AIC(cpue_WL.models[[2]])
+AIC(cpue_WL.models[[3]]) # model 3 = 2287.47 = lowest AIC of 1 - 3
+
+
+## WEATHER
+# rain
+cpue_WL.models[[4]] <- mlogit(choice ~ 0 | Season + total3monRain + totalWeekRain,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
                             panel=TRUE,
                             iterlim=1, print.level=1,
                             data=cpue.caughts.WL)
-## 
-cpue_WL.models[[3]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue_WL.models[[5]] <- mlogit(choice ~ 0 | Season + total3monRain,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL) 
+
+cpue_WL.models[[6]] <- mlogit(choice ~ 0 | Season + totalWeekRain,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+# now compare AIC models between models
+AIC(cpue_WL.models[[4]])
+AIC(cpue_WL.models[[5]])
+AIC(cpue_WL.models[[6]]) # model 6 = 1585.373 = lowest AIC of 4 - 6 
+
+# all weather
+cpue_WL.models[[7]] <- mlogit(choice ~ 0 | Season + total3monRain + totalWeekRain + meanRelHum + meanSoilMois + 
+                                meanSolRad + meanTmin + meanTmin,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
                             panel=TRUE,
                             iterlim=1, print.level=1,
                             data=cpue.caughts.WL)
-# 
-cpue_WL.models[[4]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
+cpue_WL.models[[8]] <- mlogit(choice ~ 0 | Season + totalWeekRain + meanRelHum + meanSoilMois + 
+                                meanSolRad + meanTmin + meanTmin,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+cpue_WL.models[[9]] <- mlogit(choice ~ 0 | Season + totalWeekRain + meanRelHum + meanSoilMois + meanTmin + meanTmin,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+cpue_WL.models[[10]] <- mlogit(choice ~ 0 | Season + totalWeekRain + meanSoilMois + meanTmin + meanTmin,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+cpue_WL.models[[11]] <- mlogit(choice ~ 0 | Season + totalWeekRain + meanTmin + meanTmin,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+AIC(cpue_WL.models[[7]]) 
+AIC(cpue_WL.models[[8]]) 
+AIC(cpue_WL.models[[9]]) 
+AIC(cpue_WL.models[[10]]) # model 10 = 1577.997 = lowest AIC of 7 - 11
+AIC(cpue_WL.models[[11]]) 
+
+## LUNAR AND WEATHER
+cpue_WL.models[[12]] <- mlogit(choice ~ 0 | Season + MoonTime1wk + MoonIllum1wk + totalWeekRain + totalWeekRain + 
+                                meanRelHum + meanSoilMois + meanSolRad + meanTmin + meanTmin,
                             iterlim=1, print.level=1,
                             data=cpue.caughts.WL) 
+cpue_WL.models[[13]] <- mlogit(choice ~ 0 | Season + MoonIllum1wk + totalWeekRain + meanTmin + meanTmin,
+                               iterlim=1, print.level=1,
+                               data=cpue.caughts.WL) 
+
+# now compare AIC models between models
+AIC(cpue_WL.models[[12]])
+AIC(cpue_WL.models[[13]]) # model 13 = 1722.412 = lowest AIC of 12 - 13
+
+
+### analyze results for model 10 (the best fit for the "caughts_only" data)
+## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
+myfitted_WL <- fitted(cpue_WL.models[[10]], outcome=FALSE)
+# head(myfitted)
+# dim(myfitted)
+# dim(expanded_data.Caughts_only)
+
+# ## select year, season, and trapline data for the fitted values
+# # Copy data and thin it down to one row per chid
+# fitted_cpue_WL <- expanded_data.Caughts_only_WL %>%
+#   select(chid, Trapline, Year_, Season, Week) %>%
+#   unique()
+# # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
+# fitted_cpue_WL <- cbind(fitted_cpue_WL, myfitted_WL) %>%
+#   # thin the fitted values further (i.e. remove replicates and keep the unique combos of Trapline, Year, & Season)
+#   select(-chid) %>%
+#   unique()
+
+

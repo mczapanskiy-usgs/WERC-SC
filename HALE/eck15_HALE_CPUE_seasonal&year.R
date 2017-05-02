@@ -10,7 +10,7 @@ library(stringr)
 library(ggplot2)
 library(mosaic)
 
-read.csv('~/WERC-SC/HALE/catch_12_spatialCatches_20170109.csv',
+read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv',
          stringsAsFactors = FALSE) -> catch_spatial
 read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
          stringsAsFactors = FALSE) -> catch_EventPUE
@@ -21,25 +21,28 @@ seasonalEvents <- catch_EventPUE %>%
   group_by(Season, predEvent) %>% 
   summarise(eventCount = sum(NEvents)) 
 ### SEASONS
-# bar graphs of proportion of events happening in different seasons
 catch_EventPUE$Season <- factor(catch_EventPUE$Season, levels = c("Pre-laying", "Incubation", "Nestling", "offSeason"))
-season_trend <- ggplot(catch_EventPUE, aes(Season, CPUE)) +
+catch_EventPUE$predEvent <- factor(catch_EventPUE$predEvent, levels = c("catCaught", "ratCaught", "mongooseCaught", "mouseCaught", "birdOtherCaught", "baitLost", "trapTriggered", "none"))
+# box plot of CPUE in different seasons
+season_box <- ggplot(catch_EventPUE, aes(Season, CPUE)) +
   geom_boxplot() + #geom_bar(stat = "identity") +
   facet_wrap(~ predEvent) +
   theme_bw() 
   # scale_fill_gradient(low = "green", high = "red")
-season_trend %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught")) # , "trapTriggered", "baitLost", "none"))
+season_box %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught")) # , "trapTriggered", "baitLost", "none"))
 
-pred_seas <- ggplot(seasonalEvents) +
-  geom_col(aes(x = Season, y = eventCount, fill = predEvent)) + # , position = "fill") +
-  theme_bw() 
-pred_seas %+% subset(seasonalEvents, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
-
-seas_pred <- ggplot(catch_EventPUE, aes(predEvent, fill = Season)) +
+# bar graphs of proportion of events happening in different seasons
+season_bar <- ggplot(catch_EventPUE, aes(Season, fill = predEvent)) + # season_bar <- ggplot(arrange(catch_EventPUE, Season), aes(Season, fill = predEvent)) +
   geom_bar(position = "fill") +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle=60, hjust=1)) 
-seas_pred %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+  theme_bw() 
+  # theme(axis.text.x = element_text(angle=60, hjust=1)) 
+season_bar %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+
+season_bar_pred <- ggplot(catch_EventPUE, aes(Season, fill = predEvent)) +
+  geom_bar(position = "fill") +
+  theme_bw()
+season_bar_pred %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+
 
 ### YEAR
 # GRAPH annual average CPUE and SD
@@ -61,8 +64,8 @@ CPUE_yr_preds <- ggplot(annualCPUE, aes(Year_, annCPUE)) +
   labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort')
 CPUE_yr_preds %+% subset(annualCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 
-## ggplot(mpg, aes(reorder_size(class))) + geom_bar()
 
+### TRAPLINE
 
 
 

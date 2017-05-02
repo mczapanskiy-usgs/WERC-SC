@@ -121,7 +121,9 @@ weatherIndex <- weatherData %>%
          meanSoilMois = rollapply(SoilMoisture, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
          meanSolRad = rollapply(SolarRadiation, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
          meanTmax = rollapply(Tmax, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
-         meanTmin = rollapply(Tmin, 7, mean, na.rm = TRUE, fill = NA, align = 'right'))
+         meanTmin = rollapply(Tmin, 7, mean, na.rm = TRUE, fill = NA, align = 'right'),
+         month = month(WeatherDate), day = day(WeatherDate),
+         WeatherDate = ISOdatetime(Year, month, day, 12, 0, 0,'US/Hawaii'))
   
 # # test of data is being pulled from the right weather station for each trapline
 # trapData_WeatherSta <- trapData %>% 
