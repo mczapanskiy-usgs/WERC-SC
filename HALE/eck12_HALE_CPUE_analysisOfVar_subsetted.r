@@ -128,8 +128,6 @@ cpue.models[[11]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events) # runs
-# summary(cpue.models[[11]])
-
 ## and random effects
 cpue.models[[12]] <- mlogit(choice ~ 1 | Season + Trapline + Year,
                               rpar=c('predatorEvent:(intercept)'='n',
@@ -139,10 +137,6 @@ cpue.models[[12]] <- mlogit(choice ~ 1 | Season + Trapline + Year,
                               reflevel = "noEvent",
                               iterlim=1, print.level=1,
                               data=cpue3events) # error: missing value where TRUE/FALSE needed
-# summary(cpue.models[[12]])
-# # compare AIC
-# AIC(cpue.models[[11]])
-# AIC(cpue.models[[12]])
 
 ## REMOVED TRAPLINE AS INDIV-SPP EFFECT
 # Year & Season = individual-specific variables
@@ -158,7 +152,7 @@ cpue.models[[14]] <- mlogit(choice ~ 1 | Season + YearCts,
                               panel=TRUE, # correlation = TRUE,
                               reflevel = "noEvent",
                               iterlim=1, print.level=1,
-                              data=cpue3events) # error "missing value where TRUE/FALSE needed"
+                              data=cpue3events) # error: missing value where TRUE/FALSE needed
 ## subsetted data
 cpue.models[[15]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
@@ -176,8 +170,11 @@ cpue.models[[16]] <- mlogit(choice ~ 1 | Season + YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events_sub2)
+# summaries
+summary(cpue.models[[11]], cpue.models[[13]])
 # compare AIC
-# AIC(cpue.models[[14]])
+AIC(cpue.models[[11]])
+AIC(cpue.models[[13]])
 AIC(cpue.models[[15]])
 AIC(cpue.models[[16]])
 

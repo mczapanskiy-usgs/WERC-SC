@@ -65,7 +65,7 @@ data_rev <- CPUEdata %>%
     # Do this with the merge function.  The alternative names will be stored in column `x`.
     expanded_data <- merge(events, data2)
     expanded_data <- expanded_data %>% 
-      mutate(choice = ifelse(x==eventType, TRUE, FALSE), # mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE),  # mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  
+      mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # mutate(choice = ifelse(x==eventType, TRUE, FALSE), # mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE), #  
              YearCat = as.factor(Year),
              YearCts = as.numeric(Year))
     return(expanded_data)
@@ -176,7 +176,7 @@ cpue.models[[4]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
                            R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
-                           data=cpue.year) 
+                           data=cpue.year) # does not run on all data or just front country traps 
 ## Trapline = random variable 
 cpue.trap <- mlogit.data(expanded_data, # %>% filter(loc == "front"), 
                          choice="choice",
@@ -190,7 +190,7 @@ cpue.models[[5]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
                            R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
-                           data=cpue.trap) 
+                           data=cpue.trap) # does not run on all data or just front country traps
 ## Trapline and Year = random variable 
 cpue.trapyr <- mlogit.data(expanded_data %>% 
                              filter(loc == "back") %>% # filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))) %>% # 
@@ -206,12 +206,12 @@ cpue.models[[6]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
                            R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
-                           data=cpue.trapyr) 
+                           data=cpue.trapyr)  # does not run on all data or just front country traps
 
 ### PREDS ONLY ANALYSIS: compare 3 random effect options
 # Year = random variable, Trapline, Season, Year = individual-specific variables
-cpue.year.caughts <- mlogit.data(expanded_data.Caughts_only
-                                 %>% filter(loc == "front"), # %>% filter(Trapline %in% c('A')) # >>> too many zeros
+cpue.year.caughts <- mlogit.data(expanded_data.Caughts_only %>% 
+                                 filter(loc == "front"), # %>% filter(Trapline %in% c('A')) # >>> too many zeros
                               choice="choice",
                               alt.var ="x", 
                               id.var = "Year",
@@ -223,7 +223,7 @@ cpue.models[[7]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
                            R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
-                           data=cpue.year.caughts) 
+                           data=cpue.year.caughts) # runs on just front country traps but not all data
 summary(cpue.models[[7]])
 # Trapline = random variable, Trapline, Season, Year = individual-specific variables
 cpue.trap.caughts <- mlogit.data(expanded_data.Caughts_only %>%
@@ -239,7 +239,7 @@ cpue.models[[8]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
                            R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
-                           data=cpue.trap.caughts)
+                           data=cpue.trap.caughts) # runs on just front country traps but not all data
 summary(cpue.models[[8]])
 ## Year and Trapline = random variable (combined into one variable), Trapline, Season, Year = individual-specific variables
 cpue.trapyr.caughts <- mlogit.data(expanded_data.Caughts_only %>% 
@@ -256,7 +256,7 @@ cpue.models[[9]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
                            R=50, halton=NA,
                            panel=TRUE,
                            iterlim=1, print.level=1,
-                           data=cpue.trapyr.caughts)
+                           data=cpue.trapyr.caughts) # runs on just front country traps but not all data
 summary(cpue.models[[9]])
 # without any random effects, Trapline, Season, Year = individual-specific variables
 cpue.caughts <- mlogit.data(expanded_data.Caughts_only
@@ -268,9 +268,9 @@ cpue.caughts <- mlogit.data(expanded_data.Caughts_only
 cpue.models[[10]] <- mlogit(choice ~ 0 | Season + Year + Trapline,
          iterlim=1, print.level=1,
          data=cpue.caughts) 
-summary(cpue.models[[10]])
+summary(cpue.models[[10]]) # runs on just front country traps but not all data
 
-# now compare AIC models between models 4 - 7
+# now compare AIC models between models 4 - 7 (frontcountry trap analysis)
 AIC(cpue.models[[7]])
 AIC(cpue.models[[8]])
 AIC(cpue.models[[9]])
@@ -519,6 +519,8 @@ AIC(cpue.models[[26]])
 
 # view model summaries
 summary(cpue.models[[23]])
+AIC(cpue.models[[23]])
+logLik(cpue.models[[23]])
 
 
 # Trapline = random variable, Trapline, Season, Year = individual-specific variables
