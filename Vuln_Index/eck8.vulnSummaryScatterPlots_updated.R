@@ -3,15 +3,18 @@
 
 setwd("~/WERC-SC/Vuln_Index")
 
-## load data and toolboxes
-PVscores <- read.csv("PCV&PDVscores.csv") ## matrix of cumulative PV, CPV, and DPV before 1-10 ranking
-PVscores <- PVscores[complete.cases(PVscores), ] # remove blank observations at bottom of matrix
-scores <- read.csv("PV.CV.DVscores.csv") ## matrix of final PV, CV, and DV
-
 library(ggplot2)
 library(jpeg)
 library(plyr)
 library(dplyr)
+
+## load data and toolboxes
+PVscores <- read.csv("PCV&PDVscores.csv") ## matrix of cumulative PV, CPV, and DPV before 1-10 ranking
+  PVscores <-   PVscores[complete.cases(PVscores), ] # remove blank observations at bottom of matrix
+PVscores_old <- read.csv("PCV&PDVscores_old.csv")
+  PVscores_old <-   PVscores_old[complete.cases(PVscores_old), ]
+scores <- read.csv("PV.CV.DVscores.csv") ## matrix of final PV, CV, and DV
+
 
 ## establish color palettes
 cbbPalette <- c("#FF0033", "#000000", "#56B4E9", "#E69F00", "#009E73", "#666666", "#0072B2", "#D55E00", "#FF33CC", "#6600CC", "#66FF00") # http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/
@@ -32,7 +35,23 @@ x1 <- ggplot(PVscores,
   theme_bw(base_size = 14) + 
   scale_colour_manual(values=cbbPalette) # + scale_colour_brewer(palette = "Set1") 
 x1
-ggsave("PCVvsPDV.pdf")
+ggsave("PCVvsPDV_20170512.pdf", width = 12, height = 8)
+
+PVscores_old$AlphaCode <- factor(PVscores_old$AlphaCode, levels = PVscores_old$AlphaCode[order(PVscores_old$Order)]) # will keep original order of species
+x2 <- ggplot(PVscores_old, 
+             aes(PDVbest, 
+                 PCVbest, 
+                 label=as.character(AlphaCode))) + 
+  geom_text(aes(color=Taxomony), 
+            size=3, 
+            face="bold") +
+  # , subset = .(Taxomony %in% c("Pelicans", "Cormorants"))) +  ## select only a couple spp groups- *change the color options accordingly*
+  scale_x_continuous(name="Population Displacement Vulnerability", limits=c(5,200)) +
+  scale_y_continuous(name="Population Collision Vulnerability", limits=c(5,300)) +
+  theme_bw(base_size = 14) + 
+  scale_colour_manual(values=cbbPalette) # + scale_colour_brewer(palette = "Set1") 
+x2
+ggsave("PCVvsPDV_old.pdf", width = 12, height = 8)
 
 ## graph CV vs DV colored by species group with convex hull polygons around species groups
 # keep original order of species
