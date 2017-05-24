@@ -11,7 +11,7 @@ library(tidyr)
 
 
 # read in files
-read.csv('~/WERC-SC/Vuln_Index/spatial/SoCAvulnScores.csv',
+read.csv('~/WERC-SC/Vuln_Index/spatial/SoCAvulnScores_20170524.csv',
          stringsAsFactors = FALSE) -> vulnScores
 read.csv('~/WERC-SC/Vuln_Index/spatial/SoCA5minDensities.csv',
          stringsAsFactors = FALSE) -> densities
@@ -37,8 +37,8 @@ ranksDensityPDV <- select(densities_long, species, TGRIDALB_I, rankDensPDV) %>%
 
 
 ## save ranksDensityPCV and ranksDensityPDV data file to GitHub file
-write.csv(ranksDensityPCV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPCV_soCal.csv',
+write.csv(ranksDensityPCV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPCV_soCal_20170524.csv',
           row.names = FALSE) 
 
-write.csv(ranksDensityPDV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPDV_soCal.csv',
+write.csv(ranksDensityPDV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPDV_soCal_20170524.csv',
           row.names = FALSE) 
