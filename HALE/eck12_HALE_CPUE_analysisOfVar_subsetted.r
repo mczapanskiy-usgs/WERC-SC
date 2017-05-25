@@ -33,10 +33,13 @@ data_rev <- CPUEdata %>%
   ) 
 
 #### RESTRUCTURE DATA FUNCTION
-formatData <- function(data, subset = NA){
+formatData <- function(data, var, subset = NA){
+  if(!(var %in% colnames(data)))
+    stop(sprintf('var [%s] not found in data columns', var))
+  data$var <- getElement(data, var)
   # Reshape data so that there is one row for every option, for every choice situation. 
   # Here are the possible outcomes every time the trap is set:
-  events <- unique(data$eventType) # events <- unique(data$eventCnoC) # events <- unique(data$predEvent) # 
+  events <- unique(data$var) 
   # And here are the number of choice situations:
   nEvents <- sum(data$NEvents)
   
@@ -53,7 +56,7 @@ formatData <- function(data, subset = NA){
   # Do this with the merge function.  The alternative names will be stored in column `x`.
   expanded_data <- merge(events, data2)
   expanded_data <- expanded_data %>% 
-    mutate(choice = ifelse(x==eventType, TRUE, FALSE), # mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE),  # mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  
+    mutate(choice = ifelse(x==var, TRUE, FALSE), 
            YearCat = as.factor(Year),
            YearCts = as.numeric(Year))
   return(expanded_data)
