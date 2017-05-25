@@ -12,6 +12,7 @@ library(mapproj)
 library(lubridate)
 library(dplyr)
 library(geosphere)
+library(mosaic)
 dyn.load('RST/RST_residenceRadii.dll')
 source('RST/RST_functions_all.R')
 
@@ -35,6 +36,7 @@ Then project the data to convert lat/lon coordinates to x and y
 ```{r load_tracks, cache = TRUE}
 RST.data <- tracks %>%
   filter(Species == 'RTTR',
+         
          TripFlag == 0,
          Year == 2016) %>%
   collect %>%
@@ -179,15 +181,11 @@ all_tracksD %>%
   })
 ```
 
-```{r state_maps}
-df
-```
-
 ## Static radius
 
 From Torres et al.: R = (mean transit speed * sampling interval) / 2
 
-```{r static.R, eval=FALSE, cache=TRUE, include=FALSE}
+```{r static.R, cache=TRUE}
 speed.data <- RST.data %>%
   group_by(band) %>%
   mutate(dt = as.numeric(difftime(lead(datetime), datetime, units = 'secs')),
@@ -199,47 +197,92 @@ speed.data <- RST.data %>%
   ungroup %>%
   filter(dt < 60 * 5) # No gaps longer than 5 minutes
 
+median.tortuosity <- speed.data %>% 
+  filter(speed > 1) %>% 
+  summarize(med.tor = median(tortuosity, na.rm = TRUE)) %>% 
+  as.numeric
+
 mean.transit.spd <- speed.data %>%
-  filter(speed > 5,
-         tortuosity < 2) %>%
+  filter(speed > 1,
+         tortuosity < median.tortuosity) %>%
   summarize(mean(speed)) %>% 
   as.numeric
 
 mean.transit.spd
 
 ggplot(speed.data,
-       aes(speed, 
-           tortuosity)) +
-  geom_point() +
-  geom_density2d() +
-  xlim(5, 20) +
-  ylim(0, 2)
+       aes(speed)) +
+  geom_histogram(binwidth = 0.05) +
+  geom_vline(xintercept = 1.0)
 
 sample.interval <- 180
 
-R <- mean.transit.spd * sample.interval / 2 / 1000 # (convert to km)
+R1 <- mean.transit.spd * sample.interval / 2 / 1000 # (convert to km)
+
+R1
+
+R2 <- dynscale %>%
+  as.data.frame %>%
+  summarize_at(vars(contains('radius')), funs(mean), na.rm = TRUE) %>%
+  as.numeric
+
+R2
+
+radius <- c(R1, R2) %>% round(digits = 2)
 ```
 
-```{r static.res, eval=FALSE, cache=TRUE, include=FALSE}
-all_tracks = data.frame()
+```{r static.res, cache=TRUE}
+all_tracks_static = data.frame()
 
 for (i in 1:length(bandIDs)) {
 	subdata = RST.data[RST.data$band == bandIDs[i], ]
 	
 	subdata$time_diff = as.numeric(subdata$datetime - subdata$datetime[1], units = time_units)
 	
-	result <- residenceCalc(subdata$x, subdata$y, subdata$time_diff, R, threshold)
+	result <- residenceCalc(subdata$x, subdata$y, subdata$time_diff, radius, threshold)
 	subdata = cbind(subdata, result)
-	all_tracks = rbind(all_tracks, subdata)
+	all_tracks_static = rbind(all_tracks_static, subdata)
 }
+
+all_tracks_static <- merge(all_tracks_static, speed.data) %>%
+  mutate(beh_state_R1 = derivedFactor(ars = res_rad_0.94_th_0 > 0,
+                                      rest = res_rad_0.94_th_0 < 0,
+                                      transit = res_rad_0.94_th_0 == 0),
+         beh_state_R2 = derivedFactor(ars = res_rad_1.38_th_0 > 0,
+                                      rest = res_rad_1.38_th_0 < 0,
+                                      transit = res_rad_1.38_th_0 == 0))
+
+all_tracks_static %>%
+  merge(all_tracksD2) %>%
+  transmute(band,
+            datetime,
+            lat,
+            lon,
+            radiusD = radius,
+            behaviorD = state,
+            radiusS1 = R1,
+            behaviorS1 = beh_state_R1,
+            radiusS2 = R2,
+            behaviorS2 = beh_state_R2) %>%
+write.csv('RST/rttr_2016_R1R2.csv', row.names = FALSE)
 ```
 
-```{r plot.static, eval=FALSE, cache=TRUE, include=FALSE}
-# This function plots the track contours, color-coded by both residence time and distance:
-x11()#for Windows users
-plotTrackContour(all_tracks, R, 0)
-
-# This function plots the residual values and the track contour, color-coded by sign of residual:
-x11()#for Windows users
-plotTrackRes(all_tracks, R, 0, time_units)
+```{r radius.comparison}
+rad.comp <- merge(all_tracksD2, all_tracks_static) %>%
+  transmute(band, 
+            radiusD = radius,
+            behaviorD = state,
+            radiusS1 = R1,
+            behaviorS1 = beh_state_R1,
+            radiusS2 = R2,
+            behaviorS2 = beh_state_R2) %>%
+  summarize(ratioRestD = sum(behaviorD == 'rest', na.rm = TRUE) / n(),
+            ratioTransitD = sum(behaviorD == 'transit', na.rm = TRUE) / n(),
+            ratioArsD = sum(behaviorD == 'ars', na.rm = TRUE) / n(),
+            ratioRestS1 = sum(behaviorS1 == 'rest', na.rm = TRUE) / n(),
+            ratioTransitS1 = sum(behaviorS1 == 'transit', na.rm = TRUE) / n(),
+            ratioArsS1 = sum(behaviorS1 == 'ars', na.rm = TRUE) / n(),
+            ratioRestS2 = sum(behaviorS2 == 'rest', na.rm = TRUE) / n(),
+            ratioTransitS2 = sum(behaviorS2 == 'transit', na.rm = TRUE) / n(),
+            ratioArsS2 = sum(behaviorS2 == 'ars', na.rm = TRUE) / n())
 ```

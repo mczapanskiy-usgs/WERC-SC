@@ -11,4 +11,5 @@ schema.ini
 src/wetdry-analysis.R
 Hawaii_data/*
 !Hawaii_data/*.Rmd
+!Hawaii_data/src/*
 schema.ini

@@ -1,0 +1,213 @@
+---
+title: "Acceleration Calibration"
+author: "Max Czapanskiy"
+date: "January 5, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(foreach)
+library(iterators)
+library(doParallel)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+library(move)
+library(RSQLite)
+library(httr)
+
+select <- dplyr::select
+
+httr::set_config( config( ssl_verifypeer = 0L ) )
+curl <- movebankLogin(readLines('movebank.txt')[1], readLines('movebank.txt')[2])
+MovebankID <- 169686018
+
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+```
+
+## Acceleration Calibration
+Static vs dynamic
+Convert readings to m/s^2
+
+Field	Meaning
+TagID ID number of e-obs tag
+A	    -z orientation start time (see pages 4-5 of e-obs GPS-Acceleration-Tags manual)
+B	    +z orientation start time
+C	    -x orientation start time
+D	    +x orientation start time
+E	    +y orientation start time
+F	    -y orientation start time
+
+Fit a line to (x1, -g), (x2, +g) [where x1 is C and x2 and D] to get acceleration in x-axis. Similarly for y and z.
+a = mr + b
+where a is acceleration in m/s^2 and r is the raw measurement.
+-g = m * A + b
+
+```{r calib, warning=FALSE}
+calib.meta <- read.csv('E-Obs/Calibration/e-obs_calibration.csv', stringsAsFactors = FALSE) %>%
+  mutate_at(.cols = vars(A:F), .funs = funs(as.POSIXct(. , tz = 'US/Pacific')))
+
+# Assumes tagxxxx_acc.txt has ACC in columns
+# i.e. decoder.exe -> 6 -> c
+calib.const <- foreach(tag = dir('E-Obs/Calibration', pattern = '.*_acc.txt'), .combine = rbind) %do% {
+  tagid <- substr(tag, 4, 7) %>% as.integer
+  calib.data <- read.csv(sprintf('E-Obs/Calibration/%s', tag),
+                         stringsAsFactors = FALSE,
+                         col.names = c('jDate', 'date', 'day', 'time', 'X', 'Y', 'Z')) %>%
+    mutate(Tag.ID = tagid,
+           date.time = paste(date, time) %>% dmy_hms(tz = 'UTC')) 
+  
+  mean.acc <- foreach(position = LETTERS[1:6],
+                      start.time = filter(calib.meta, Tag.ID == tagid) %>% select(A:F),
+                      .combine = rbind) %do% {
+    begin <- start.time + minutes(1)
+    end <- start.time + minutes(9)
+    # Calibration metadata is in UTC-7 but calibration data is in UTC+0 so you'll get an inconsistent tzone warning
+    filter(calib.data, date.time > begin, date.time < end) %>%
+      summarize_at(.cols = vars(X:Z), .funs = funs(mean)) %>%
+      mutate(Position = position,
+             Begin = begin,
+             End = end)
+  } %>%
+    transmute(Position,
+              Begin,
+              End,
+              Measurement = c(Z[1], Z[2], X[3], X[4], Y[5], Y[6]),
+              Orientation = c('-z', '+z', '-x', '+x', '+y', '-y'),
+              TagID = tagid)
+  
+  plot.data <- calib.data %>%
+    select(date.time, X:Z) %>%
+    gather(key = dimension, value = measurement, X:Z) %>% 
+    arrange(date.time, dimension) 
+  
+  p <- ggplot(plot.data,
+         aes(x = date.time, y = measurement, color = dimension)) +
+    geom_segment(aes(x = Begin, xend = End,
+                     y = Measurement, yend = Measurement,
+                     color = Orientation),
+                 data = mean.acc,
+                 size = 2,
+                 show.legend = FALSE) +
+    geom_line() +
+    labs(title = sprintf('ACC Calibration: Tag %i', tagid),
+         x = 'Time',
+         y = 'Raw Reading')
+  
+  ggsave(sprintf('E-Obs/Calibration/Plots/%i.png', tagid), p, height = 7.5, width = 10, units = 'in')
+  
+  g <- 9.820 #m/s^2
+  x1 = mean.acc$Measurement[3]
+  x2 = mean.acc$Measurement[4]
+  y1 = mean.acc$Measurement[6]
+  y2 = mean.acc$Measurement[5]
+  z1 = mean.acc$Measurement[1]
+  z2 = mean.acc$Measurement[2]
+  data.frame(TagID = tagid) %>%
+    mutate(mX = -2 * g / (x1 - x2),
+           bX = -g - mX * x1,
+           mY = -2 * g / (y1 - y2),
+           bY = -g - mY * y1,
+           mZ = -2 * g / (z1 - z2),
+           bZ = -g - mZ * z1)
+}
+```
+
+```{r analyze}
+getMovebankAccData <- function(study = MovebankID, login = curl, animalName = 'RFBO01') {
+  d <- getMovebank("individual", login=login, study_id=study, attributes=c('id','local_identifier'))
+  animalName <- d[as.character(d$local_identifier) %in% animalName,'id']
+  
+  individual <- getMovebank("individual", login=login, study_id=study, id=animalName, attributes=c("id", "local_identifier")) %>%
+    rename(individual_id = id,
+           animal_name = local_identifier)
+  deployment <- getMovebank("deployment", login=login, study_id=study, attributes=c("individual_id","tag_id","id"), individual_id=animalName) %>%
+    rename(deployment_id = id)
+  tags <- getMovebank("tag", login=login, study_id=study, attributes=c("id", "local_identifier")) %>%
+    rename(tag_id = id,
+           tag_name = local_identifier)
+  
+  idData <- merge(individual, deployment) %>%
+    merge(tags)
+  
+  accSen <- 2365683
+  attribs <- c("timestamp", "eobs_acceleration_axes", "eobs_acceleration_sampling_frequency_per_axis", "eobs_accelerations_raw", "sensor_type_id", "deployment_id", "event_id")
+  
+  trackDF <- getMovebank("event", login = login, study_id = study, attributes = attribs , deployment_id = idData$deployment, sensor_type_id = accSen)
+
+  if(nrow(trackDF)==0){
+    stop('No records found for this individual/study combination')
+  }
+  
+  trackDF$timestamp <- as.POSIXct(strptime(as.character(trackDF$timestamp), format = "%Y-%m-%d %H:%M:%OS",tz="UTC"), tz="UTC")
+  
+  if(any(tapply(trackDF$sensor_type_id, trackDF$deployment_id, length)!=1)){# data comes in ordered by sensor but needs to be ordered by timestamp
+    trackDF <- trackDF[ with(trackDF, order(trackDF$deployment_id, timestamp)) , ]  
+  }
+  
+  trackDF$TagID <- idData$tag_name
+  
+  trackDF
+}
+
+AccSensorID <- 2365683
+tags <- getMovebank("tag", login=curl, study_id=MovebankID, attributes=c("id", "local_identifier")) %>%
+  rename(tag_id = id,
+         tag_name = local_identifier)
+animals <- getMovebankAnimals(MovebankID, curl) %>%
+  filter(sensor_type_id == AccSensorID) %>%
+  merge(tags)
+
+foreach(animal_dep = animals$animalName_deployment, tag = animals$tag_name) %do% {
+  animal <- substr(animal_dep, 1, 6)
+  const <- filter(calib.const, TagID == tag)
+  m <- select(const, starts_with('m')) %>% as.numeric
+  b <- select(const, starts_with('b')) %>% as.numeric
+  
+  print(sprintf('Fetching acceleration for %s (tag %i)...', animal, tag))
+  eobs.data <- getMovebankAccData(animalName = animal) %>% 
+    transmute(TagID, 
+              timestamp, 
+              ACC = as.character(eobs_accelerations_raw))
+  
+  print('Calculating ODBA...')
+  odba.data <- 
+    foreach(row = iter(eobs.data, by = 'row'),
+            .combine = bind_rows,
+            .multicombine = TRUE,
+            .packages = 'dplyr') %dopar%
+    {
+      raw.acc <- strsplit(row$ACC, ' ') %>%
+        unlist(use.names = FALSE) %>%
+        as.numeric %>%
+        matrix(ncol = 3, byrow = TRUE)
+      colnames(raw.acc) <- c('X0', 'Y0', 'Z0')
+      
+      acc <- data.frame(raw.acc) %>%
+        mutate(totX = m[1] * X0 + b[1],
+               totY = m[2] * Y0 + b[2],
+               totZ = m[3] * Z0 + b[3],
+               staticX = mean(totX),
+               staticY = mean(totY),
+               staticZ = mean(totZ),
+               dynX = totX - staticX,
+               dynY = totY - staticY,
+               dynZ = totZ - staticZ)
+      
+      odba <- with(acc, sqrt(dynX^2 + dynY^2 + dynZ^2))
+      
+      row %>%
+        select(TagID, timestamp) %>%
+        mutate(meanODBA = mean(odba),
+               sdODBA = sd(odba),
+               minODBA = min(odba),
+               maxODBA = max(odba))
+    }
+  
+  print('Writing to file...')
+  write.csv(odba.data, sprintf('E-Obs/Calibration/%s_%i.csv', animal, tag), row.names = FALSE)
+}
+```

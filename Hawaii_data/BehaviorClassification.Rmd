@@ -1,0 +1,241 @@
+---
+title: "Behavioral Classification"
+author: "Max Czapanskiy"
+date: "December 24, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+library(ggplot2)
+library(proj4)
+library(lubridate)
+library(dplyr)
+library(geosphere)
+library(mosaic)
+library(adehabitatLT)
+library(foreach)
+library(doParallel)
+library(iterators)
+library(RSQLite)
+library(DBI)
+library(tcltk)
+select <- dplyr::select
+
+# dplyr connections
+MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+metadata_db <- tbl(MHI_db, 'Metadata')
+tracks_db <- tbl(MHI_db, sql('SELECT * FROM TrackView')) %>%
+  filter(TripEndUTC - TripStartUTC > 60 * 30) 
+trips_db <- tbl(MHI_db, sql('SELECT * FROM Trips')) %>%
+  filter(Duration > .5)
+tidytracks_db <- tbl(MHI_db, 'TidyTracks')
+dives_db <- tbl(MHI_db, sql('SELECT * FROM DiveView'))
+
+POSIX.origin = ymd('1970-01-01', tz = 'UTC')
+RST_tracker <- 'RST/RST_Output/RST_tracker.csv'
+
+cl <- makeCluster(5)
+registerDoParallel(cl)
+```
+
+```{r setupx32, include = FALSE}
+dyn.load('RST/RST_residenceRadii.dll')
+source('RST/RST_functions_all.R')
+```
+
+## Behavioral Classification
+
+This script classifies tracks using three behavioral states: transit, area-restricted search (ARS), and rest. Classification takes place in two phases. First, resting points are identified using a speed threshold (e.g. rest = speed < 1 m/s). The remaining points are divided between transit and ARS using the Residence in Space and Time (RST) algorithm (Torres et al. n.d.). For each point along the track, RST calculates a residence time (RT, time it takes to cross a circle of radius *r*) and residence distance (RD, distance traversed while crossing a circle of radius *r*), where *r* is defined as mean transit speed \* sampling interval / 2. Normalizing these residence values (nRT, nRD) and taking the difference provides the basis for classification (*res* = nRD - nRT). Thus, points with positive *res* are more distance-intensive than time-intensive and are classified as ARS. Conversely, points with negative *res* are more time-intensive than distance-intensive and are added to the resting classification. Points where *res* = 0 have high speeds and low tortuosity and re classified as transit.
+
+ * Only trips with durations greater than 30 minutes and TripFlag = 0 (i.e. no issues) are considered for behavioral classification.
+ * The RST library only works with 32-bit R. Many systems use 64-bit R by default so watch out!
+ 
+### Rediscretize and calculate speed/tortuostiy
+Set R to 64-bit for reliability
+
+ 
+```{r rediscretize, eval=FALSE}
+#rediscretized <- foreach(species = c('BRBO', 'LAAL', 'RFBO', 'RTTR', 'WTSH'), .combine = rbind) %do% {
+rediscretized <- foreach(species = 'RFBO', .combine = rbind) %do% {
+  trips <- trips_db %>%
+    filter(Species == species) %>%
+    collect
+  
+  pb <- tkProgressBar(title = "Tidying tracks", label = "", min = 0, max = nrow(trips), initial = 0, width = 300)
+
+  foreach(did = trips$DeployID, tn = trips$TripNumber, i = seq(trips$DeployID), .combine = rbind) %do% {
+    setTkProgressBar(pb, i, label = sprintf('%s DID:%i TN:%i', species, did, tn))
+    
+    # Load trip track
+    raw.track <- filter(tracks_db, 
+                        DeployID == did,
+                        TripNumber == tn) %>%
+      arrange(TimestampUTC) %>%
+      collect %>%
+      transmute(band = as.numeric(sprintf('%i%05i', DeployID, TripNumber)),
+                lat = Latitude,
+                lon = Longitude,
+                datetime = as.POSIXct(TimestampUTC, origin = POSIX.origin, tz = 'UTC'))
+    
+    # Create grid x- and y- coordinates from the longitude/latitude coordinates
+    proj.string <- '+proj=lcc +lat_1=20 +lat_2=40 +lon_0=160 +lat_0=-10'
+    lambert <- proj4::project(raw.track[, c('lon', 'lat')],
+                              proj = proj.string)
+    raw.track$x <- lambert$x
+    raw.track$y <- lambert$y
+    
+    # Rediscretize track to 3 min (for now; will vary by deployment) 
+    time_step <- 2 * 60
+    # Yields a ltraj (adehabitatLT)
+    redis.track <- as.ltraj(raw.track[,c('x','y')],
+                            date = raw.track$datetime,
+                            id = raw.track$band) %>%
+      redisltraj(u = time_step,
+                 samplex0 = TRUE,
+                 type = 'time')
+    
+    # Calculate speed and tortuosity
+    track <- redis.track %>%
+      ld %>% # Convert ltraj to data.frame
+      mutate(dd = dist,
+             speed = dd / dt,
+             cumdd = cumsum(dd),
+             tortuosity = (lead(cumdd, 4) - lag(cumdd, 6)) / 
+               sqrt((lead(x, 5) - lag(x, 5))^2 + (lead(y, 5) - lag(y, 5))^2)) %>%
+      transmute(TripID = burst,
+                TimestampUTC = date,
+                x,
+                y,
+                DeployID = did,
+                TripNumber = tn,
+                Species = species,
+                Year = year(date[1]),
+                dd,
+                dt,
+                speed,
+                tortuosity)
+    
+    # Invert projection to get longitude/latitude in WGS84
+    wgs84 <- proj4::project(track[, c('x', 'y')],
+                            proj = proj.string,
+                            inverse = TRUE)
+    track$Longitude <- wgs84$x
+    track$Latitude = wgs84$y
+    
+    # Trip QAQC flags
+    TripQAQC <- trips %>%
+      filter(DeployID == did,
+             TripNumber == tn) %>%
+      select(TripFlag:BehaviorOK) %>%
+      slice(1) 
+
+    track <- mutate(track, 
+                    nRT = NA, nRD = NA, residual = NA, behavior = NA) %>%
+      merge(TripQAQC)
+  
+    # Write to DB
+    # INTEGERs are converted to REALs - what gives?
+    dbWriteTable(MHI_db$con, 'TidyTracks', track, append = TRUE)
+    
+    data.frame(species = species, deployid = did, tripnumber = tn)
+  } 
+}
+```
+
+### Classify by RST
+Set R to 32-bit for compatibility with RST DLL
+
+```{r classify, eval=FALSE}
+#foreach(species = c('BRBO', 'LAAL', 'RFBO', 'RTTR', 'WTSH'), .combine = rbind) %do% {
+classified <- foreach(species = 'RFBO', .combine = rbind) %do% {  
+  time_step <- 2 * 60
+  
+  # Mean transit speed
+  median.tortuosity.df <- filter(tidytracks_db,
+                                 Species == species,
+                                 speed > 1,
+                                 TripFlag == 0) %>%
+    select(tortuosity) %>%
+    collect(n = Inf)
+  median.tortuosity <- median(median.tortuosity.df$tortuosity, na.rm = TRUE)
+  mean.transit.speed.df <- filter(tidytracks_db,
+                                  Species == species,
+                                  speed > 1,
+                                  TripFlag == 0,
+                                  tortuosity < median.tortuosity) %>%
+    select(speed) %>%
+    collect(n = Inf)
+  mean.transit.speed <- mean(mean.transit.speed.df$speed, na.rm = TRUE)
+  
+  radius <- mean.transit.speed * time_step / 2 # in meters
+  threshold <- 0
+  
+  # trips <- trips_db %>%
+  #   filter(Species == species,
+  #          Year >= 2013,
+  #          BehaviorOK == 'y') %>%
+  #   collect
+  trips <- trips_db %>%
+    filter(Species == species,
+           Year == 2016) %>%
+    collect
+  
+  time_units <- 'secs'
+  
+  pb <- tkProgressBar(title = "Classifying tracks", label = "", min = 0, max = nrow(trips), initial = 0, width = 300)
+  foreach(tid = trips$TripID, i = seq(trips$TripID), .combine = rbind) %do% {
+    setTkProgressBar(pb, i, label = sprintf('%s TID:%i', species, tid))
+    # Load species' tracks
+    tracks <- filter(tidytracks_db, 
+                     TripID == tid) %>%
+      arrange(TimestampUTC) %>%
+      collect(n = Inf) %>%
+      mutate(datetime = as.POSIXct(TimestampUTC, origin = POSIX.origin, tz = 'UTC'),
+             time_diff = as.numeric(datetime - datetime[1], units = time_units))
+    
+    if(with(tracks, as.numeric(last(tracks$datetime) - first(tracks$datetime), units = 'hours') < .5)) return(NULL)
+    
+    rst <- with(tracks, residenceCalc(x, y, time_diff, radius, threshold)) %>%
+      select(nRT = 4, nRD = 5, residual = 6)
+    
+    tracks.rst <- tracks %>%
+      select(-datetime, -time_diff, -nRT, -nRD, -residual, -behavior) %>%
+      cbind(rst) %>%
+      mutate(behavior = derivedFactor(
+        rest = (residual < 0 | speed < 1),
+        ars = residual > 0,
+        transit = residual == 0,
+        .method = 'first'))
+    
+    out.file <- sprintf('RST/RST_Output/%s.csv', tid)
+    write.csv(tracks.rst, out.file, row.names = FALSE)
+    data.frame(rst.file = out.file)
+  }
+}
+
+write.csv(classified, RST_tracker, row.names = FALSE)
+```
+
+### Write classifications to DB
+Switch back to 64-bit
+
+```{r classify2, eval=FALSE}
+rst.files <- read.csv(RST_tracker, stringsAsFactors = FALSE)$rst.file
+pb <- tkProgressBar(title = "Uploading classifications", label = "", min = 0, max = length(rst.files), initial = 0, width = 300)
+
+foreach(csv = rst.files, i = seq(rst.files)) %do% {
+  rst.track <- read.csv(csv, stringsAsFactors = FALSE)
+  tid <- rst.track$TripID[1]
+  setTkProgressBar(pb, i, label = sprintf('TID:%i', tid))
+ 
+  rst.track <- select_(rst.track, .dots = colnames(tidytracks_db))
+  q <- dbSendStatement(MHI_db$con, sprintf('DELETE FROM TidyTracks WHERE TripID = %i', tid))
+  dbClearResult(q)
+  dbWriteTable(MHI_db$con, 'TidyTracks', rst.track, append = TRUE)  
+}
+```

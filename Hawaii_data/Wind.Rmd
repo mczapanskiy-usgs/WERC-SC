@@ -1,0 +1,263 @@
+---
+title: "Wind Annotation"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+Note to self: get data description from file on work laptop
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(RSQLite)
+library(DBI)
+library(data.table)
+library(foreach)
+library(lubridate)
+library(ggplot2)
+library(RNetCDF)
+library(abind)
+library(oce)
+library(geosphere)
+library(lme4)
+library(plot3D)
+
+# dplyr connections
+MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+metadata_db <- tbl(MHI_db, 'Metadata')
+tracks_db <- tbl(MHI_db, sql('SELECT * FROM TrackView')) %>%
+  filter(TripFlag == 0,
+         TripEndUTC - TripStartUTC > 60 * 30) 
+trips_db <- tbl(MHI_db, sql('SELECT * FROM Trips')) %>%
+  filter(TripFlag == 0,
+         Duration > .5)
+tidytracks_db <- tbl(MHI_db, 'TidyTracks')
+acc_db <- tbl(MHI_db, 'ACC_Behavior')
+dives_db <- tbl(MHI_db, sql('SELECT * FROM DiveView'))
+
+POSIX.origin = ymd('1970-01-01', tz = 'UTC')
+```
+
+The full wind data set for 2016 was too large to download in one file. I downloaded monthly data in four separate files (Jun-Sep). Here I concatenate the four files while retaining the general NCDF structure.
+
+```{r concatenate}
+# Concatenates ncdf lists and drops duplicate points
+# Assumes nc1 and nc2 are temporally adjacent and spatially contiguous
+concat.wind <- function(nc1, nc2) {
+  if(last(nc1$time) == first(nc2$time)) {
+    nc2$Uwind <- nc2$Uwind[1:length(nc2$longitude),
+                           1:length(nc2$latitude),
+                           2:length(nc2$time)]
+    nc2$Vwind <- nc2$Vwind[1:length(nc2$longitude),
+                           1:length(nc2$latitude),
+                           2:length(nc2$time)]
+    nc2$time <- nc2$time[-1]
+  }
+  list(time = c(nc1$time, nc2$time),
+       latitude = nc1$latitude,
+       longitude = nc1$longitude,
+       Uwind = abind(nc1$Uwind, nc2$Uwind, along = 3),
+       Vwind = abind(nc1$Vwind, nc2$Vwind, along = 3))
+}
+
+wind.files <- list('Wind/WRF_HI_Best_ef69_0644_a22b_Jun.nc',
+                   'Wind/WRF_HI_Best_42fe_56d1_4307_Jul.nc',
+                   'Wind/WRF_HI_Best_24a5_06c9_80ba_Aug.nc',
+                   'Wind/WRF_HI_Best_ab1f_5288_5f35_sep.nc')
+
+wind.nc <- foreach(file = wind.files, .combine = concat.wind) %do% 
+  read.nc(open.nc(file))
+
+str(wind.nc)
+```
+
+To annotate a GPS point with u and v wind vectors, I linearly interpolate between eight points. Imagine a cube. The x- and y-axes correspond to longitude and latitude, respectively, and the z-axis represents time. Each GPS point occupies a point within this three-dimensional space and is thus surrounded by eight points. The 'lower' four points (along the z-axis) are the u- and v-values for the timestamp immediately preceeding the GPS timestamp. Similarly, the 'upper' four points are the wind vector values for the following timestamp. These two sets of four points are the closest (longitude, latitude) pairs southwest, southeast, northwest, and northeast of the GPS point on either side temporally. Trilinearly interpolating between these eight points provides our wind components for annotating GPS points.
+
+```{r annotate}
+tracks.dt <- tidytracks_db %>%
+  filter(Year == 2016,
+         Species == 'RFBO',
+         Latitude < 24.29) %>%
+  select(DeployID,
+         TimestampUTC,
+         Longitude,
+         Latitude) %>%
+  mutate(dummyTime = TimestampUTC,
+         dummyLon = Longitude,
+         dummyLat = Latitude) %>%
+  collect(n = Inf) %>%
+  data.table(key = 'dummyTime')
+
+time.dt <- data.table(time = wind.nc$time,
+                      time.idx = seq(wind.nc$time), 
+                      key = 'time')
+lon.dt <- data.table(lon = wind.nc$longitude,
+                     lon.idx = seq(wind.nc$longitude),
+                     key = 'lon')
+lat.dt <- data.table(lat = wind.nc$latitude,
+                     lat.idx = seq(wind.nc$latitude),
+                     key = 'lat')
+
+
+# Conveniently, the wind NCDF files and our SQLite database both store times in unix epoch format: seconds since 1/1/1970 00:00 UTC
+# Sequentially join time index, longitude index, and latitude index
+tracks.time <- time.dt[tracks.dt, roll = Inf]
+setkey(tracks.time, dummyLon)
+tracks.lon <- lon.dt[tracks.time, roll = Inf]
+setkey(tracks.lon, dummyLat)
+tracks.lat <- lat.dt[tracks.lon, roll = Inf]
+
+interp.wind <- function(lon, lat, time, uv) {
+  wind <- if(uv == 'u') wind.nc$Uwind else wind.nc$Vwind
+  approx3d(x = seq(from = min(wind.nc$longitude),
+                   to = max(wind.nc$longitude),
+                   length.out = length(wind.nc$longitude)),
+           y = seq(from = min(wind.nc$latitude),
+                   to = max(wind.nc$latitude),
+                   length.out = length(wind.nc$latitude)),
+           z = seq(from = min(wind.nc$time),
+                   to = max(wind.nc$time),
+                   length.out = length(wind.nc$time)),
+           f = wind,
+           xout = lon,
+           yout = lat,
+           zout = time)
+}
+
+tracks.wind <- tracks.lat %>%
+  mutate(u = interp.wind(Longitude, Latitude, TimestampUTC, 'u'),
+         v = interp.wind(Longitude, Latitude, TimestampUTC, 'v')) %>%
+  arrange(DeployID, TimestampUTC) %>%
+  select(DeployID, TimestampUTC, Longitude, Latitude, u, v)
+
+head(tracks.wind)
+```
+
+Join wind data with other annotations (behavior, day phase, etc) and write back to database.
+```{r write_db, eval=FALSE}
+tracks.wind2 <- tracks.wind %>%
+  group_by(DeployID) %>%
+  mutate(WindMag = sqrt(u^2 + v^2),
+         Bearing = bearing(cbind(Longitude, Latitude),
+                           cbind(lead(Longitude), lead(Latitude))),
+         WindBearing = atan2(v, u) * 180 / pi,
+         # Relative angle between two bearings (headwind = 0, tailwind = 180, see amelineau et al 2014)
+         Theta = -((((Bearing - WindBearing) %% 360) + 540) %% 360 - 180)) %>%
+  select(DeployID, 
+         TimestampUTC, 
+         UWind = u, 
+         VWind = v, 
+         WindMag, 
+         Theta)
+
+tidytracks_update <- tidytracks_db %>%
+  collect(n = Inf) %>%
+  join(tracks.wind2, by = c('DeployID', 'TimestampUTC'))
+
+dbWriteTable(MHI_db$con, 'AnnotatedTracks', tidytracks_update, overwrite = TRUE)
+```
+
+```{r lme}
+tidytracks_db <- tbl(MHI_db, 'TidyTracks')
+rfbo.tracks <- tidytracks_db %>%
+  filter(Species == 'RFBO',
+         Year == '2016',
+         Latitude < 24.29) %>%
+  select(DeployID,
+         TimestampUTC,
+         Behavior = behavior,
+         Speed = speed,
+         WindMag,
+         Theta) %>%
+  collect(n = Inf) %>%
+  mutate(dummyTimestamp = TimestampUTC) %>%
+  data.table(key = c('DeployID', 'dummyTimestamp'))
+
+rfbo.acc <- acc_db %>%
+  select(DeployID,
+         TripID,
+         ACCTimestampUTC,
+         Longitude,
+         Latitude,
+         meanODBA) %>%
+  collect(n = Inf) %>%
+  mutate(dummyTimestamp = ACCTimestampUTC) %>%
+  data.table(key = c('DeployID', 'dummyTimestamp'))
+
+lme.data <- rfbo.acc[rfbo.tracks, roll = 'nearest'] %>% 
+  select(-dummyTimestamp) %>%
+  na.omit %>% 
+  mutate(lag = abs(ACCTimestampUTC - TimestampUTC),
+         DeployID = factor(DeployID),
+         Behavior = factor(Behavior),
+         # Convert m/s^2 to g
+         ODBA = meanODBA / 9.80665,
+         # Negative cosine transform theta (-1 for tailwind, 1 for headwind)
+         Theta = Theta * pi / 180,
+         nTheta = -cos(Theta * pi / 180),
+         # Normalize bird and wind speed
+         Speed,
+         nSpeed = (Speed - min(Speed)) / (max(Speed) - min(Speed)),
+         WindMag,
+         nWindMag = (WindMag - min(WindMag)) / (max(WindMag) - min(WindMag))) %>%
+  filter(lag < 180,
+         Behavior %in% c('ars', 'transit'))
+summary(lme.data)
+
+#write.csv(lme.data, 'odba_model_data.csv', row.names = FALSE)
+
+# Test distributions
+plot.data <- lme.data %>%
+  filter(Behavior == 'transit',
+         Speed < 35,           # High speed points are interpolation artifacts
+         Speed > 5)            # Still investigating low-speed transit
+
+plot.data %>%
+  ggplot(aes(ODBA)) +
+  geom_histogram(binwidth=.05)
+  # Looks normal
+
+plot.data %>%
+  ggplot(aes(ODBA)) +
+  geom_density() +
+  stat_function(fun = dnorm, args = list(mean = 0.56, sd = 0.16), col = 'red')
+  # Super normal
+
+plot.data %>%
+  ggplot(aes(sample = ODBA)) +
+  stat_qq(dparams = list(mean = 0.56, sd = 0.16)) + 
+  geom_abline(slope = 1, intercept = 0, col = 'red') +
+  coord_fixed()
+  # Normality holds for all but the ends of the tails
+
+# What does ODBA look like as a function of the bird's speed?
+plot.data %>%
+  ggplot(aes(Speed, ODBA)) +
+  geom_point() +
+  geom_smooth()
+  # It's U-shaped! Kinda!
+
+# What does ODBA look like as a function of bird-wind angle?
+plot.data %>%
+  ggplot(aes(Theta, ODBA)) +
+  geom_point() +
+  geom_smooth()
+  # Hard to see a pattern - may be swamped by flight speed/wind speed
+
+# What does ODBA look like as a function of wind speed?
+plot.data %>%
+  ggplot(aes(WindMag, ODBA)) +
+  geom_point() +
+  geom_smooth()
+  # Also pretty flat
+
+odba.model <- lmer(ODBA ~ poly(Speed, 2) + -cos(Theta) + WindMag + Behavior + (1 | DeployID), data = lme.data)
+summary(odba.model)
+```
+
+```{r viz_mod}
+library(visreg)
+visreg(odba.model)
+visreg(odba.model, 'Theta', cond = )
+```

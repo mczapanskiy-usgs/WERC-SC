@@ -2,25 +2,38 @@
 title: "MHI Tracking Report"
 author: "Max Czapanskiy"
 date: "December 8, 2016"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
+library(data.table)
+library(functional)
 library(RSQLite)
 library(lubridate)
 library(foreach)
+library(iterators)
 library(geosphere)
 library(doParallel)
 library(xtable)
-MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
-metadata <- tbl(MHI_db, 'Metadata')
-tracks <- tbl(MHI_db, sql('SELECT * FROM TrackView'))
-dives <- tbl(MHI_db, sql('SELECT * FROM DiveView'))
+library(mosaic)
+library(oce)
+library(tables)
+library(tidyr)
 
-field.types <- read.csv('../metadata/MHI_DB_FieldType.csv',
-                        stringsAsFactors = FALSE)
+# dplyr connections
+MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+metadata_db <- tbl(MHI_db, 'Metadata')
+metadata <- collect(metadata_db)
+tracks_db <- tbl(MHI_db, sql('SELECT * FROM TrackView')) %>%
+  filter(TripFlag == 0,
+         TripEndUTC - TripStartUTC > 60 * 30) 
+trips_db <- tbl(MHI_db, sql('SELECT * FROM Trips')) %>%
+  filter(TripFlag == 0,
+         Duration > .5)
+tidytracks_db <- tbl(MHI_db, 'TidyTracks')
+dives_db <- tbl(MHI_db, sql('SELECT * FROM DiveView'))
 
 POSIX.origin = ymd('1970-01-01', tz = 'UTC')
 
@@ -57,7 +70,6 @@ deploy_summary <- metadata %>%
          (GPS_deployed == 'Y' | TDR_deployed == 'Y')) %>%
   mutate(duration = (RecoverCaptureTime - DeployCaptureTime) / 3600 / 24) %>%
   collect %>%
-  mutate(Year = year(as.POSIXct(DeployCaptureTime, tz = 'UTC', origin = POSIX.origin))) %>%
   group_by(Species, Island, Site, Year, DepSess) %>%
   summarize(NestStatus = getNestStatus(length(intersect(Phenology, c('EC', 'MC', 'LC'))) > 0,
                                        any(Phenology == 'I')),
@@ -70,7 +82,7 @@ deploy_summary <- metadata %>%
             sdTrackDur = sd(duration, na.rm = TRUE)) %>%
   ungroup
 
-sp <- 'RFBO'
+sp <- 'RTTR'
 filter(deploy_summary, Species == sp) %>%
   mutate_at(vars(Species:Year), no.repeat) %>%
   transmute(Island, Site, Year, `Deploy Session`=DepSess,
@@ -85,13 +97,20 @@ filter(deploy_summary, Species == sp) %>%
         comment = FALSE)
 ```
 
-```{r trips}
+```{r trips, eval=FALSE}
 HI_time <- function(time_float) {
   (as.POSIXct(time_float, tz = 'utc', origin = POSIX.origin) - hours(10)) %>%
     strftime('%H:%M%:%S', tz = 'utc') %>%
     hms %>%
     period_to_seconds
 }
+
+localDate <- function(timestamp) {
+  as.POSIXct(timestamp, tz = 'UTC', origin = POSIX.origin) %>%
+    as.Date(tz = 'Etc/GMT+10')
+}
+
+
 trip_summaries <- 
   foreach(yr = HIYears, .combine = rbind) %:%
   foreach(sp = HISpecies, .combine = rbind, .packages=c('dplyr', 'geosphere', 'lubridate')) %dopar% {
@@ -123,7 +142,10 @@ trip_summaries <-
                   CentroidAzimuth = bearing(c(OriginLon[1], OriginLat[1]), c(CentroidLon, CentroidLat)),
                   FarthestLon = Longitude[which.max(Dist2Col)],
                   FarthestLat = Latitude[which.max(Dist2Col)],
-                  FarthestAzimuth = bearing(c(OriginLon[1], OriginLat[1]), c(FarthestLon, FarthestLat))) %>%
+                  FarthestAzimuth = bearing(c(OriginLon[1], OriginLat[1]), c(FarthestLon, FarthestLat)),
+                  BeginDate = localDate(first(TimestampUTC)),
+                  EndDate = localDate(last(TimestampUTC)),
+                  TripLength = factor(ifelse(BeginDate == EndDate, 'Short', 'Long'))) %>%
         ungroup
     } else {
       NULL
@@ -173,4 +195,298 @@ pretty_trips_by_colony <- trips_by_colony %>%
             `Farthest Azimuth` = sprintf('%f2 (%f2 - %f2) [%f2]', FarthestAzimuth_mean, FarthestAzimuth_min, FarthestAzimuth_max, FarthestAzimuth_sd))
 
 write.csv(pretty_trips_by_colony, 'PrettyTripsByColony.csv', row.names = FALSE)
+```
+
+```{r rttr_behavior, results='asis'}
+localDate <- function(timestamp) {
+  as.POSIXct(timestamp, tz = 'UTC', origin = POSIX.origin) %>%
+    as.Date(tz = 'Etc/GMT+10')
+}
+
+dayPhase <- function(timestamp, longitude, latitude) {
+  alt <- as.POSIXct(timestamp, tz = 'UTC', origin = POSIX.origin) %>%
+    sunAngle(longitude, latitude) %>%
+    `$`(altitude)
+  derivedFactor(Day = alt > 0,
+                Night = alt < -18,
+                Twilight = (alt <= 0 & alt >= -18))
+}
+
+annotated.behavior <- tidytracks_db %>%
+  filter(Species == 'RTTR') %>%
+  collect(n = Inf) %>%
+  group_by(TripID) %>%
+  mutate(BeginDate = localDate(first(TimestampUTC)),
+         EndDate = localDate(last(TimestampUTC)),
+         TripLength = derivedFactor(
+           Short = BeginDate == EndDate,
+           Long = BeginDate != EndDate)) %>%
+  ungroup %>%
+  mutate(dayPhase = dayPhase(TimestampUTC, Longitude, Latitude),
+         behavior = factor(behavior))
+
+# Short trips table
+mean2 <- Curry(mean, na.rm = TRUE)
+mean2 <- function(x) mean(x, na.rm = TRUE)
+sd2 <- Curry(sd, na.rm = TRUE)
+print('Short Trips')
+annotated.behavior %>%
+  filter(TripLength == 'Short',
+         !is.na(behavior),
+         dayPhase != 'Night') %>%  
+  tabular(Heading('Behavior') * 
+            (behavior + 1) ~ 
+            DropEmpty() * Heading('Day Phase') * (Heading() * dayPhase + 1) * 
+            (Paste(Percent('col'), length, head = 'Freq (N)', justify = 'r', sep = '\\% (', postfix = ')') + 
+               Heading() * speed * PlusMinus(mean2, sd2, head = 'Speed (m/s)')), 
+          data = .) %>%
+  latex %>%
+  print
+
+print('Long Trips')
+annotated.behavior %>%
+  filter(TripLength == 'Long',
+         !is.na(behavior)) %>%  
+  tabular(Heading('Behavior') * 
+            (behavior + 1) ~ 
+            Heading('Day Phase') * (Heading() * dayPhase + 1) * 
+            (Paste(Percent('col'), Format(digits = 0) * length, head = 'Freq (N)', justify = 'r', sep = '\\% (', postfix = ')') + 
+               Heading() * speed * PlusMinus(mean2, sd2, head = 'Speed (m/s)')), 
+          data = .) %>%
+  latex %>%
+  print
+```
+
+```{r rttr_angles}
+azimuth <- function(lon, lat, direction) {
+  n <- length(lon)
+  colony <- if(direction == 'out') c(first(lon), first(lat)) else c(last(lon), last(lat))
+  transit <- if(direction == 'out') cbind(lon[2:6], lat[2:6]) else cbind(lon[(n-5):(n-1)], lat[(n-5):(n-1)])
+  bearings <- deg2rad(bearing(colony, transit))
+  # circular mean
+  rad2deg(atan2(sum(sin(bearings)), sum(cos(bearings))))
+}
+
+farthest.azimuth <- trip_summaries %>%
+  mutate(TripID = sprintf('%i%05i', DeployID, TripNumber) %>% as.numeric) %>%
+  select(TripID, FarthestAzimuth)
+
+with.azimuth <- annotated.behavior %>%
+  group_by(DeployID, TripLength, TripID) %>%
+  filter(n() >= 12) %>% 
+  summarize(OutAzimuth = azimuth(Longitude, Latitude, 'out'),
+            InAzimuth = azimuth(Longitude, Latitude, 'in')) %>%
+  merge(select(metadata_db, DeployID, Site) %>% collect) %>%
+  merge(farthest.azimuth)
+
+# Azimuth roses
+binwidth <- 30
+breaks <- seq(-180 + binwidth, 180, by = binwidth)
+foreach(site = unique(with.azimuth$Site)) %do% {
+  site.data <- filter(with.azimuth, Site == site)
+  
+  angleFreq <- function(.a, .b, .l) {
+    if(is.null(.l)) {
+      foreach(a = .a, b = .b, .combine = c) %do% {
+        site.data %>%
+          mutate(azimuth = switch(b,
+                                  Out = OutAzimuth,
+                                  In = InAzimuth,
+                                  Farthest = FarthestAzimuth)) %>%
+          filter(azimuth >= a - binwidth / 2,
+                 azimuth < a + binwidth / 2) %>% 
+          nrow
+      }
+    } else {
+      foreach(a = .a, b = .b, l = .l, .combine = c) %do% {
+        site.data %>%
+          mutate(azimuth = switch(b,
+                                  Out = OutAzimuth,
+                                  In = InAzimuth,
+                                  Farthest = FarthestAzimuth)) %>%
+          filter(TripLength == l,
+                 azimuth >= a - binwidth / 2,
+                 azimuth < a + binwidth / 2) %>% 
+          nrow
+      }
+    }
+  }
+  
+  if(site == 'Halona') {
+    rose.data <- expand.grid(Angle = breaks,
+                             Bound = c('Out', 'In', 'Farthest')) %>%
+      mutate(Freq = angleFreq(Angle, Bound, NULL))
+    
+    p <- ggplot(rose.data, aes(x = Angle, y = Freq)) +
+      coord_polar(theta = 'x', start = -pi + deg2rad(binwidth / 2)) +
+      geom_bar(stat = "identity") +
+      scale_x_continuous(breaks = breaks) +
+      facet_wrap( ~ Bound) +
+      labs(title = sprintf('%s Trip Azimuths', site),
+           subtitle = sprintf('N = %i trips', nrow(site.data))) 
+  } else {
+    rose.data <- expand.grid(Angle = breaks,
+                             Bound = c('Out', 'In', 'Farthest'),
+                             TripLength = c('Short', 'Long')) %>%
+      mutate(Freq = angleFreq(Angle, Bound, TripLength))
+    
+    p <- ggplot(rose.data, aes(x = Angle, y = Freq)) +
+      coord_polar(theta = 'x', start = -pi + deg2rad(binwidth / 2)) +
+      geom_bar(stat = "identity") +
+      scale_x_continuous(breaks = breaks) +
+      facet_wrap(TripLength ~ Bound) +
+      labs(title = sprintf('%s Trip Azimuths', site),
+           subtitle = sprintf('N = %i trips', nrow(site.data))) 
+  }
+  
+  ggsave(filename = sprintf('Plots/%s_Azimuth.png', site))
+}
+```
+
+```{r rttr_tripTimes}
+trips <- annotated.behavior %>%
+  group_by(TripID, TripLength) %>%
+  summarize(TripStart0 = min(TimestampUTC, na.rm = TRUE),
+            TripEnd0 = max(TimestampUTC, na.rm = TRUE),
+            TripStart = HI_time(TripStart0) / 3600,
+            TripEnd = HI_time(TripEnd0) / 3600)
+
+binwidth <- 2 # 2 hour bins
+breaks <- seq(0, 24 - binwidth, by = binwidth)
+axis.breaks <- breaks[seq(1, length(breaks), by = 2)]
+
+timeFreq <- function(.t, .l, .s) {
+  foreach(t = .t, l = .l, s = .s, .combine = c) %do% {
+    trips %>%
+      mutate(startend = if(s == 'Start') TripStart else TripEnd) %>%
+      filter(TripLength == l,
+             startend >= t - binwidth / 2,
+             startend < t + binwidth / 2) %>%
+      nrow
+  }
+}
+
+rose.data <- expand.grid(Time = breaks,
+                         TripLength = c('Short', 'Long'),
+                         StartEnd = c('Start', 'End')) %>% 
+  mutate(Freq = timeFreq(Time, TripLength, StartEnd))
+
+p1 <- ggplot(rose.data, aes(x = Time, y = Freq, fill = StartEnd)) +
+  coord_polar(theta = 'x', start = -pi * binwidth / 24) +
+  geom_bar(stat = "identity", position = 'dodge') +
+  scale_x_continuous(breaks = breaks,
+                     labels = sprintf('%02i:%02i', floor(breaks), floor(breaks %% 1 * 60))) +
+  facet_wrap(~ TripLength) +
+  labs(title = 'RTTR Trip Start/End Times',
+       subtitle = sprintf('N = %i trips', nrow(trips)))
+
+p2 <- ggplot(rose.data, aes(x = Time, y = Freq, fill = StartEnd)) +
+  geom_bar(stat = "identity", position = 'dodge') +
+  scale_x_continuous(breaks = axis.breaks,
+                     labels = sprintf('%02i:%02i', floor(axis.breaks), floor(axis.breaks %% 1 * 60))) +
+  facet_wrap(~ TripLength) +
+  labs(title = 'RTTR Trip Start/End Times',
+       subtitle = sprintf('N = %i trips', nrow(trips)))
+
+ggsave('Plots/RTTR_startend_polar.png', p1)
+ggsave('Plots/RTTR_startend_linear.png', p2)
+```
+
+```{r rttr_hourlyBehavior}
+binwidth <- 1 # 1 hour bins
+breaks <- seq(0, 24 - binwidth, by = binwidth)
+axis.breaks <- breaks[seq(1, length(breaks), by = 4)]
+
+annotated.behavior2 <- annotated.behavior %>%
+  mutate(since.midnight = HI_time(TimestampUTC) / 3600)
+
+behaviorFreq <- function(.t, .l, .b) {
+  foreach(t = .t, l = .l, b = .b, .combine = c) %do% {
+    result <- annotated.behavior2 %>%
+      filter(TripLength == l,
+             since.midnight >= t,
+             since.midnight < t + binwidth,
+             !is.na(behavior)) %>%
+      group_by(behavior) %>%
+      summarize(N = n()) %>%
+      mutate(Freq = N / sum(N, na.rm = TRUE)) %>%
+      filter(behavior == b)
+    
+    if(nrow(result) == 0)
+      0
+    else
+      result$Freq
+  }
+}
+
+rose.data <- expand.grid(Time = breaks,
+                         TripLength = c('Short', 'Long'),
+                         Behavior = c('ars', 'rest', 'transit')) %>%
+  mutate(Freq = behaviorFreq(Time, TripLength, Behavior))
+
+p <- rose.data %>%
+  ggplot(aes(x = Time + binwidth / 2, y = Freq, fill = Behavior)) +
+  geom_bar(stat = 'identity') +
+  facet_wrap(~ TripLength) +
+  scale_x_continuous(breaks = breaks,
+                     minor_breaks = NULL) +
+  labs(title = 'RTTR Hourly Behavior',
+       x = 'Time')
+ggsave('Plots/RTTR_hourly_behavior.png', p)
+```
+
+```{r rttr_speeds}
+annotated.behavior %>% 
+  filter(!is.na(behavior)) %>% 
+  group_by(dayPhase, behavior) %>%
+  summarize(meanSpeed = mean(speed, na.rm = TRUE),
+            sdSpeed = sd(speed, na.rm = TRUE)) %>%
+  ggplot(aes(x=behavior, 
+             y=meanSpeed, fill=dayPhase)) + 
+  geom_bar(stat = 'identity', 
+           position = 'dodge',
+           width = 0.8) + 
+  geom_errorbar(aes(ymax=meanSpeed + sdSpeed,
+                    ymin=meanSpeed - sdSpeed), 
+                position = position_dodge(), 
+                width = 0.25) +
+  labs(title = 'Speed by Behavior and Time of Day',
+       x = 'Behavior',
+       y = 'Speed (m/s)')
+```
+
+```{r attach_altitude}
+rttr.meta <- filter(metadata, 
+                    Species == 'RTTR',
+                    GPS_recovery == 1) 
+altitude.data <- foreach(row = iter(rttr.meta, by = 'row'), 
+                         .combine = bind_rows, 
+                         .multicombine = TRUE) %do% {
+  sprintf('1RawFiles/iGotU/CSV/%s.csv', row$GPS_filename) %>%
+    read.csv(stringsAsFactors = FALSE) %>%
+    transmute(DeployID = row$DeployID,
+              AltitudeTimestampUTC = ymd_hms(paste(Date, Time), tz = 'UTC'),
+              Altitude)
+} %>%
+  mutate(DummyTimestamp = AltitudeTimestampUTC) %>%
+  data.table(key = c('DeployID', 'DummyTimestamp'))
+
+annotated.behavior.dt <- annotated.behavior %>%
+  mutate(TimestampUTC = as.POSIXct(TimestampUTC, origin = POSIX.origin, tz = 'UTC'),
+         DummyTimestamp = TimestampUTC) %>%
+  data.table(key = c('DeployID', 'DummyTimestamp'))
+
+altitude.dt <- altitude.data[annotated.behavior.dt, roll = 'nearest'] %>%
+  mutate(lag = abs(as.numeric(AltitudeTimestampUTC - TimestampUTC, units = 'secs'))) %>%
+  filter(lag < 90) %>% # half the sampling rate
+  select(TimestampUTC, behavior, Altitude, dayPhase)
+
+# NOTE: DeployID 727 didn't have altitude
+
+write.csv(altitude.dt, 'rttraltitudebehavior.csv', row.names = FALSE)
+
+altitude.dt %>%
+  group_by(dayPhase, behavior) %>%
+  summarize(meanAltitude = mean(Altitude, na.rm = TRUE),
+            sdAltitude = sd(Altitude, na.rm = TRUE))
 ```

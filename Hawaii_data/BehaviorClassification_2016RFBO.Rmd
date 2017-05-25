@@ -1,0 +1,182 @@
+---
+title: "Behavioral Classification"
+author: "Max Czapanskiy"
+date: "January 11, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(geosphere)
+library(RSQLite)
+library(moveHMM)
+library(mosaic)
+library(CircStats)
+select <- dplyr::select
+
+# dplyr connections
+MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+metadata_db <- tbl(MHI_db, 'Metadata')
+tracks_db <- tbl(MHI_db, sql('SELECT * FROM TrackView')) %>%
+  filter(TripFlag == 0,
+         TripEndUTC - TripStartUTC > 60 * 30) 
+trips_db <- tbl(MHI_db, sql('SELECT * FROM Trips')) %>%
+  filter(TripFlag == 0,
+         Duration > .5)
+tidytracks_db <- tbl(MHI_db, 'TidyTracks')
+dives_db <- tbl(MHI_db, sql('SELECT * FROM DiveView'))
+
+POSIX.origin = ymd('1970-01-01', tz = 'UTC')
+
+cl <- makeCluster(5)
+registerDoParallel(cl)
+```
+
+## Behavioral Classification 2
+
+This script classifies the 2016 RFBO tracks using hidden Markov models (HMMs) with step length and turning angle as the variables.
+ 
+```{r collect_data}
+# Collect metadata and trip info for 2016 RFBO
+RFBO2016.meta <- metadata_db %>%
+  filter(Species == 'RFBO',
+         Year == 2016) %>%
+  collect
+RFBO2016.trips <- trips_db %>%
+  filter(Species == 'RFBO',
+         Year == 2016) %>%
+  collect
+
+# Choose a sample trip to test
+test.TripID <- 114500015
+test.DeployID <- test.TripID %>% as.character %>% substr(1, nchar(.) - 5) %>% as.numeric
+test.TripNumber <- test.TripID %>% as.character %>% substr(nchar(.) - 4, nchar(.)) %>% as.numeric
+test.meta <- filter(RFBO2016.meta, DeployID == test.DeployID)
+
+test.tracks <- tracks_db %>%
+  filter(DeployID == test.DeployID,
+         TripNumber == test.TripNumber) %>%
+  collect(n = Inf) %>%
+  mutate(TripID = test.TripID)
+
+# Check for gaps
+prog.interval <- test.meta$GPS_interval_min
+time.gaps <- with(test.tracks, (lead(TimestampUTC) - TimestampUTC)) %>% na.omit
+ggplot(data.frame(time.gaps = time.gaps),
+       aes(x = time.gaps)) +
+  geom_histogram(binwidth = prog.interval) +
+  scale_x_continuous(breaks = function(lim) seq(0, lim[2], by = prog.interval),
+                     minor_breaks = NULL) +
+  labs(title = 'Histogram of Time Gaps',
+       subtitle = sprintf('Deploy ID %i, Trip Number %i', test.DeployID, test.TripNumber),
+       x = "Time Gaps (s)")
+sum(time.gaps < .9 * prog.interval | time.gaps > 1.1 * prog.interval)
+```
+
+Histogram looks great. Only eight gaps with discrepancies greater than 10% of the programmed sampling rate.
+
+Now, let's determine our initial parameters for behavioral states rest, transit, and ARS. 
+
+```{r train_data}
+train.data <- test.tracks %>%
+  transmute(TimestampUTC = as.POSIXct(TimestampUTC, origin = POSIX.origin, tz = 'UTC'),
+            Longitude,
+            Latitude,
+            step_length = distGeo(cbind(Longitude, Latitude), cbind(lead(Longitude), lead(Latitude))),
+            turn_angle = bearing(cbind(Longitude, Latitude), cbind(lead(Longitude), lead(Latitude))) -
+              bearing(cbind(lag(Longitude), lag(Latitude)), cbind(Longitude, Latitude)),
+            speed = step_length / as.numeric(difftime(lead(TimestampUTC), TimestampUTC, units = 'sec')),
+            cum_step = cumsum(step_length),
+            tortuosity = (lead(cum_step, 2) - lag(cum_step, 4)) / 
+               distGeo(cbind(lag(Longitude, 3), lag(Latitude, 3)), cbind(lead(Longitude, 3), lead(Latitude, 3))))
+
+ggplot(train.data, aes(x = speed)) + 
+  geom_histogram(binwidth = .5) + 
+  labs(title = 'Speed Histogram', 
+       x = 'Speed (m/s)')
+ggplot(train.data, aes(x = tortuosity)) + 
+  geom_histogram(binwidth = .1) + 
+  labs(title = 'Tortuosity Histogram', 
+       x = 'Tortuosity (\u00B1 3 points)')
+ggplot(train.data, aes(x = speed, y = tortuosity)) +
+  geom_point() +
+  geom_density2d()
+
+
+proj.string <- '+proj=lcc +lat_1=20 +lat_2=40 +lon_0=160 +lat_0=-10'
+lambert <- proj4::project(train.data[, c('Longitude', 'Latitude')],
+                          proj = proj.string)
+train.data$x <- lambert$x
+train.data$y <- lambert$y
+
+test.fpt <- fpt(as.ltraj(train.data[,c('x','y')],
+                        date = train.data$TimestampUTC,
+                        id = test.TripID), radii = c(seq(200, 1000, by = 5), seq(1010, 2000, by = 10)), units = 'seconds')
+varlogfpt(test.fpt)
+abline(v = 350)
+# Slight peak at ~350m
+plot(test.fpt, scale = 350)
+# Break at about 500s
+fpt.350 <- test.fpt[[1]][, which(attr(test.fpt, 'radii') == 350)]
+
+train.data <- mutate(train.data,
+                     guess_state = derivedFactor('rest' = speed < 1,
+                                                 'ars' = fpt.350 > 500,
+                                                 .method = 'first',
+                                                 .default = 'transit'))
+
+ggplot(train.data,
+       aes(x = speed,
+           color = guess_state)) +
+  geom_density(aes(color = guess_state)) +
+  labs(title = 'Speed Distribution by State', 
+       x = 'Speed (m/s)')
+ggplot(train.data,
+       aes(x = tortuosity,
+           color = guess_state)) +
+  geom_density(aes(color = guess_state)) +
+  labs(title = 'Tortuosity Distribution by State', 
+       x = 'Tortuosity (\u00B1 3 points)')
+
+par0 <- train.data %>%
+  filter(!is.na(guess_state)) %>%
+  group_by(guess_state) %>%
+  summarize(meanStep = mean(step_length, na.rm = TRUE),
+            sdStep = sd(step_length, na.rm = TRUE),
+            meanAngle = mean(abs(turn_angle), na.rm = TRUE),
+            kappaAngle = est.kappa(turn_angle))
+```
+
+```{r try_hmm}
+hmm.data <- test.tracks %>%
+  select(ID = TripID, Longitude, Latitude) %>%
+  # test.tracks is a tbl_df, which causes prepData to puke
+  data.frame %>%
+  prepData(type = 'LL', coordNames = c('Longitude', 'Latitude'))
+
+
+  
+
+summary(hmm.data)
+plot(hmm.data)
+
+# States = rest, transit, ars
+mu0 <- c(0.01, 1, 0.5) # step mean
+sigma0 <- c(0.005, 0.25, 0.5) # step SD
+stepPar0 <- c(mu0, sigma0)
+angleMean0 <- c(pi, 0, pi/2) # angle mean
+kappa0 <- c(0.1, 1, 0.5) # angle concentration
+anglePar0 <- c(angleMean0, kappa0)
+hmm.mod <- fitHMM(hmm.data, 
+                  nbStates = 3, 
+                  stepPar0,
+                  anglePar0)
+hmm.mod
+```

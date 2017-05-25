@@ -1,0 +1,143 @@
+---
+title: "ACC By Behavior"
+author: "Max Czapanskiy"
+date: "January 10, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(RSQLite)
+library(data.table)
+library(foreach)
+library(lubridate)
+library(ggplot2)
+
+# dplyr connections
+MHI_db <- src_sqlite('MHI_GPS_TDR.sqlite')
+metadata_db <- tbl(MHI_db, 'Metadata')
+tracks_db <- tbl(MHI_db, sql('SELECT * FROM TrackView')) %>%
+  filter(TripFlag == 0,
+         TripEndUTC - TripStartUTC > 60 * 30) 
+trips_db <- tbl(MHI_db, sql('SELECT * FROM Trips')) %>%
+  filter(TripFlag == 0,
+         Duration > .5)
+tidytracks_db <- tbl(MHI_db, 'TidyTracks')
+dives_db <- tbl(MHI_db, sql('SELECT * FROM DiveView'))
+
+POSIX.origin = ymd('1970-01-01', tz = 'UTC')
+```
+
+## Acceleration Analysis
+See Acceleration Calibration report for details on calculating overall dynamic body acceleration (ODBA).
+See Behavior Classification report for details on splitting GPS tracks into rest, transit, and area-restricted search (ARS).
+
+This code joins acceleration data with behavioral classifications and writes the results to a database table. 
+
+### Time Lags
+Because behavioral classification uses rediscretized tracks and acceleration readings are sampled at a different rate than GPS, there are lags between acceleration, behavior, and "true" locations. So in addition to annotating acceleration with behavioral state, we also note two time lags. The acceleration lag is the interval between an acceleration reading and the *latest* behavior before it (i.e. rolling forward from behavior). The behavior lag is the interval between a behavior and the *closest* GPS point (i.e rolling nearest from GPS). Only acceleration-behavior tuples with lags below a threshold (e.g. 5 minutes) will be retained for later analyses.
+```{r join, cache=TRUE}
+# List of acceleration CSVs (output from Acceleration Calibration report)
+calib.files <- dir('E-Obs/Calibration/', 
+                  pattern = 'RFBO[0-9]{2}_[0-9]{4}.csv', 
+                  full.names = TRUE)
+
+# Iterating through acceleration CSVs...
+foreach(acc.file = calib.files,
+        i = seq(calib.files),
+        .combine = rbind) %do% {
+          
+  # Acceleration data read from file joined with metadata
+  acc.data <- read.csv(acc.file,
+                       stringsAsFactors = FALSE) %>%
+    mutate(ACCTimestampUTC = ymd_hms(timestamp, tz = 'UTC'),
+           DummyTimestampUTC = ACCTimestampUTC)
+  metadata <- metadata_db %>%
+    filter(ACC_ID == acc.data$TagID[1]) %>%
+    select(TagID = ACC_ID,
+           DeployID) %>%
+    collect
+  acc.data$DeployID = metadata$DeployID
+  acc.dt <- data.table(acc.data, key = 'DummyTimestampUTC')
+  
+  # Behavior data read from database
+  behavior.dt <- tidytracks_db %>%
+    filter(DeployID == metadata$DeployID) %>%
+    select(DeployID,
+           TripID,
+           TimestampUTC,
+           Longitude,
+           Latitude,
+           Behavior = behavior) %>%
+    collect(n = Inf) %>%
+    mutate(BehaviorTimestampUTC = as.POSIXct(TimestampUTC, origin = POSIX.origin, tz = 'UTC'),
+           DummyTimestampUTC = BehaviorTimestampUTC) %>%
+    data.table(key = 'DummyTimestampUTC')
+  
+  # Join acceleration with behavior data
+  acc.behavior0 <- behavior.dt[acc.dt, roll = TRUE] %>%
+    select(DeployID, 
+           TripID, 
+           TagID, 
+           BehaviorTimestampUTC, 
+           Behavior,
+           ACCTimestampUTC, 
+           Longitude,
+           Latitude,
+           ends_with('ODBA'),
+           DummyTimestampUTC)
+  setkey(acc.behavior0, DummyTimestampUTC)
+  
+  # "True" GPS readings read from database
+  tracks.dt <- tracks_db %>%
+    filter(DeployID == metadata$DeployID) %>%
+    select(DeployID, 
+           TimestampUTC) %>%
+    collect(n = Inf) %>%
+    mutate(TrueTimestampUTC = as.POSIXct(TimestampUTC, origin = POSIX.origin, tz = 'UTC'),
+           DummyTimestampUTC = TrueTimestampUTC) %>%
+    data.table(key = 'DummyTimestampUTC')
+  
+  # Join "true" GPS readings with acceleration/behavior and calculate lags
+  acc.behavior <- tracks.dt[acc.behavior0, roll = 'nearest'] %>% 
+    select(DeployID, 
+           TripID, 
+           TagID, 
+           Longitude,
+           Latitude,
+           BehaviorTimestampUTC, 
+           Behavior, 
+           ACCTimestampUTC, 
+           ends_with('ODBA'), 
+           TrueTimestampUTC) %>%
+    mutate(BehaviorLag = BehaviorTimestampUTC - TrueTimestampUTC,
+           ACCLag = ACCTimestampUTC - TrueTimestampUTC) %>%
+    na.omit
+  
+  # Write to database
+  dbWriteTable(MHI_db$con, 'ACC_Behavior', acc.behavior, overwrite = i == 1, append = i > 1)
+  
+  # Summarize effort
+  acc.behavior %>%
+    summarize(DeployID = first(DeployID),
+              TagID = first(TagID),
+              Trips = n_distinct(TripID),
+              N = n())
+}
+```
+
+## Visualize results
+```{r plot}
+tbl(MHI_db, 'ACC_Behavior') %>%
+  # Only include behaviors within five minutes of a recorded point
+  filter(abs(BehaviorLag) < 5 * 60) %>%
+  collect(n=Inf) %>%
+  mutate(Behavior = factor(Behavior, levels = c('rest', 'transit', 'ars'), labels = c('Rest', 'Transit', 'ARS'))) %>%
+  ggplot(aes(x = Behavior, y = meanODBA)) +
+  geom_violin() +
+  theme_bw() +
+  labs(title = 'Distribution of ODBA Across Behaviors',
+       subtitle = 'Tri-axial acceleration measured in bursts every thirty seconds at 20hz for 4.8s',
+       y = 'Mean ODBA\n(Per burst)')
+```

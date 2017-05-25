@@ -1,0 +1,17 @@
+---
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tables)
+library(dplyr)
+```
+
+```{r table, results='asis'}
+seed <- 1
+iris2 <- iris %>% mutate(Region = factor(sample(c('East', 'West', 'Central'), 150, replace = TRUE)))
+tabular((Species + 1) ~ (Region + 1) * Sepal.Length * Paste(Percent(), length, sep = '\\% (', postfix = ')'),
+        data = iris2) %>%
+  latex %>%
+  print
+```
