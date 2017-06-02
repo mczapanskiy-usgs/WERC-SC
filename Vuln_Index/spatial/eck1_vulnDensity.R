@@ -36,10 +36,14 @@ densities_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to lo
 
 ranksDensityPCV <- select(densities_long, species, TGRIDALB_I, rankDensPCV) %>% 
   spread(species, rankDensPCV) %>% 
+  replace(is.na(.), 0) %>%
+  mutate(ALL_PCV_density = rowSums(.[2:66])) %>% 
   setnames(old = c(spp), new = c(PCVspp))
 
 ranksDensityPDV <- select(densities_long, species, TGRIDALB_I, rankDensPDV) %>% 
   spread(species, rankDensPDV) %>% 
+  replace(is.na(.), 0) %>%
+  mutate(ALL_PDV_density = rowSums(.[2:66])) %>% 
   setnames(old = c(spp), new = c(PDVspp))
 
 ranksDensity <- inner_join(ranksDensityPCV, ranksDensityPDV, by = "TGRIDALB_I")
