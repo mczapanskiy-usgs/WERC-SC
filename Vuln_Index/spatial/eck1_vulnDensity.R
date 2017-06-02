@@ -17,6 +17,11 @@ read.csv('~/WERC-SC/Vuln_Index/spatial/SoCA5minDensities.csv',
          stringsAsFactors = FALSE) -> densities
 densities <- select(densities, -ALL_BIRDS)
 
+# create species name string
+spp <- as.vector(vulnScores$SurveySpp)
+PCVspp <- paste(spp, "PCV", "density", sep = "_")
+PDVspp <- paste(spp, "PDV", "density", sep = "_")  
+
 # vuln score percent rank
 vulnRanks <- mutate(vulnScores,
                     PCVrank = percent_rank(PCV), 
@@ -30,10 +35,14 @@ densities_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to lo
          rankDensPDV = densityRank*PDVrank)
 
 ranksDensityPCV <- select(densities_long, species, TGRIDALB_I, rankDensPCV) %>% 
-  spread(species, rankDensPCV)
+  spread(species, rankDensPCV) %>% 
+  setnames(old = c(spp), new = c(PCVspp))
 
 ranksDensityPDV <- select(densities_long, species, TGRIDALB_I, rankDensPDV) %>% 
-  spread(species, rankDensPDV)
+  spread(species, rankDensPDV) %>% 
+  setnames(old = c(spp), new = c(PDVspp))
+
+ranksDensity <- inner_join(ranksDensityPCV, ranksDensityPDV, by = "TGRIDALB_I")
 
 
 ## save ranksDensityPCV and ranksDensityPDV data file to GitHub file
@@ -41,4 +50,7 @@ write.csv(ranksDensityPCV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPCV_
           row.names = FALSE) 
 
 write.csv(ranksDensityPDV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPDV_soCal_20170524.csv',
+          row.names = FALSE) 
+
+write.csv(ranksDensity, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensity_soCal_20170602.csv',
           row.names = FALSE) 
