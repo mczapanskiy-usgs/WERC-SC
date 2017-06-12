@@ -1,0 +1,273 @@
+## this script statistically tests the effect of subsetting the model on the AIC values
+## by analyzing the effect of year, trap location, trap type, and bait type on predator events: RAT, CAT, MONGOOSE
+## using the mlogit model
+## THIS SCRIPT IS CARRIED OVER FROM eck12_HALE_CPUE_analysisOfVar.r
+
+library(stats)
+library(plyr)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(ez)
+library(mlogit)
+library(mosaic)
+
+setwd("~/WERC-SC/HALE")
+
+read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
+         stringsAsFactors = FALSE) -> CPUEdata
+
+#### EDIT DATA: remove the mouse events, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
+data_rev <- CPUEdata %>% 
+  filter(predEvent != 'mouseCaught') %>% 
+  mutate(eventType = mosaic::derivedFactor(
+    "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
+    "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
+    "noEvent" = predEvent =="none",
+    .default = "noEvent"),
+    loc = mosaic::derivedFactor(
+      front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
+      back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
+      .default = "back"),
+    eventCnoC = mosaic::derivedFactor(
+      "event" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught', 'birdOtherCaught', 'trapTriggered', 'baitLost'),
+      "none" = predEvent == "none", 
+      .default = "none")
+  ) 
+
+#### RESTRUCTURE DATA FUNCTION
+formatData <- function(data, var, subset = NA){
+  if(!(var %in% colnames(data)))
+    stop(sprintf('var [%s] not found in data columns', var))
+  data$var <- getElement(data, var)
+  # Reshape data so that there is one row for every option, for every choice situation. 
+  # Here are the possible outcomes every time the trap is set:
+  events <- unique(data$var) 
+  # And here are the number of choice situations:
+  nEvents <- sum(data$NEvents)
+  
+  # Replicate the rows according to number of events:
+  data2 <- data[rep(row.names(data), data$NEvents),]
+  data2 <- data2 %>%
+    mutate(chid = row.names(data2))
+  
+  if (!is.na(subset)){
+    data2 <- data2[sample(1:nrow(data2), subset),]
+  }
+  
+  # Expand each choice situation so that each alternative is on its own row.  
+  # Do this with the merge function.  The alternative names will be stored in column `x`.
+  expanded_data <- merge(events, data2)
+  expanded_data <- expanded_data %>% 
+    mutate(choice = ifelse(x==var, TRUE, FALSE), 
+           YearCat = as.factor(Year),
+           YearCts = as.numeric(Year))
+  return(expanded_data)
+}
+
+## with only predator data
+data.Caughts_only <- data_rev %>% 
+  filter(eventType == "predatorEvent")
+expanded_data.Caughts_only <- formatData(data.Caughts_only, 'predEvent')
+## subset to test validity of subset btwn models
+set.seed(20170612)
+expanded_data.Caughts_only_subset <- formatData(data.Caughts_only, 'predEvent', subset=1000)
+expanded_data.Caughts_only_subset2 <- formatData(data.Caughts_only, 'predEvent', subset=1000)
+
+### PREDS ONLY ANALYSIS
+## Year = random variable, Trapline, Season, Year = individual-specific variables
+cpue.year.caughts2 <- mlogit.data(expanded_data.Caughts_only,
+                                  # %>% filter(loc == "front"), 
+                                  choice="choice",
+                                  alt.var ="x", 
+                                  id.var = "YearCat",
+                                  shape="long", 
+                                  chid.var="chid")
+# subsetted
+cpue.year.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset,
+                                       # %>% filter(loc == "front"), 
+                                       choice="choice",
+                                       alt.var ="x", 
+                                       id.var = "YearCat",
+                                       shape="long", 
+                                       chid.var="chid")
+cpue.year.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2,
+                                       # %>% filter(loc == "front"), 
+                                       choice="choice",
+                                       alt.var ="x", 
+                                       id.var = "YearCat",
+                                       shape="long", 
+                                       chid.var="chid")
+
+## Trapline = random variable, Trapline, Season, Year = individual-specific variables
+cpue.trap.caughts2 <- mlogit.data(expanded_data.Caughts_only, # %>% filter(loc == "front"), 
+                                  choice="choice",
+                                  alt.var ="x", 
+                                  id.var = "Trapline",
+                                  shape="long", 
+                                  chid.var="chid")
+#subsetted
+cpue.trap.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset, # %>% filter(loc == "front"), 
+                                       choice="choice",
+                                       alt.var ="x", 
+                                       id.var = "Trapline",
+                                       shape="long", 
+                                       chid.var="chid")
+cpue.trap.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2, # %>% filter(loc == "front"), 
+                                       choice="choice",
+                                       alt.var ="x", 
+                                       id.var = "Trapline",
+                                       shape="long", 
+                                       chid.var="chid")
+## Year and Trapline = random variable (combined into one variable), Trapline, Season, Year = individual-specific variables
+cpue.trapyr.caughts2 <- mlogit.data(expanded_data.Caughts_only %>% 
+                                      # filter(loc == "front") %>%
+                                      mutate(trapyr=paste0(Trapline,'-',YearCat)),
+                                    choice="choice",
+                                    alt.var ="x", 
+                                    id.var = "trapyr",
+                                    shape="long", 
+                                    chid.var="chid")
+#subsetted
+cpue.trapyr.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset %>% 
+                                      # filter(loc == "front") %>%
+                                      mutate(trapyr=paste0(Trapline,'-',YearCat)),
+                                    choice="choice",
+                                    alt.var ="x", 
+                                    id.var = "trapyr",
+                                    shape="long", 
+                                    chid.var="chid")
+cpue.trapyr.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2 %>% 
+                                      # filter(loc == "front") %>%
+                                      mutate(trapyr=paste0(Trapline,'-',YearCat)),
+                                    choice="choice",
+                                    alt.var ="x", 
+                                    id.var = "trapyr",
+                                    shape="long", 
+                                    chid.var="chid")
+## without any random effects, Trapline, Season, Year = individual-specific variables
+cpue.caughts2 <- mlogit.data(expanded_data.Caughts_only,
+                             # %>% filter(loc == "front"),
+                             choice="choice",
+                             alt.var ="x", 
+                             shape="long", 
+                             chid.var="chid")
+#subsetted
+cpue.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset,
+                             # %>% filter(loc == "front"),
+                             choice="choice",
+                             alt.var ="x", 
+                             shape="long", 
+                             chid.var="chid")
+cpue.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2,
+                             # %>% filter(loc == "front"),
+                             choice="choice",
+                             alt.var ="x", 
+                             shape="long", 
+                             chid.var="chid")
+### PREDS ONLY ANALYSIS: compare 3 random effect options
+# Year = random variable, Trapline, Season, Year = individual-specific variables
+cpue.models[[22]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            iterlim=1, print.level=1,
+                            data=cpue.year.caughts2) 
+# Trapline = random variable, Trapline, Season, Year = individual-specific variables
+cpue.models[[23]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            # reflevel = "ratCaught",
+                            iterlim=1, print.level=1,
+                            data=cpue.trap.caughts2)
+# Year and Trapline = random variable (combined into one variable), Trapline, Season, Year = individual-specific variables
+cpue.models[[24]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            iterlim=1, print.level=1,
+                            data=cpue.trapyr.caughts2)
+# without any random effects, Trapline, Season, Year = individual-specific variables
+cpue.models[[25]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
+                            iterlim=1, print.level=1,
+                            data=cpue.caughts2) 
+# remove trapline
+cpue.models[[26]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            iterlim=1, print.level=1,
+                            data=cpue.caughts2) 
+
+### SUBSET 1 ANALYSIS: compare 3 random effect options
+# Year = random variable, Trapline, Season, Year = individual-specific variables
+cpue.models[[27]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            iterlim=1, print.level=1,
+                            data=cpue.year.caughts2_sub1) 
+# Trapline = random variable, Trapline, Season, Year = individual-specific variables
+cpue.models[[28]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            # reflevel = "ratCaught",
+                            iterlim=1, print.level=1,
+                            data=cpue.trap.caughts2_sub1)
+# Year and Trapline = random variable (combined into one variable), Trapline, Season, Year = individual-specific variables
+cpue.models[[29]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            iterlim=1, print.level=1,
+                            data=cpue.trapyr.caughts2_sub1)
+# without any random effects, Trapline, Season, Year = individual-specific variables
+cpue.models[[30]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
+                            iterlim=1, print.level=1,
+                            data=cpue.caughts2_sub1) 
+# remove trapline
+cpue.models[[31]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            iterlim=1, print.level=1,
+                            data=cpue.caughts2_sub1) 
+
+### SUBSET 2 ANALYSIS: compare 3 random effect options
+# Year = random variable, Trapline, Season, Year = individual-specific variables
+cpue.models[[32]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            iterlim=1, print.level=1,
+                            data=cpue.year.caughts2_sub2) 
+# Trapline = random variable, Trapline, Season, Year = individual-specific variables
+cpue.models[[33]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            # reflevel = "ratCaught",
+                            iterlim=1, print.level=1,
+                            data=cpue.trap.caughts2_sub2)
+# Year and Trapline = random variable (combined into one variable), Trapline, Season, Year = individual-specific variables
+cpue.models[[34]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('ratCaught:(intercept)'='n',
+                                   'mongooseCaught:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            iterlim=1, print.level=1,
+                            data=cpue.trapyr.caughts2_sub2)
+# without any random effects, Trapline, Season, Year = individual-specific variables
+cpue.models[[35]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
+                            iterlim=1, print.level=1,
+                            data=cpue.caughts2_sub2) 
+# remove trapline
+cpue.models[[36]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            iterlim=1, print.level=1,
+                            data=cpue.caughts2_sub2) 
+
+)

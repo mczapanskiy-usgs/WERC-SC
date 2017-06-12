@@ -10,9 +10,10 @@ library(ez)
 library(mlogit)
 library(mosaic)
 
+setwd("~/WERC-SC/HALE")
+
 read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
           stringsAsFactors = FALSE) -> CPUEdata
-
 
 ## normal distribution? freq hist should be ~symetical, SD of most variable sample should be <10x the SD of least variable sample
 hist(CPUEdata$CPUE)
@@ -80,7 +81,6 @@ data_rev <- CPUEdata %>%
     events <- unique(data$var) 
     # And here are the number of choice situations:
     nEvents <- sum(data$NEvents)
-    
     # Replicate the rows according to number of events:
     data2 <- data[rep(row.names(data), data$NEvents),]
     data2 <- data2 %>%
@@ -89,7 +89,6 @@ data_rev <- CPUEdata %>%
     if (!is.na(subset)){
       data2 <- data2[sample(1:nrow(data2), subset),]
     }
-    
     # Expand each choice situation so that each alternative is on its own row.  
     # Do this with the merge function.  The alternative names will be stored in column `x`.
     expanded_data <- merge(events, data2)
@@ -467,7 +466,7 @@ cpue.models[[21]] <- mlogit(choice ~ 0 | Season + YearCts,
 ### PREDS ONLY ANALYSIS: compare 3 random effect options
 # Year = random variable, Trapline, Season, Year = individual-specific variables
 cpue.year.caughts2 <- mlogit.data(expanded_data.Caughts_only,
-                                 # %>% filter(loc == "front"), # %>% filter(Trapline %in% c('A')) # >>> too many zeros
+                                 # %>% filter(loc == "front"), 
                                  choice="choice",
                                  alt.var ="x", 
                                  id.var = "YearCat",
@@ -481,8 +480,7 @@ cpue.models[[22]] <- mlogit(choice ~ 0 | Season + YearCts,
                            iterlim=1, print.level=1,
                            data=cpue.year.caughts2) 
 # Trapline = random variable, Trapline, Season, Year = individual-specific variables
-cpue.trap.caughts2 <- mlogit.data(expanded_data.Caughts_only, # %>%
-                                   # filter(loc == "front"), 
+cpue.trap.caughts2 <- mlogit.data(expanded_data.Caughts_only, # %>% filter(loc == "front"), 
                                  choice="choice",
                                  alt.var ="x", 
                                  id.var = "Trapline",

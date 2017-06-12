@@ -3,13 +3,15 @@
 ## THIS SCRIPT IS CARRIED OVER FROM eck12_HALE_CPUE_analysisOfVar.r
 
 library(stats)
-library(data.table)
 library(plyr)
+library(data.table)
 library(dplyr)
 library(ggplot2)
 library(ez)
 library(mlogit)
 library(mosaic)
+
+setwd("~/WERC-SC/HALE")
 
 read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
          stringsAsFactors = FALSE) -> CPUEdata
@@ -70,15 +72,15 @@ data_events <- data_rev %>%
   dplyr::summarise(NEvents=sum(NEvents)) %>%
   mutate(CPUE = NEvents/NTraps) %>% # this line optional
   as.data.frame()
-expanded_data.events <- formatData(data_events)
+expanded_data.events <- formatData(data_events, 'eventType')
 ## subset 'data_events' b/c original dataset is too big
-set.seed(20170502)
-expanded_data.events_subset <- formatData(data_events, subset=55000)
-expanded_data.events_subset2 <- formatData(data_events, subset=55000)
-head(expanded_data.events_subset)
-head(expanded_data.events_subset2)
-summary(expanded_data.events_subset)
-summary(expanded_data.events_subset2)
+set.seed(20170612)
+expanded_data.events_subset <- formatData(data_events, 'eventType', subset=55000)
+expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=55000)
+# head(expanded_data.events_subset)
+# head(expanded_data.events_subset2)
+# summary(expanded_data.events_subset)
+# summary(expanded_data.events_subset2)
 
 # # also run for 2 event types: event, no event
 # data_CnoC <- data_rev %>%
@@ -181,19 +183,45 @@ AIC(cpue.models[[13]])
 AIC(cpue.models[[15]])
 AIC(cpue.models[[16]])
 
-## run on 2 events: event, no event
-cpue.models[[17]] <- mlogit(choice ~ 0 | Season + YearCts,
-                            reflevel = "none",
+# ## run on 2 events: event, no event
+# cpue.models[[17]] <- mlogit(choice ~ 0 | Season + YearCts,
+#                             reflevel = "none",
+#                             iterlim=1, print.level=1,
+#                             data=cpue2events)
+# summary(cpue.models[[17]]) # runs
+# # add random effect
+# cpue.models[[18]] <- mlogit(choice ~ 1 | Season + YearCts,
+#                               rpar=c('event:(intercept)'='n'),
+#                               R=50, halton=NA,
+#                               panel=TRUE, # correlation = TRUE,
+#                               reflevel = "none",
+#                               iterlim=1, print.level=1,
+#                               data=cpue2events)
+# summary(cpue.models[[18]]) # "missing value where TRUE/FALSE needed"
+
+
+# view model summaries
+summary(cpue.models[[23]])
+AIC(cpue.models[[23]])
+logLik(cpue.models[[23]])
+
+
+# Trapline = random variable, Trapline, Season, Year = individual-specific variables
+cpue.test <- mlogit.data(expanded_data.test, # %>%
+                         # filter(loc == "front"), 
+                         choice="choice",
+                         alt.var ="x", 
+                         id.var = "Trapline",
+                         shape="long", 
+                         chid.var="chid")
+cpue.models[[27]] <- mlogit(choice ~ 0 | Season + YearCts,
+                            rpar=c('trapTriggered:(intercept)'='n'),
+                            #        'trapTriggered:(intercept)'='n'),
+                            R=50, halton=NA,
+                            panel=TRUE,
+                            # reflevel = "ratCaught",
                             iterlim=1, print.level=1,
-                            data=cpue2events)
-summary(cpue.models[[17]]) # runs
-# add random effect
-cpue.models[[18]] <- mlogit(choice ~ 1 | Season + YearCts,
-                              rpar=c('event:(intercept)'='n'),
-                              R=50, halton=NA,
-                              panel=TRUE, # correlation = TRUE,
-                              reflevel = "none",
-                              iterlim=1, print.level=1,
-                              data=cpue2events)
-summary(cpue.models[[18]]) # "missing value where TRUE/FALSE needed"
+                            data=cpue.test)
+
+
 
