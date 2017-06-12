@@ -72,7 +72,7 @@ data_rev <- CPUEdata %>%
   #   return(expanded_data)
   # }
   
-  formatData <- function(data, var, subset = NA){
+formatData <- function(data, var, subset = NA){
     if(!(var %in% colnames(data)))
       stop(sprintf('var [%s] not found in data columns', var))
     data$var <- getElement(data, var)
@@ -105,28 +105,24 @@ expanded_data <- formatData(data_rev, 'predEvent')
 ## with only predator data
 data.Caughts_only <- data_rev %>% 
   filter(eventType == "predatorEvent")
-expanded_data.Caughts_only <- formatData(data.Caughts_only)
+expanded_data.Caughts_only <- formatData(data.Caughts_only, 'predEvent')
 # with(expanded_data.Caughts_only %>% 
 #        filter(choice==TRUE), # filter(choice==TRUE & Trapline=='A'),
 #      table(predEvent, Trapline))
 
-data.test <- data_rev %>% 
-  filter(predEvent %in% c("birdOtherCaught", "none"))
-expanded_data.test <- formatData(data.test)
+# ## with predator + nothing caught data
+# data.Caughts_none <- data_rev %>% 
+#   filter(eventType %in% c("noEvent", "predatorEvent"))
+# expanded_data.Caughts_none <- formatData(data.Caughts_none)
 
-## with predator + nothing caught data
-data.Caughts_none <- data_rev %>% 
-  filter(eventType %in% c("noEvent", "predatorEvent"))
-expanded_data.Caughts_none <- formatData(data.Caughts_none)
-
-# ## run function using grouped 'event' (predator, other, no) variable.
-# # First, aggregate the data by summing the NEvents within each event group.
-# data_events <- data_rev %>%
-#   group_by(Trapline, Week, Year, Season, Month, NTraps, loc, eventType) %>%
-#   dplyr::summarise(NEvents=sum(NEvents)) %>%
-#   mutate(CPUE = NEvents/NTraps) %>% # this line optional
-#   as.data.frame()
-# expanded_data.events <- formatData(data_events)
+## run function using grouped 'event' (predator, other, no) variable.
+# First, aggregate the data by summing the NEvents within each event group.
+data_events <- data_rev %>%
+  group_by(Trapline, Week, Year, Season, Month, NTraps, loc, eventType) %>%
+  dplyr::summarise(NEvents=sum(NEvents)) %>%
+  mutate(CPUE = NEvents/NTraps) %>% # this line optional
+  as.data.frame()
+expanded_data.events <- formatData(data_events, 'eventType')
 # ## subset 'data_events' b/c original dataset is too big
 # set.seed(20170502)
 # expanded_data.events_subset <- formatData(data_events, subset=50000)
@@ -526,16 +522,6 @@ cpue.models[[26]] <- mlogit(choice ~ 0 | Season + YearCts,
                             data=cpue.caughts2) 
 
 
-# cpue.models[[22]] <- mlogit(choice ~ 0 | Season + YearCts,
-#                             rpar=c('catCaught:(intercept)'='n',
-#                                    'ratCaught:(intercept)'='n',
-#                                    'mongooseCaught:(intercept)'='n'),
-#                             R=50, halton=NA,
-#                             panel=TRUE,
-#                             reflevel = "none",
-#                             iterlim=1, print.level=1,
-#                             data=cpue.trap.caughts3) # "missing value where TRUE/FALSE needed"
-
 # now compare AIC models between models 18 - 21
 AIC(cpue.models[[22]])
 AIC(cpue.models[[23]])
@@ -566,7 +552,7 @@ cpue.models[[27]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.test)
 
-### analyze results for model 19 (the best fit for the "caughts_only" data)
+### analyze results for model 23 (the best fit for the "caughts_only" data)
 ## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
 myfitted <- fitted(cpue.models[[23]], outcome=FALSE)
 # head(myfitted)
@@ -584,23 +570,5 @@ fitted_cpue <- cbind(fitted_cpue, myfitted) %>%
   select(-chid) %>%
   unique()
 
-cSeason <- ggplot(fitted_cpue, aes(Season, catCaught))
-cSeason + geom_boxplot()
-
-rSeason <- ggplot(fitted_cpue, aes(Season, ratCaught))
-rSeason + geom_boxplot()
-
-mSeason <- ggplot(fitted_cpue, aes(Season, mongooseCaught))
-mSeason + geom_boxplot()
-
-cTrapline <- ggplot(fitted_cpue, aes(Trapline, catCaught))
-cTrapline + geom_boxplot()
-
-rTrapline <- ggplot(fitted_cpue, aes(Trapline, ratCaught))
-rTrapline + geom_boxplot()
-
-mTrapline <- ggplot(fitted_cpue, aes(Trapline, mongooseCaught))
-mTrapline + geom_boxplot()
-
-
-# apply(fitted)
+write.csv(fitted_cpue, file = '~/WERC-SC/HALE/fitted_cpue_model23.csv',
+          row.names = FALSE)
