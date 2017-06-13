@@ -1,5 +1,7 @@
-## this script uses catch data with spatail data
-## graphs of seasonal and yearly effects
+## this script graphically analyzes spatial results of CPUE data
+## seasonal and yearly effects on:
+##   event types (pred, other, none)
+##   predator events (rat, cat, mongoose)
 
 library(stats)
 library(plyr)
@@ -10,17 +12,14 @@ library(stringr)
 library(ggplot2)
 library(mosaic)
 
+setwd("~/WERC-SC/HALE")
+
 read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv',
          stringsAsFactors = FALSE) -> catch_spatial
 read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
          stringsAsFactors = FALSE) -> catch_EventPUE
-read.csv('~/WERC-SC/HALE/fitted_cpue_model23.csv',
-         stringsAsFactors = FALSE) -> fitted_cpue
 
-fitted_cpue_lg <- melt(fitted_cpue, id.vars = c("Trapline", "Year", "Season"),
-                       measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
-
-### SEASONS
+### SEASONAL ANALYSIS
 seasonalEvents <- catch_EventPUE %>% 
   group_by(Season, predEvent) %>% 
   summarise(eventCount = sum(NEvents)) 
@@ -47,10 +46,6 @@ season_bar_pred <- ggplot(catch_EventPUE, aes(Season, fill = predEvent)) +
   theme_bw()
 season_bar_pred %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 
-### use fitted results of mlogit model23 to graph fitted frequencies
-fit_preds_year <- ggplot(fitted_cpue_lg, aes(x=Year, y=value, color=variable) +
-                             geom_line())
-
 
 ### YEAR
 # GRAPH annual average CPUE and SD
@@ -71,25 +66,6 @@ CPUE_yr_preds <- ggplot(annualCPUE, aes(Year_, annCPUE)) +
   theme_bw() +
   labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort')
 CPUE_yr_preds %+% subset(annualCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
-
-
-# cSeason <- ggplot(fitted_cpue, aes(Season, catCaught))
-# cSeason + geom_boxplot()
-# 
-# rSeason <- ggplot(fitted_cpue, aes(Season, ratCaught))
-# rSeason + geom_boxplot()
-# 
-# mSeason <- ggplot(fitted_cpue, aes(Season, mongooseCaught))
-# mSeason + geom_boxplot()
-# 
-# cTrapline <- ggplot(fitted_cpue, aes(Trapline, catCaught))
-# cTrapline + geom_boxplot()
-# 
-# rTrapline <- ggplot(fitted_cpue, aes(Trapline, ratCaught))
-# rTrapline + geom_boxplot()
-# 
-# mTrapline <- ggplot(fitted_cpue, aes(Trapline, mongooseCaught))
-# mTrapline + geom_boxplot()
 
 
 # apply(fitted)
