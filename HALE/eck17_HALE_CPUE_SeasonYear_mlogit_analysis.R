@@ -31,24 +31,18 @@ fit_preds_season <- ggplot(fitted_cpue_lg, aes(x=Season, y=value)) +
   labs(x = 'Season', y = 'Probability of Events per Unit Effort')
 fit_preds_season
 
-aov_season_cat <- lm(catCaught ~ Season, data=fitted_cpue, y=offSeason)
-summary(aov_season_cat)
-anova(aov_season_cat)
-aov_season_rat <- lm(ratCaught ~ Season, data=fitted_cpue)
-summary(aov_season_rat)
-anova(aov_season_rat)
-aov_season_mongoose <- lm(mongooseCaught ~ Season, data=fitted_cpue)
-summary(aov_season_mongoose)
-anova(aov_season_mongoose)
+lm_season_cat <- lm(catCaught ~ Season, data=fitted_cpue)
+summary(lm_season_cat)
+anova(lm_season_cat)
+lm_season_rat <- lm(ratCaught ~ Season, data=fitted_cpue)
+summary(lm_season_rat)
+anova(lm_season_rat)
+lm_season_mongoose <- lm(mongooseCaught ~ Season, data=fitted_cpue)
+summary(lm_season_mongoose)
+anova(lm_season_mongoose)
 
 #### YEAR
 ### use fitted results of mlogit model23 to graph fitted frequencies
-fit_preds_year <- ggaov_year_cat <- aov(catCaught ~ Year, data=fitted_cpue)
-summary(aov_year_cat)
-aov_year_rat <- aov(ratCaught ~ Year, data=fitted_cpue)
-summary(aov_year_rat)
-aov_year_mongoose <- aov(mongooseCaught ~ Year, data=fitted_cpue)
-summary(aov_year_mongoose)
 plot(fitted_cpue_lg, aes(x=Year, y=value)) +
   geom_point(aes(color=Season)) +
   facet_wrap(~ variable, scales = 'free') +
@@ -56,5 +50,10 @@ plot(fitted_cpue_lg, aes(x=Year, y=value)) +
   labs(x = 'Year', y = 'Probability of Events per Unit Effort')
 fit_preds_year
 
-
+lm_year_cat <- lm(catCaught ~ Year, data=fitted_cpue)
+summary(lm_year_cat)
+lm_year_rat <- lm(ratCaught ~ Year, data=fitted_cpue)
+summary(lm_year_rat)
+lm_year_mongoose <- lm(mongooseCaught ~ Year, data=fitted_cpue)
+summary(lm_year_mongoose)
 

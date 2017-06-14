@@ -74,7 +74,7 @@ data_events <- data_rev %>%
   as.data.frame()
 expanded_data.events <- formatData(data_events, 'eventType')
 ## subset 'data_events' b/c original dataset is too big
-set.seed(170612)
+set.seed(170613)
 expanded_data.events_subset <- formatData(data_events, 'eventType', subset=55000)
 expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=55000)
 expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=55000)
@@ -92,32 +92,26 @@ summary(expanded_data.events_subset2)
 # expanded_data.CnoC<- formatData(data_CnoC)
 
 ### EVENTS ANALYSIS: dependent var = predator, other, none (events)
-cpue3events_trap <- mlogit.data(expanded_data.events, # %>% filter(loc == "front") %>%
-                                 # mutate(trapyr=paste0(Trapline,'-',YearCat)), 
+cpue3events_trap <- mlogit.data(expanded_data.events, 
                                choice="choice",
                                alt.var ="x", 
                                id.var = "Trapline",
                                shape="long", 
                                chid.var="chid")
 # subsetted
-cpue3events_sub <- mlogit.data(expanded_data.events_subset, # %>% filter(loc == "front") %>%
-                               # mutate(trapyr=paste0(Trapline,'-',YearCat)), 
+cpue3events_trap_sub <- mlogit.data(expanded_data.events_subset, 
                            choice="choice",
                            alt.var ="x", 
                            id.var = "Trapline",
                            shape="long", 
                            chid.var="chid")
-
-cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2, # %>% filter(loc == "front") %>%
-                                # mutate(trapyr=paste0(Trapline,'-',YearCat)),  
+cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2,  
                             choice="choice",
                             alt.var ="x", 
                             id.var = "Trapline",
                             shape="long", 
                             chid.var="chid")
-
-cpue3events_sub3 <- mlogit.data(expanded_data.events_subset3, # %>% filter(loc == "front") %>%
-                                  # mutate(trapyr=paste0(Trapline,'-',YearCat)),
+cpue3events_trap_sub3 <- mlogit.data(expanded_data.events_subset3, 
                                 choice="choice",
                                 alt.var ="x", 
                                 id.var = "Trapline",
@@ -139,7 +133,7 @@ cpue3events_year_sub2 <- mlogit.data(expanded_data.events_subset2,
                                      id.var = "YearCat",
                                      shape="long", 
                                      chid.var="chid")
-
+# trapline as random effect
 cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2,  
                                      choice="choice",
                                      alt.var ="x", 
@@ -163,8 +157,8 @@ cpue.models <- list()
 cpue.models[[11]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events) # runs
-## and random effects
+                            data=cpue3events_trap) # runs
+## and random effect
 cpue.models[[12]] <- mlogit(choice ~ 1 | Season + Trapline + Year,
                               rpar=c('predatorEvent:(intercept)'='n',
                                      'otherEvent:(intercept)'='n'),
@@ -172,14 +166,14 @@ cpue.models[[12]] <- mlogit(choice ~ 1 | Season + Trapline + Year,
                               panel=TRUE, # correlation = TRUE,
                               reflevel = "noEvent",
                               iterlim=1, print.level=1,
-                              data=cpue3events) # error: missing value where TRUE/FALSE needed
+                              data=cpue3events_trap) # error: missing value where TRUE/FALSE needed
 
 ## REMOVED TRAPLINE AS INDIV-SPP EFFECT
 # Year & Season = individual-specific variables
 cpue.models[[13]] <- mlogit(choice ~ 0 | Season + YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events) # runs
+                            data=cpue3events_trap) # runs
 ## and random effects
 cpue.models[[14]] <- mlogit(choice ~ 1 | Season + YearCts,
                               rpar=c('predatorEvent:(intercept)'='n',
@@ -188,7 +182,7 @@ cpue.models[[14]] <- mlogit(choice ~ 1 | Season + YearCts,
                               panel=TRUE, # correlation = TRUE,
                               reflevel = "noEvent",
                               iterlim=1, print.level=1,
-                              data=cpue3events) # error: missing value where TRUE/FALSE needed
+                              data=cpue3events_trap) # error: missing value where TRUE/FALSE needed
 ## subsetted data
 cpue.models[[15]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
@@ -197,7 +191,7 @@ cpue.models[[15]] <- mlogit(choice ~ 1 | Season + YearCts,
                             panel=TRUE, # correlation = TRUE,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events_sub)
+                            data=cpue3events_trap_sub)
 cpue.models[[16]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
@@ -205,7 +199,7 @@ cpue.models[[16]] <- mlogit(choice ~ 1 | Season + YearCts,
                             panel=TRUE, # correlation = TRUE,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events_sub2)
+                            data=cpue3events_trap_sub2)
 cpue.models[[17]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
@@ -213,9 +207,7 @@ cpue.models[[17]] <- mlogit(choice ~ 1 | Season + YearCts,
                             panel=TRUE, # correlation = TRUE,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events_sub3)
-# summaries
-summary(cpue.models[[11]], cpue.models[[13]])
+                            data=cpue3events_trap_sub3)
 # compare AIC
 AIC(cpue.models[[11]])
 AIC(cpue.models[[13]])
@@ -230,7 +222,7 @@ cpue.models[[37]] <- mlogit(choice ~ 1 | Season + YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events_sub2)
-# year as random effects
+# year as random effect
 cpue.models[[38]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
@@ -239,7 +231,7 @@ cpue.models[[38]] <- mlogit(choice ~ 1 | Season + YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events_year_sub2)
-# trapline as random effects
+# trapline as random effect
 cpue.models[[39]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
@@ -248,7 +240,7 @@ cpue.models[[39]] <- mlogit(choice ~ 1 | Season + YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events_trap_sub2)
-# trapline +year as random effects
+# trapline + year as random effects
 cpue.models[[40]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
