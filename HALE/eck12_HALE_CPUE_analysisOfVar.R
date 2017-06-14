@@ -45,32 +45,32 @@ data_rev <- CPUEdata %>%
       .default = "none")
     ) 
 
-#### RESTRUCTURE DATA FUNCTION
-  # formatData <- function(data, subset = NA){
-  #   # Reshape data so that there is one row for every option, for every choice situation. 
-  #   # Here are the possible outcomes every time the trap is set:
-  #   events <- unique(data$predEvent) # events <- unique(data$eventType) # events <- unique(data$eventCnoC) #  
-  #   # And here are the number of choice situations:
-  #   nEvents <- sum(data$NEvents)
-  #   
-  #   # Replicate the rows according to number of events:
-  #   data2 <- data[rep(row.names(data), data$NEvents),]
-  #   data2 <- data2 %>%
-  #     mutate(chid = row.names(data2))
-  #   
-  #   if (!is.na(subset)){
-  #     data2 <- data2[sample(1:nrow(data2), subset),]
-  #   }
-  #   
-  #   # Expand each choice situation so that each alternative is on its own row.  
-  #   # Do this with the merge function.  The alternative names will be stored in column `x`.
-  #   expanded_data <- merge(events, data2)
-  #   expanded_data <- expanded_data %>% 
-  #     mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # mutate(choice = ifelse(x==eventType, TRUE, FALSE), # mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE), #  
-  #            YearCat = as.factor(Year),
-  #            YearCts = as.numeric(Year))
-  #   return(expanded_data)
-  # }
+### RESTRUCTURE DATA FUNCTION
+formatData_old <- function(data, subset = NA){
+  # Reshape data so that there is one row for every option, for every choice situation.
+  # Here are the possible outcomes every time the trap is set:
+  events <- unique(data$eventType) # events <- unique(data$eventCnoC) # events <- unique(data$predEvent) # 
+  # And here are the number of choice situations:
+  nEvents <- sum(data$NEvents)
+
+  # Replicate the rows according to number of events:
+  data2 <- data[rep(row.names(data), data$NEvents),]
+  data2 <- data2 %>%
+    mutate(chid = row.names(data2))
+
+  if (!is.na(subset)){
+    data2 <- data2[sample(1:nrow(data2), subset),]
+  }
+
+  # Expand each choice situation so that each alternative is on its own row.
+  # Do this with the merge function.  The alternative names will be stored in column `x`.
+  expanded_data <- merge(events, data2)
+  expanded_data <- expanded_data %>%
+    mutate(choice = ifelse(x==eventType, TRUE, FALSE), # mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE), # mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # 
+           YearCat = as.factor(Year),
+           YearCts = as.numeric(Year))
+  return(expanded_data)
+}
   
 formatData <- function(data, var, subset = NA){
     if(!(var %in% colnames(data)))
