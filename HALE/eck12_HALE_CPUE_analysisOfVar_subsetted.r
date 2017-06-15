@@ -74,7 +74,7 @@ data_events <- data_rev %>%
   as.data.frame()
 expanded_data.events <- formatData(data_events, 'eventType') # expanded_data.events_old <- formatData_old(data_events)
 ## subset 'data_events' b/c original dataset is too big
-# set.seed(101)
+set.seed(102)
 expanded_data.events_subset <- formatData(data_events, 'eventType', subset=10000)
 expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=10000)
 expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=10000)

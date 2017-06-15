@@ -71,8 +71,8 @@ data.Caughts_only <- data_rev %>%
   filter(eventType == "predatorEvent")
 expanded_data.Caughts_only <- formatData(data.Caughts_only, 'predEvent')
 ## subset to test validity of subset btwn models
-# set.seed(20170613)
-expanded_data.Caughts_only_subset <- formatData(data.Caughts_only, 'predEvent', subset=500)
+set.seed(20170615)
+expanded_data.Caughts_only_subset <- formatData(data.Caughts_only, 'predEvent', subset=600)
 expanded_data.Caughts_only_subset2 <- formatData(data.Caughts_only, 'predEvent', subset=500)
 
 ### PREDS ONLY ANALYSIS
