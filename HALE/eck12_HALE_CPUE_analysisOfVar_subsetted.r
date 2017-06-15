@@ -72,10 +72,9 @@ data_events <- data_rev %>%
   dplyr::summarise(NEvents=sum(NEvents)) %>%
   mutate(CPUE = NEvents/NTraps) %>% # this line optional
   as.data.frame()
-expanded_data.events <- formatData(data_events, 'eventType')
-expanded_data.events_old <- formatData_old(data_events)
+expanded_data.events <- formatData(data_events, 'eventType') # expanded_data.events_old <- formatData_old(data_events)
 ## subset 'data_events' b/c original dataset is too big
-set.seed(5)
+# set.seed(101)
 expanded_data.events_subset <- formatData(data_events, 'eventType', subset=10000)
 expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=10000)
 expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=10000)
@@ -105,22 +104,22 @@ cpue3events_trap <- mlogit.data(expanded_data.events,
                                shape="long", 
                                chid.var="chid")
 # subsetted
-cpue3events_trap_sub <- mlogit.data(expanded_data.events_subset,
+cpue3events_sub <- mlogit.data(expanded_data.events_subset,
                                        choice="choice",
                                        alt.var ="x", 
-                                       id.var = "Trapline",
+                                       # id.var = "Trapline",
                                        shape="long", 
                                        chid.var="chid")
-cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2,  
+cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2,  
                                        choice="choice",
                                        alt.var ="x", 
-                                       id.var = "Trapline",
+                                       # id.var = "Trapline",
                                        shape="long", 
                                        chid.var="chid")
-cpue3events_trap_sub3 <- mlogit.data(expanded_data.events_subset3,  
+cpue3events_sub3 <- mlogit.data(expanded_data.events_subset3,  
                                        choice="choice",
                                        alt.var ="x", 
-                                       id.var = "Trapline",
+                                       # id.var = "Trapline",
                                        shape="long", 
                                        chid.var="chid")
 
@@ -197,7 +196,7 @@ cpue.models[[15]] <- mlogit(choice ~ 1 | Season + YearCts,
                             panel=TRUE,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events_trap_sub)
+                            data=cpue3events_sub)
 cpue.models[[16]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
@@ -205,7 +204,7 @@ cpue.models[[16]] <- mlogit(choice ~ 1 | Season + YearCts,
                             panel=TRUE, 
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events_trap_sub2)
+                            data=cpue3events_sub2)
 cpue.models[[17]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
@@ -213,7 +212,7 @@ cpue.models[[17]] <- mlogit(choice ~ 1 | Season + YearCts,
                             panel=TRUE,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events_trap_sub3)
+                            data=cpue3events_sub3)
 # compare AIC
 AIC(cpue.models[[11]])
 AIC(cpue.models[[13]])

@@ -483,11 +483,11 @@ cpue.trap.caughts2 <- mlogit.data(expanded_data.Caughts_only, # %>% filter(loc =
                                  shape="long", 
                                  chid.var="chid")
 cpue.models[[23]] <- mlogit(choice ~ 0 | Season + YearCts,
-                           rpar=c('ratCaught:(intercept)'='n',
+                           rpar=c('catCaught:(intercept)'='n',
                                   'mongooseCaught:(intercept)'='n'),
                            R=50, halton=NA,
                            panel=TRUE,
-                           # reflevel = "ratCaught",
+                           reflevel = "ratCaught",
                            iterlim=1, print.level=1,
                            data=cpue.trap.caughts2)
 ## Year and Trapline = random variable (combined into one variable), Trapline, Season, Year = individual-specific variables
@@ -533,6 +533,7 @@ AIC(cpue.models[[26]])
 summary(cpue.models[[23]])
 AIC(cpue.models[[23]])
 logLik(cpue.models[[23]])
+write.table(exp(coefficients(cpue.models[[23]])))
 
 
 # Trapline = random variable, Trapline, Season, Year = individual-specific variables

@@ -1,0 +1,49 @@
+
+===========================================================
+                                    Dependent variable:    
+                                ---------------------------
+                                          choice           
+-----------------------------------------------------------
+catCaught:(intercept)                    89.152**          
+                                         (43.448)          
+                                                           
+mongooseCaught:(intercept)                43.478*          
+                                         (22.773)          
+                                                           
+catCaught:SeasonNestling                  0.491*           
+                                          (0.281)          
+                                                           
+mongooseCaught:SeasonNestling            0.723***          
+                                          (0.181)          
+                                                           
+catCaught:SeasonoffSeason                0.798***          
+                                          (0.293)          
+                                                           
+mongooseCaught:SeasonoffSeason           1.146***          
+                                          (0.185)          
+                                                           
+catCaught:SeasonPre-laying                -0.110           
+                                          (0.329)          
+                                                           
+mongooseCaught:SeasonPre-laying          0.552***          
+                                          (0.195)          
+                                                           
+catCaught:YearCts                        -0.047**          
+                                          (0.022)          
+                                                           
+mongooseCaught:YearCts                   -0.024**          
+                                          (0.011)          
+                                                           
+sd.catCaught:(intercept)                 0.663***          
+                                          (0.086)          
+                                                           
+sd.mongooseCaught:(intercept)            0.583***          
+                                          (0.053)          
+                                                           
+-----------------------------------------------------------
+Observations                              10,201           
+R2                                         0.057           
+Log Likelihood                          -2,542.529         
+LR Test                            304.547*** (df = 12)    
+===========================================================
+Note:                           *p<0.1; **p<0.05; ***p<0.01
