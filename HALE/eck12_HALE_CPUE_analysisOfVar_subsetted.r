@@ -9,7 +9,7 @@ library(dplyr)
 library(ggplot2)
 library(ez)
 library(mlogit)
-library(mosaic)
+# library(mosaic)
 
 setwd("~/WERC-SC/HALE")
 
@@ -92,54 +92,62 @@ summary(expanded_data.events_subset2)
 # expanded_data.CnoC<- formatData(data_CnoC)
 
 ### EVENTS ANALYSIS: dependent var = predator, other, none (events)
-cpue3events <- mlogit.data(expanded_data.events, 
+cpue3events <- mlogit.data(expanded_data.events %>% 
+                             filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), 
                                 choice="choice",
                                 alt.var ="x", 
                                 shape="long", 
                                 chid.var="chid")
-cpue3events_trap <- mlogit.data(expanded_data.events, 
+cpue3events_trap <- mlogit.data(expanded_data.events %>% 
+                                  filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), 
                                choice="choice",
                                alt.var ="x", 
                                id.var = "Trapline",
                                shape="long", 
                                chid.var="chid")
 # subsetted
-cpue3events_sub <- mlogit.data(expanded_data.events_subset,
+cpue3events_sub <- mlogit.data(expanded_data.events_subset %>% 
+                                 filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                                        choice="choice",
                                        alt.var ="x", 
-                                       # id.var = "Trapline",
+                                       id.var = "Trapline",
                                        shape="long", 
                                        chid.var="chid")
-cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2,  
+cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
+                                  filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
                                        choice="choice",
                                        alt.var ="x", 
-                                       # id.var = "Trapline",
+                                       id.var = "Trapline",
                                        shape="long", 
                                        chid.var="chid")
-cpue3events_sub3 <- mlogit.data(expanded_data.events_subset3,  
+cpue3events_sub3 <- mlogit.data(expanded_data.events_subset3 %>% 
+                                  filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
                                        choice="choice",
                                        alt.var ="x", 
-                                       # id.var = "Trapline",
+                                       id.var = "Trapline",
                                        shape="long", 
                                        chid.var="chid")
 
 #### CHOSEN DATASET: SUBSET 2
 ### expand data to compare models
 # no random effects
-cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2,  
+cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
+                                  filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
                                      choice="choice",
                                      alt.var ="x", 
                                      shape="long", 
                                      chid.var="chid")
 # year as random effect
-cpue3events_year_sub2 <- mlogit.data(expanded_data.events_subset2, 
+cpue3events_year_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
+                                       filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), 
                                      choice="choice",
                                      alt.var ="x", 
                                      id.var = "YearCat",
                                      shape="long", 
                                      chid.var="chid")
 # trapline as random effect
-cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2,  
+cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
+                                       filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
                                      choice="choice",
                                      alt.var ="x", 
                                      id.var = "Trapline",
@@ -147,7 +155,8 @@ cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2,
                                      chid.var="chid")
 # trapline + yr as random effect
 cpue3events_trapyr_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
-                                       mutate(trapyr=paste0(Trapline,'-',YearCat)),  
+                                       mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
+                                         filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
                                      choice="choice",
                                      alt.var ="x", 
                                      id.var = "trapyr",

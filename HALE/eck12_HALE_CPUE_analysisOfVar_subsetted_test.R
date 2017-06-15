@@ -71,26 +71,29 @@ data.Caughts_only <- data_rev %>%
   filter(eventType == "predatorEvent")
 expanded_data.Caughts_only <- formatData(data.Caughts_only, 'predEvent')
 ## subset to test validity of subset btwn models
-set.seed(20170613)
-expanded_data.Caughts_only_subset <- formatData(data.Caughts_only, 'predEvent', subset=1000)
-expanded_data.Caughts_only_subset2 <- formatData(data.Caughts_only, 'predEvent', subset=1000)
+# set.seed(20170613)
+expanded_data.Caughts_only_subset <- formatData(data.Caughts_only, 'predEvent', subset=500)
+expanded_data.Caughts_only_subset2 <- formatData(data.Caughts_only, 'predEvent', subset=500)
 
 ### PREDS ONLY ANALYSIS
 ## Year = random variable
-cpue.year.caughts2 <- mlogit.data(expanded_data.Caughts_only,
+cpue.year.caughts2 <- mlogit.data(expanded_data.Caughts_only %>% 
+                                    filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                                   choice="choice",
                                   alt.var ="x", 
                                   id.var = "YearCat",
                                   shape="long", 
                                   chid.var="chid")
 # subsetted
-cpue.year.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset,
+cpue.year.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset %>% 
+                                         filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                                        choice="choice",
                                        alt.var ="x", 
                                        id.var = "YearCat",
                                        shape="long", 
                                        chid.var="chid")
-cpue.year.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2,
+cpue.year.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2 %>% 
+                                         filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                                        choice="choice",
                                        alt.var ="x", 
                                        id.var = "YearCat",
@@ -98,20 +101,23 @@ cpue.year.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2,
                                        chid.var="chid")
 
 ## Trapline = random variable
-cpue.trap.caughts2 <- mlogit.data(expanded_data.Caughts_only, 
+cpue.trap.caughts2 <- mlogit.data(expanded_data.Caughts_only %>% 
+                                    filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), 
                                   choice="choice",
                                   alt.var ="x", 
                                   id.var = "Trapline",
                                   shape="long", 
                                   chid.var="chid")
 #subsetted
-cpue.trap.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset, 
+cpue.trap.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset %>% 
+                                         filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), 
                                        choice="choice",
                                        alt.var ="x", 
                                        id.var = "Trapline",
                                        shape="long", 
                                        chid.var="chid")
-cpue.trap.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2, 
+cpue.trap.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2 %>% 
+                                         filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), 
                                        choice="choice",
                                        alt.var ="x", 
                                        id.var = "Trapline",
@@ -120,7 +126,8 @@ cpue.trap.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2,
 
 ## Year + Trapline = random variable (combined into one variable)
 cpue.trapyr.caughts2 <- mlogit.data(expanded_data.Caughts_only %>% 
-                                      mutate(trapyr=paste0(Trapline,'-',YearCat)),
+                                      mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
+                                      filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                                     choice="choice",
                                     alt.var ="x", 
                                     id.var = "trapyr",
@@ -128,14 +135,16 @@ cpue.trapyr.caughts2 <- mlogit.data(expanded_data.Caughts_only %>%
                                     chid.var="chid")
 #subsetted
 cpue.trapyr.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset %>% 
-                                      mutate(trapyr=paste0(Trapline,'-',YearCat)),
+                                      mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
+                                        filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                                     choice="choice",
                                     alt.var ="x", 
                                     id.var = "trapyr",
                                     shape="long", 
                                     chid.var="chid")
 cpue.trapyr.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2 %>% 
-                                      mutate(trapyr=paste0(Trapline,'-',YearCat)),
+                                      mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
+                                        filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                                     choice="choice",
                                     alt.var ="x", 
                                     id.var = "trapyr",
@@ -143,18 +152,21 @@ cpue.trapyr.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2 %>%
                                     chid.var="chid")
 
 ## without any random effects
-cpue.caughts2 <- mlogit.data(expanded_data.Caughts_only,
+cpue.caughts2 <- mlogit.data(expanded_data.Caughts_only %>% 
+                               filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                              choice="choice",
                              alt.var ="x", 
                              shape="long", 
                              chid.var="chid")
 #subsetted
-cpue.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset,
+cpue.caughts2_sub1 <- mlogit.data(expanded_data.Caughts_only_subset %>% 
+                                    filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                              choice="choice",
                              alt.var ="x", 
                              shape="long", 
                              chid.var="chid")
-cpue.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2,
+cpue.caughts2_sub2 <- mlogit.data(expanded_data.Caughts_only_subset2 %>% 
+                                    filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                              choice="choice",
                              alt.var ="x", 
                              shape="long", 
