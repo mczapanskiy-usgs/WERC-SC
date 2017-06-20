@@ -524,10 +524,15 @@ cpue.models[[26]] <- mlogit(choice ~ 0 | Season + YearCts,
 
 # now compare AIC models between models 18 - 21
 AIC(cpue.models[[22]])
+logLik(cpue.models[[22]])
 AIC(cpue.models[[23]])
+logLik(cpue.models[[23]])
 AIC(cpue.models[[24]])
+logLik(cpue.models[[24]])
 AIC(cpue.models[[25]])
+logLik(cpue.models[[25]])
 AIC(cpue.models[[26]])
+logLik(cpue.models[[26]])
 
 # view model summaries
 summary(cpue.models[[23]])

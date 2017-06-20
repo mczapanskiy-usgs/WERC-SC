@@ -48,7 +48,7 @@ plot(fitted_cpue_lg, aes(x=Year, y=value)) +
   facet_wrap(~ variable, scales = 'free') +
   theme_bw() +
   labs(x = 'Year', y = 'Probability of Events per Unit Effort')
-fit_preds_year
+fit_preds_year,lo 
 
 lm_year_cat <- lm(catCaught ~ Year, data=fitted_cpue)
 summary(lm_year_cat)

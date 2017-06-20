@@ -1,4 +1,6 @@
-## this script statistically analyzes the effect of year, trap location, trap type, and bait type on event types: PREDATOR, OTHER, NONE
+## this script tests which subset can be used 
+## to test the effect of: year, trap location, trap type, and bait type 
+## on event types: PREDATOR, OTHER, NONE
 ## using the mlogit model
 ## THIS SCRIPT IS CARRIED OVER FROM eck12_HALE_CPUE_analysisOfVar.r
 
@@ -75,9 +77,9 @@ data_events <- data_rev %>%
 expanded_data.events <- formatData(data_events, 'eventType') # expanded_data.events_old <- formatData_old(data_events)
 ## subset 'data_events' b/c original dataset is too big
 set.seed(102)
-expanded_data.events_subset <- formatData(data_events, 'eventType', subset=10000)
-expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=10000)
-expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=10000)
+expanded_data.events_subset <- formatData(data_events, 'eventType', subset=5000)
+expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=8500)
+expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=5000)
 head(expanded_data.events_subset)
 head(expanded_data.events_subset2)
 head(expanded_data.events_subset3)
@@ -263,12 +265,23 @@ cpue.models[[40]] <- mlogit(choice ~ 1 | Season + YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events_trapyr_sub2)
+## Year + Trapline + Season = individual-specific variables                 
+cpue.models[[41]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
+                            reflevel = "noEvent",
+                            iterlim=1, print.level=1,
+                            data=cpue3events_sub2) # runs
+
 # compare AIC
-AIC(cpue.models[[37]])
-AIC(cpue.models[[38]])
-AIC(cpue.models[[39]])
-AIC(cpue.models[[40]])
-AIC(cpue.models[[17]])
+AIC(cpue.models[[37]]) # no random effects 
+logLik(cpue.models[[37]])
+AIC(cpue.models[[38]]) # year as random effect
+logLik(cpue.models[[38]])
+AIC(cpue.models[[39]]) # trapline as random effect
+logLik(cpue.models[[39]])
+AIC(cpue.models[[40]]) # trapline + year as random effects
+logLik(cpue.models[[40]])
+AIC(cpue.models[[41]]) # Year + Trapline + Season = individual-specific variables
+logLik(cpue.models[[41]])
 
 
 
