@@ -76,10 +76,10 @@ data_events <- data_rev %>%
   as.data.frame()
 expanded_data.events <- formatData(data_events, 'eventType') # expanded_data.events_old <- formatData_old(data_events)
 ## subset 'data_events' b/c original dataset is too big
-set.seed(102)
-expanded_data.events_subset <- formatData(data_events, 'eventType', subset=5000)
-expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=8500)
-expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=5000)
+set.seed(20170621)
+expanded_data.events_subset <- formatData(data_events, 'eventType', subset=10000)
+expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=10000)
+expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=10000)
 head(expanded_data.events_subset)
 head(expanded_data.events_subset2)
 head(expanded_data.events_subset3)
@@ -100,33 +100,37 @@ cpue3events <- mlogit.data(expanded_data.events %>%
                                 alt.var ="x", 
                                 shape="long", 
                                 chid.var="chid")
-cpue3events_trap <- mlogit.data(expanded_data.events %>% 
-                                  filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), 
+cpue3events_trapyr <- mlogit.data(expanded_data.events %>% 
+                                    mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
+                                    filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
                                choice="choice",
                                alt.var ="x", 
-                               id.var = "Trapline",
+                               id.var = "trapyr",
                                shape="long", 
                                chid.var="chid")
 # subsetted
 cpue3events_sub <- mlogit.data(expanded_data.events_subset %>% 
+                                 mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
                                  filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
                                        choice="choice",
                                        alt.var ="x", 
-                                       id.var = "Trapline",
+                                       id.var = "trapyr",
                                        shape="long", 
                                        chid.var="chid")
 cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
+                                  mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
                                   filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
                                        choice="choice",
                                        alt.var ="x", 
-                                       id.var = "Trapline",
+                                       id.var = "trapyr",
                                        shape="long", 
                                        chid.var="chid")
 cpue3events_sub3 <- mlogit.data(expanded_data.events_subset3 %>% 
+                                  mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
                                   filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
                                        choice="choice",
                                        alt.var ="x", 
-                                       id.var = "Trapline",
+                                       id.var = "trapyr",
                                        shape="long", 
                                        chid.var="chid")
 
@@ -155,6 +159,7 @@ cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2 %>%
                                      id.var = "Trapline",
                                      shape="long", 
                                      chid.var="chid")
+
 # trapline + yr as random effect
 cpue3events_trapyr_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
                                        mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
@@ -232,14 +237,29 @@ AIC(cpue.models[[16]])
 AIC(cpue.models[[17]])
 
 ### compare models for dataset subset 2
-# start at model 37
-# no random effects
-cpue.models[[37]] <- mlogit(choice ~ 1 | Season + YearCts,
+# start at model 39
+# without any random effects, Year + Trapline + Season = individual-specific variables                 
+cpue.models[[39]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
+                            reflevel = "noEvent",
+                            iterlim=1, print.level=1,
+                            data=cpue3events_sub2) # runs
+# without any random effects, Season + Year = individual-specific variables
+cpue.models[[40]] <- mlogit(choice ~ 1 | Season + YearCts,
+                            reflevel = "noEvent",
+                            iterlim=1, print.level=1,
+                            data=cpue3events_sub2)
+# without any random effects, Season = individual-specific variables
+cpue.models[[41]] <- mlogit(choice ~ 1 | Season,
+                            reflevel = "noEvent",
+                            iterlim=1, print.level=1,
+                            data=cpue3events_sub2)
+# without any random effects, Year = individual-specific variables
+cpue.models[[42]] <- mlogit(choice ~ 1 | YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events_sub2)
 # year as random effect
-cpue.models[[38]] <- mlogit(choice ~ 1 | Season + YearCts,
+cpue.models[[43]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
                             R=50, halton=NA,
@@ -248,7 +268,7 @@ cpue.models[[38]] <- mlogit(choice ~ 1 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue3events_year_sub2)
 # trapline as random effect
-cpue.models[[39]] <- mlogit(choice ~ 1 | Season + YearCts,
+cpue.models[[44]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
                             R=50, halton=NA,
@@ -257,7 +277,7 @@ cpue.models[[39]] <- mlogit(choice ~ 1 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue3events_trap_sub2)
 # trapline + year as random effects
-cpue.models[[40]] <- mlogit(choice ~ 1 | Season + YearCts,
+cpue.models[[45]] <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
                             R=50, halton=NA,
@@ -265,23 +285,24 @@ cpue.models[[40]] <- mlogit(choice ~ 1 | Season + YearCts,
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
                             data=cpue3events_trapyr_sub2)
-## Year + Trapline + Season = individual-specific variables                 
-cpue.models[[41]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
-                            reflevel = "noEvent",
-                            iterlim=1, print.level=1,
-                            data=cpue3events_sub2) # runs
+
 
 # compare AIC
-AIC(cpue.models[[37]]) # no random effects 
-logLik(cpue.models[[37]])
-AIC(cpue.models[[38]]) # year as random effect
-logLik(cpue.models[[38]])
-AIC(cpue.models[[39]]) # trapline as random effect
+AIC(cpue.models[[39]]) # no random effects, Year + Trapline + Season = individual-specific variables
 logLik(cpue.models[[39]])
-AIC(cpue.models[[40]]) # trapline + year as random effects
+AIC(cpue.models[[40]]) # no random effects, Season + Year = individual-specific variables
 logLik(cpue.models[[40]])
-AIC(cpue.models[[41]]) # Year + Trapline + Season = individual-specific variables
+AIC(cpue.models[[41]])# no random effects, Season = individual-specific variables
 logLik(cpue.models[[41]])
+AIC(cpue.models[[42]]) # no random effects, Year = individual-specific variables
+logLik(cpue.models[[42]])
+AIC(cpue.models[[43]]) # year as random effect, Season + Year = individual-specific variables
+logLik(cpue.models[[43]])
+AIC(cpue.models[[44]]) # trapline as random effect, Season + Year = individual-specific variables
+logLik(cpue.models[[44]])
+AIC(cpue.models[[45]]) # trapline + year as random effects, Season + Year = individual-specific variables
+logLik(cpue.models[[45]])
+
 
 
 

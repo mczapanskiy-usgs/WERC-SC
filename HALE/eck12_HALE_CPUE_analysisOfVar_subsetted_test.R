@@ -71,8 +71,8 @@ data.Caughts_only <- data_rev %>%
   filter(eventType == "predatorEvent")
 expanded_data.Caughts_only <- formatData(data.Caughts_only, 'predEvent')
 ## subset to test validity of subset btwn models
-set.seed(20170615)
-expanded_data.Caughts_only_subset <- formatData(data.Caughts_only, 'predEvent', subset=600)
+set.seed(20170621)
+expanded_data.Caughts_only_subset <- formatData(data.Caughts_only, 'predEvent', subset=500)
 expanded_data.Caughts_only_subset2 <- formatData(data.Caughts_only, 'predEvent', subset=500)
 
 ### PREDS ONLY ANALYSIS
@@ -210,7 +210,7 @@ cpue.models[[26]] <- mlogit(choice ~ 0 | Season + YearCts,
 
 ### SUBSET 1 ANALYSIS
 # Year = random variable, Season + Year  = individual-specific variables
-cpue.models[[27]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[29]] <- mlogit(choice ~ 0 | Season + YearCts,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
@@ -218,7 +218,7 @@ cpue.models[[27]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.year.caughts2_sub1) 
 # Trapline = random variable, Season + Year = individual-specific variables
-cpue.models[[28]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[30]] <- mlogit(choice ~ 0 | Season + YearCts,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
@@ -226,7 +226,7 @@ cpue.models[[28]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.trap.caughts2_sub1)
 # Year and Trapline = random variable (combined into one variable), Season + Year  = individual-specific variables
-cpue.models[[29]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[31]] <- mlogit(choice ~ 0 | Season + YearCts,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
@@ -234,17 +234,17 @@ cpue.models[[29]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.trapyr.caughts2_sub1)
 # No random effects, Trapline, Season, Year = individual-specific variables
-cpue.models[[30]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
+cpue.models[[32]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
                             iterlim=1, print.level=1,
                             data=cpue.caughts2_sub1) 
 # No random effects, Season + Year= individual-specific variables
-cpue.models[[31]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[33]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.caughts2_sub1) 
 
 ### SUBSET 2 ANALYSIS
 # Year = random variable, Season + Year = individual-specific variables
-cpue.models[[32]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[34]] <- mlogit(choice ~ 0 | Season + YearCts,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
@@ -252,7 +252,7 @@ cpue.models[[32]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.year.caughts2_sub2) 
 # Trapline = random variable, Season + Year = individual-specific variables
-cpue.models[[33]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[35]] <- mlogit(choice ~ 0 | Season + YearCts,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
@@ -261,7 +261,7 @@ cpue.models[[33]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.trap.caughts2_sub2)
 # Year and Trapline = random variable (combined into one variable), Season + Year = individual-specific variables
-cpue.models[[34]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[36]] <- mlogit(choice ~ 0 | Season + YearCts,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
@@ -269,15 +269,15 @@ cpue.models[[34]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.trapyr.caughts2_sub2)
 # No random effects, Trapline + Season + Year = individual-specific variables
-cpue.models[[35]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
+cpue.models[[37]] <- mlogit(choice ~ 0 | Season + YearCts + Trapline,
                             iterlim=1, print.level=1,
                             data=cpue.caughts2_sub2) 
 # No random effects, Season + Year= individual-specific variables
-cpue.models[[36]] <- mlogit(choice ~ 0 | Season + YearCts,
+cpue.models[[38]] <- mlogit(choice ~ 0 | Season + YearCts,
                             iterlim=1, print.level=1,
                             data=cpue.caughts2_sub2) 
 
 AIC(cpue.models[[22]], cpue.models[[23]], cpue.models[[24]], cpue.models[[25]], cpue.models[[26]])
-AIC(cpue.models[[27]], cpue.models[[28]], cpue.models[[29]], cpue.models[[30]], cpue.models[[31]])
-AIC(cpue.models[[32]], cpue.models[[33]], cpue.models[[34]], cpue.models[[35]], cpue.models[[36]])
+AIC(cpue.models[[29]], cpue.models[[30]], cpue.models[[31]], cpue.models[[32]], cpue.models[[33]])
+AIC(cpue.models[[34]], cpue.models[[35]], cpue.models[[36]], cpue.models[[37]], cpue.models[[38]])
 
