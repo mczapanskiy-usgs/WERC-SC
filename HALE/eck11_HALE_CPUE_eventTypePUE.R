@@ -124,8 +124,8 @@ preds %+% subset(traplineCPUE, predEvent %in% c("catCaught", "mongooseCaught", "
 
 # a historgram of count of different trap event types
 hist <-  qplot(factor(predEvent), data = weeklyCatches, geom = "bar") +
-  labs(x = 'Trap Event Type', y = 'Number of Events (years 2000 - 2015)') 
-  #   theme_bw() + theme(axis.text.x = element_text(angle=25, hjust=1))
+  labs(x = 'Trap Event Type', y = 'Number of Events (years 2000 - 2015)') +
+    theme_bw() # + theme(axis.text.x = element_text(angle=25, hjust=1))
   
 count <- weeklyCatches %>% 
   group_by(predEvent) %>% 
