@@ -77,9 +77,9 @@ data_events <- data_rev %>%
 expanded_data.events <- formatData(data_events, 'eventType') # expanded_data.events_old <- formatData_old(data_events)
 ## subset 'data_events' b/c original dataset is too big
 set.seed(20170621)
-expanded_data.events_subset <- formatData(data_events, 'eventType', subset=10000)
-expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=10000)
-expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=10000)
+expanded_data.events_subset <- formatData(data_events, 'eventType', subset=5000)
+expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=5000)
+expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=5000)
 head(expanded_data.events_subset)
 head(expanded_data.events_subset2)
 head(expanded_data.events_subset3)
@@ -137,23 +137,20 @@ cpue3events_sub3 <- mlogit.data(expanded_data.events_subset3 %>%
 #### CHOSEN DATASET: SUBSET 2
 ### expand data to compare models
 # no random effects
-cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
-                                  filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
+cpue3events_sub2 <- mlogit.data(expanded_data.events_subset2,  
                                      choice="choice",
                                      alt.var ="x", 
                                      shape="long", 
                                      chid.var="chid")
 # year as random effect
-cpue3events_year_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
-                                       filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))), 
+cpue3events_year_sub2 <- mlogit.data(expanded_data.events_subset2, 
                                      choice="choice",
                                      alt.var ="x", 
                                      id.var = "YearCat",
                                      shape="long", 
                                      chid.var="chid")
 # trapline as random effect
-cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
-                                       filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
+cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2,  
                                      choice="choice",
                                      alt.var ="x", 
                                      id.var = "Trapline",
@@ -162,8 +159,7 @@ cpue3events_trap_sub2 <- mlogit.data(expanded_data.events_subset2 %>%
 
 # trapline + yr as random effect
 cpue3events_trapyr_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
-                                       mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
-                                         filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
+                                       mutate(trapyr=paste0(Trapline,'-',YearCat)),  
                                      choice="choice",
                                      alt.var ="x", 
                                      id.var = "trapyr",
