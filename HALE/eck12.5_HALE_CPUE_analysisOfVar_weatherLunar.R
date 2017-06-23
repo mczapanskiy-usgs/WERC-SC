@@ -222,6 +222,30 @@ AIC(cpue_WL.models[[13]]) # Season + totalWeekRain + meanRelHum + meanSoilMois +
 AIC(cpue_WL.models[[1]]) # Season 
 # logLik(cpue_WL.models[[1]])
 
+
+cpue_WL.models[[14]] <- mlogit(choice ~ 0 | Season + meanRelHum,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+cpue_WL.models[[15]] <- mlogit(choice ~ 0 | Season + meanSoilMois,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+
+cpue_WL.models[[16]] <- mlogit(choice ~ 0 | Season + meanSolRad,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue.caughts.WL)
+
 ## LUNAR AND WEATHER
 cpue_WL.models[[12]] <- mlogit(choice ~ 0 | Season + MoonTime1wk + MoonIllum1wk + totalWeekRain + totalWeekRain + 
                                 meanRelHum + meanSoilMois + meanSolRad + meanTmin + meanTmin,
