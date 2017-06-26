@@ -12,7 +12,7 @@ library(mosaic)
 
 setwd("~/WERC-SC/HALE")
 
-read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
+read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20170109.csv',
           stringsAsFactors = FALSE) -> CPUEdata
 
 ## normal distribution? freq hist should be ~symetical, SD of most variable sample should be <10x the SD of least variable sample
