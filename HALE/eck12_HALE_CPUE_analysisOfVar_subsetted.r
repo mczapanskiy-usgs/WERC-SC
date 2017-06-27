@@ -11,6 +11,7 @@ library(dplyr)
 library(ggplot2)
 library(ez)
 library(mlogit)
+library(AICcmodavg)
 # library(mosaic)
 
 setwd("~/WERC-SC/HALE")
@@ -80,18 +81,49 @@ set.seed(20170621)
 expanded_data.events_subset <- formatData(data_events, 'eventType', subset=5000)
 expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=5000)
 expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=5000)
-head(expanded_data.events_subset)
-head(expanded_data.events_subset2)
-head(expanded_data.events_subset3)
-summary(expanded_data.events_subset)
-summary(expanded_data.events_subset2)
+# head(expanded_data.events_subset)
+# head(expanded_data.events_subset2)
+# head(expanded_data.events_subset3)
+# summary(expanded_data.events_subset)
+# summary(expanded_data.events_subset2)
 
-# # also run for 2 event types: event, no event
-# data_CnoC <- data_rev %>%
-#   group_by(Trapline, Week, Year, Season, Month, NTraps, loc, eventCnoC) %>%
-#   dplyr::summarise(NEvents=sum(NEvents)) %>%
-#   as.data.frame()
-# expanded_data.CnoC<- formatData(data_CnoC)
+
+#### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
+nb = 500 # number of bootstraps
+s = 5000 # size of subset
+cpue.models.sub1 <- list()
+
+# bootstrap model with no random effects
+for (k in 1:nb) { 
+  data <- formatData(data_events, 'eventType', subset=s)
+  m.data = mlogit.data(data,  
+                   choice="choice", alt.var ="x", shape="long", chid.var="chid")
+  cpue.models.1[[k]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
+                              reflevel = "noEvent",
+                              iterlim=1, print.level=1,
+                              data=m.data)
+}
+
+# desired outputs: AIC, weighted AIC, logLik
+aictab(noReffects = cpue.models.1, modnames = NULL, sort = FALSE)
+# AIC(cpue.models.1[[k]])
+# logLik(cpue.models.1[[k]])
+
+
+# rbsort=sort(rb); #sort vector of values from lowest to highest
+# rbsl=rbsort[0.025*nb] #lower bound of 95% confidence interval of data
+# rbsu=rbsort[0.975*nb] # upper bound 
+# tropsd=cbind(mean(rb),rbsl,rbsu) # put it together
+# troppieboots<-as.data.frame(tropsd)
+# colnames(troppieboots) <- c("percent found","rbsl","rbsu")
+# rownames(troppieboots) <- NULL
+# troppieboots
+
+
+
+
+
+
 
 ### EVENTS ANALYSIS: dependent var = predator, other, none (events)
 cpue3events <- mlogit.data(expanded_data.events %>% 
@@ -165,6 +197,8 @@ cpue3events_trapyr_sub2 <- mlogit.data(expanded_data.events_subset2 %>%
                                      id.var = "trapyr",
                                      shape="long", 
                                      chid.var="chid")
+
+
 
 
 #### RUN mlogt MODELS
