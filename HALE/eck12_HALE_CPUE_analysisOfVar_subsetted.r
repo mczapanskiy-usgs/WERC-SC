@@ -16,7 +16,7 @@ library(AICcmodavg)
 
 setwd("~/WERC-SC/HALE")
 
-read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20170109.csv',
+read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20170118.csv',
          stringsAsFactors = FALSE) -> CPUEdata
 
 #### EDIT DATA: remove the mouse events, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
@@ -38,7 +38,7 @@ data_rev <- CPUEdata %>%
   ) 
 
 #### RESTRUCTURE DATA FUNCTION
-formatData <- function(data, var, subset = NA){
+formatData <- function(data, var, subset){
   if(!(var %in% colnames(data)))
     stop(sprintf('var [%s] not found in data columns', var))
   data$var <- getElement(data, var)
@@ -79,13 +79,8 @@ expanded_data.events <- formatData(data_events, 'eventType') # expanded_data.eve
 ## subset 'data_events' b/c original dataset is too big
 set.seed(20170621)
 expanded_data.events_subset <- formatData(data_events, 'eventType', subset=5000)
-expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=5000)
-expanded_data.events_subset3 <- formatData(data_events, 'eventType', subset=5000)
 # head(expanded_data.events_subset)
-# head(expanded_data.events_subset2)
-# head(expanded_data.events_subset3)
 # summary(expanded_data.events_subset)
-# summary(expanded_data.events_subset2)
 
 
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
@@ -95,12 +90,12 @@ cpue.models.sub1 <- list()
 
 # bootstrap model with no random effects
 for (k in 1:nb) { 
-  data <- formatData(data_events, 'eventType', subset=s)
+  data <- formatData(data_events, 'eventType', s)
   m.data = mlogit.data(data,  
                    choice="choice", alt.var ="x", shape="long", chid.var="chid")
-  cpue.models.1[[k]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
+  cpue.models.sub1[[k]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
                               reflevel = "noEvent",
-                              iterlim=1, print.level=1,
+                              iterlim=1, # print.level=1,
                               data=m.data)
 }
 
