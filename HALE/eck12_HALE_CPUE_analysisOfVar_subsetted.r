@@ -11,7 +11,8 @@ library(dplyr)
 library(ggplot2)
 library(ez)
 library(mlogit)
-library(AICcmodavg)
+# library(AICcmodavg)
+library(MuMIn)
 # library(mosaic)
 
 setwd("~/WERC-SC/HALE")
@@ -76,46 +77,63 @@ data_events <- data_rev %>%
   mutate(CPUE = NEvents/NTraps) %>% # this line optional
   as.data.frame()
 expanded_data.events <- formatData(data_events, 'eventType') # expanded_data.events_old <- formatData_old(data_events)
-## subset 'data_events' b/c original dataset is too big
-set.seed(20170621)
-expanded_data.events_subset <- formatData(data_events, 'eventType', subset=5000)
-# head(expanded_data.events_subset)
-# summary(expanded_data.events_subset)
 
 
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
-nb = 500 # number of bootstraps
+nb = 10 # number of bootstraps
 s = 5000 # size of subset
-cpue.models.sub1 <- list()
+cpue.models.sub1 <- matrix(NA, ncol=2, nrow=nb) # nrow = number of models
 
-# bootstrap model with no random effects
 for (k in 1:nb) { 
-  data <- formatData(data_events, 'eventType', s)
-  m.data = mlogit.data(data,  
-                   choice="choice", alt.var ="x", shape="long", chid.var="chid")
-  cpue.models.sub1[[k]] <- mlogit(choice ~ 0 | Season + Trapline + Year,
-                              reflevel = "noEvent",
-                              iterlim=1, # print.level=1,
+  ### create nb iterations of formatted (expanded) data
+  Data <- formatData(data_events, 'eventType', s)
+  ### run all 7 models through the bootstrap
+  models <- list()
+  # no random effects
+  m.data = mlogit.data(Data,  
+                        choice="choice", alt.var ="x", shape="long", chid.var="chid")
+  models[[1]] <- mlogit(choice ~ 0 | Season + Trapline + Year,   # no random effects, Year + Trapline + Season = individual-specific variables
+                              reflevel = "noEvent", iterlim=1, 
                               data=m.data)
+  models[[2]] <- mlogit(choice ~ 1 | Season + YearCts,  # no random effects, Season + Year = individual-specific variables
+                              reflevel = "noEvent", iterlim=1, 
+                              data=m.data)
+  models[[3]] <- mlogit(choice ~ 1 | Season,  # no random effects, Season = individual-specific variables
+                              reflevel = "noEvent", iterlim=1, 
+                              data=m.data)
+  models[[4]] <- mlogit(choice ~ 1 | YearCts,  # no random effects, Year = individual-specific variables
+                              reflevel = "noEvent", iterlim=1, 
+                              data=m.data)
+  # year as random effect
+  m.data.year <- mlogit.data(Data, 
+                             choice="choice", alt.var ="x", shape="long", chid.var="chid",
+                             id.var = "YearCat")
+  models[[5]] <- mlogit(choice ~ 1 | Season + YearCts,
+                              rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'),  R=50, halton=NA, panel=TRUE,  
+                              reflevel = "noEvent", iterlim=1,
+                              data=m.data.year)
+  # trapline as random effect
+  m.data.trap <- mlogit.data(Data,  
+                             choice="choice", alt.var ="x", shape="long", chid.var="chid",
+                             id.var = "Trapline")
+  models[[6]] <- mlogit(choice ~ 1 | Season + YearCts,
+                              rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE, 
+                              reflevel = "noEvent", iterlim=1,
+                              data=m.data.trap)
+  # trapline + yr as random effect
+  m.data.trapyr <- mlogit.data(Data %>% 
+                                 mutate(trapyr=paste0(Trapline,'-',YearCat)),  
+                               choice="choice", alt.var ="x", shape="long", chid.var="chid", 
+                               id.var = "trapyr")
+  models[[7]] <- mlogit(choice ~ 1 | Season + YearCts,
+                              rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE, 
+                              reflevel = "noEvent", iterlim=1,
+                              data=m.data.trapyr)
+  ### 
+  cpue.models.sub1[k, ] <- Weights(ldply(models, .fun=AIC)$V1)
 }
 
-# desired outputs: AIC, weighted AIC, logLik
-aictab(noReffects = cpue.models.1, modnames = NULL, sort = FALSE)
-# AIC(cpue.models.1[[k]])
-# logLik(cpue.models.1[[k]])
-
-
-# rbsort=sort(rb); #sort vector of values from lowest to highest
-# rbsl=rbsort[0.025*nb] #lower bound of 95% confidence interval of data
-# rbsu=rbsort[0.975*nb] # upper bound 
-# tropsd=cbind(mean(rb),rbsl,rbsu) # put it together
-# troppieboots<-as.data.frame(tropsd)
-# colnames(troppieboots) <- c("percent found","rbsl","rbsu")
-# rownames(troppieboots) <- NULL
-# troppieboots
-
-
-
+bestModel <- table(apply(cpue.models.sub1, MARGIN=1, FUN=which.max))
 
 
 

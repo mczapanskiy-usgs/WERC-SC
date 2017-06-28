@@ -11,6 +11,7 @@ library(ez)
 library(mlogit)
 library(mosaic)
 library(AICcmodavg)
+library(lubridate)
 
 setwd("~/WERC-SC/HALE")
 
@@ -26,9 +27,12 @@ dim(trapData)
 with(trapData, table(predEvent))
 
 #### EDIT DATA: remove the mouse events, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
-data_rev <- trapData %>% 
+trapData_rev <- trapData %>% 
   filter(predEvent != 'mouseCaught') %>%
+  select(6:30) %>% # remove first 5 columns that are unneccessary
   mutate(Date = as.Date(Date, "%m/%d/%Y"),
+         Year = year(Date),
+         trap=paste0(Trapline,TrapNum),
          eventType = mosaic::derivedFactor(
            "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
            "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
@@ -39,8 +43,9 @@ data_rev <- trapData %>%
            back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
             .default = "back"))
 
+
 #### RESTRUCTURE DATA FUNCTION
-formatData <- function(data, var, subset = NA){
+formatSpatialData <- function(data, var, subset = NA){
   if(!(var %in% colnames(data)))
     stop(sprintf('var [%s] not found in data columns', var))
   data$var <- getElement(data, var)
@@ -48,9 +53,9 @@ formatData <- function(data, var, subset = NA){
   # Here are the possible outcomes every time the trap is set:
   events <- unique(data$var)
   # And here are the number of choice situations:
-  nEvents <- sum(data$NEvents)
+  trap <- data$trap
   # Replicate the rows according to number of events:
-  data2 <- data[rep(row.names(data), data$NEvents),]
+  data2 <- data[rep(row.names(data), data$trap),]
   data2 <- data2 %>%
     mutate(chid = row.names(data2))
 
@@ -66,33 +71,7 @@ formatData <- function(data, var, subset = NA){
            YearCts = as.numeric(Year))
   return(expanded_data)
 }
-# formatData_old <- function(data, subset = NA){
-#   # Reshape data so that there is one row for every option, for every choice situation.
-#   # Here are the possible outcomes every time the trap is set:
-#   events <- unique(data$eventType) # events <- unique(data$eventCnoC) # events <- unique(data$predEvent) # 
-#   # And here are the number of choice situations:
-#   nEvents <- sum(data$NEvents)
-#   
-#   # Replicate the rows according to number of events:
-#   data2 <- data[rep(row.names(data), data$NEvents),]
-#   data2 <- data2 %>%
-#     mutate(chid = row.names(data2))
-#   
-#   if (!is.na(subset)){
-#     data2 <- data2[sample(1:nrow(data2), subset),]
-#   }
-#   
-#   # Expand each choice situation so that each alternative is on its own row.
-#   # Do this with the merge function.  The alternative names will be stored in column `x`.
-#   expanded_data <- merge(events, data2)
-#   expanded_data <- expanded_data %>%
-#     mutate(choice = ifelse(x==eventType, TRUE, FALSE), # mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE), # mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # 
-#            YearCat = as.factor(Year),
-#            YearCts = as.numeric(Year))
-#   return(expanded_data)
-# }
-# 
 
-# 
-# #### CREATE LONG DATA TABLES
-# expanded_data <- formatData(data_rev, 'predEvent')
+
+#### CREATE LONG DATA TABLES
+exp_spatialData <- formatSpatialData(trapData_rev, 'predEvent')
