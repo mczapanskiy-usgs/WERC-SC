@@ -73,62 +73,50 @@ data_events <- data_rev %>%
   dplyr::summarise(NEvents=sum(NEvents)) %>%
   mutate(CPUE = NEvents/NTraps) %>% # this line optional
   as.data.frame()
-expanded_data.events <- formatData(data_events, 'eventType') # expanded_data.events_old <- formatData_old(data_events)
+expanded_data_events <- formatData(data_events, 'eventType', subset=NA) 
 ## subset 'data_events' b/c original dataset is too big
-set.seed(20170620)
-expanded_data.events_subset2 <- formatData(data_events, 'eventType', subset=55000)
+set.seed(20170628)
+expanded_data_events_subset <- formatData(data_events, 'eventType', subset=55000)
 
-### expand data to compare models
-# no random effects
-# trapline + yr as random effect
-cpue3events_trapyr_sub2 <- mlogit.data(expanded_data.events_subset2 %>% 
-                                         mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
-                                         filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),  
+### CHOSEN MODEL
+# trapline + yr as random effect, Season + Year as independent-specific events
+cpue_events_trapyr <- mlogit.data(expanded_data_events_subset %>% 
+                                         mutate(trapyr=paste0(Trapline,'-',YearCat)),  
                                        choice="choice",
                                        alt.var ="x", 
                                        id.var = "trapyr",
                                        shape="long", 
                                        chid.var="chid")
-
-#### RUN mlogt MODELS
-## create model list
-cpue.models <- list()
-cpue.models[[40]] <- mlogit(choice ~ 1 | Season + YearCts,
+cpue_model_events_trapyr <- mlogit(choice ~ 1 | Season + YearCts,
                             rpar=c('predatorEvent:(intercept)'='n',
                                    'otherEvent:(intercept)'='n'),
                             R=50, halton=NA,
                             panel=TRUE, 
                             reflevel = "noEvent",
                             iterlim=1, print.level=1,
-                            data=cpue3events_trapyr_sub2)
-
-
-#### ANALYSIS
+                            data=cpue_events_trapyr)
 # view model summaries
-summary(cpue.models[[40]])
-AIC(cpue.models[[40]])
-logLik(cpue.models[[40]])
-write.table(exp(coefficients(cpue.models[[40]])))
+summary(cpue_model_events_trapyr)
+AIC(cpue_model_events_trapyr)
+logLik(cpue_model_events_trapyr)
 
-
-### analyze results for model 23 (the best fit for the "caughts_only" data)
+### ANALYZE RESULTS
 ## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
-myfitted <- fitted(cpue.models[[40]], outcome=FALSE)
-# head(myfitted)
-# dim(myfitted)
-# dim(expanded_data.Caughts_only)
+myfitted <- fitted(cpue_model_events_trapyr, outcome=FALSE)
+# head(myfitted) # dim(myfitted) # dim(expanded_data.events.subset)
 
 ## select year, season, and trapline data for the fitted values
-# Copy data and thin it down to one row per chid (i.e. 33543 rows becomes 11181; because myfitted (above) is already thinned to 11181 rows)
-fitted_cpue_eventSub <- expanded_data.events_subset2 %>%
+# Copy data and thin it down to one row per chid
+fitted_cpue_event_sub <- expanded_data_events_subset %>%
   select(chid, Trapline, Year, Season) %>%
   unique()
 # then `cbind` the data in `fitted_cpue_eventSub` with the fitted values in `myfitted`
-fitted_cpue_eventSub <- cbind(fitted_cpue_eventSub, myfitted) %>%
+fitted_cpue_event_sub <- cbind(fitted_cpue_event_sub, myfitted) %>%
   # thin the fitted values further (i.e. remove replicates and keep the unique combos of Trapline, Year, & Season)
   select(-chid) %>%
   unique()
 
-write.csv(fitted_cpue_eventSub, file = '~/WERC-SC/HALE/fitted_cpue_model40.csv',
+write.csv(fitted_cpue_event_sub, file = '~/WERC-SC/HALE/fitted_cpue_event_sub.csv',
           row.names = FALSE)
 
+### graphs and analysis in "eck17_HALE_CPUE_SeasonYear_mlogit_analysis"
