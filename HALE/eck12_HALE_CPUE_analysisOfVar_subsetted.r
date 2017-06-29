@@ -132,7 +132,7 @@ for (k in 1:nb) {
 }
 
 bestModel <- table(apply(subset.models, MARGIN=1, FUN=which.max))
-
+summary(subset.models)
 # 
 # 
 # 
