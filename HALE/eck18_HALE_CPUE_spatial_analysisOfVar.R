@@ -29,7 +29,7 @@ with(trapData, table(predEvent))
 #### EDIT DATA: remove the mouse events, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
 trapData_rev <- trapData %>% 
   filter(predEvent != 'mouseCaught') %>%
-  select(6:30) %>% # remove first 5 columns that are unneccessary
+  select(6, 10:30) %>% # remove first 5 columns that are unneccessary
   mutate(Date = as.Date(Date, "%m/%d/%Y"),
          Year = year(Date),
          trap=paste0(Trapline,TrapNum),
@@ -52,26 +52,24 @@ formatSpatialData <- function(data, var, subset = NA){
   # Reshape data so that there is one row for every option, for every choice situation.
   # Here are the possible outcomes every time the trap is set:
   events <- unique(data$var)
-  # And here are the number of choice situations:
-  trap <- data$trap
-  # Replicate the rows according to number of events:
-  data2 <- data[rep(row.names(data), data$trap),]
-  data2 <- data2 %>%
-    mutate(chid = row.names(data2))
+  # # And here are the number of choice situations:
+  # trap <- data$trap
+  # # Replicate the rows according to number of events:
+  # data2 <- data[rep(row.names(data), data$trap),]
+  # data2 <- data2 %>%
+  #   mutate(chid = row.names(data2))
 
   if (!is.na(subset)){
-    data2 <- data2[sample(1:nrow(data2), subset),]
+    data <- data[sample(1:nrow(data), subset),]
   }
   # Expand each choice situation so that each alternative is on its own row.
   # Do this with the merge function.  The alternative names will be stored in column `x`.
-  expanded_data <- merge(events, data2)
+  expanded_data <- merge(events, data)
   expanded_data <- expanded_data %>%
-    mutate(choice = ifelse(x==var, TRUE, FALSE),
-           YearCat = as.factor(Year),
-           YearCts = as.numeric(Year))
+    mutate(choice = ifelse(x==var, TRUE, FALSE))
   return(expanded_data)
 }
 
 
 #### CREATE LONG DATA TABLES
-exp_spatialData <- formatSpatialData(trapData_rev, 'predEvent')
+exp_spatialData <- formatSpatialData(trapData_rev, 'predEvent', subset = 100)
