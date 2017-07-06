@@ -36,9 +36,10 @@ ggplot(fitted_events_lg, aes(x=Season, y=value)) +
   geom_boxplot() +
   facet_wrap(~ variable) + #, scales = 'free') +
   scale_x_discrete(limits = c('Pre-laying', 'Incubation', 'Nestling', 'offSeason')) +
+  ylim(0, 1) +
   theme_bw() +
   labs(x = 'Season', y = 'Probability of Events Occurance')
-ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonEvents.pdf")
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonEvents_eck17.pdf")
 
 ggplot(fitted_preds_lg, aes(x=Season, y=value)) +
   geom_boxplot() +
@@ -46,7 +47,7 @@ ggplot(fitted_preds_lg, aes(x=Season, y=value)) +
   scale_x_discrete(limits = c('Pre-laying', 'Incubation', 'Nestling', 'offSeason')) +
   theme_bw() +
   labs(x = 'Season', y = 'Probability of Predator Type Caught')
-ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonPreds.pdf")
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonPreds_eck17.pdf")
 
 ## tables of mean and SD fitted frequencies
 # seasonal event probabilities
@@ -79,6 +80,7 @@ ggplot(fitYearEvents, aes(x=Year, y=meanProb, color = eventType)) +
   geom_line(size = 1) +
   geom_point(size = 2, shape = 18) +
   geom_errorbar(aes(ymin = meanProb-sdProb, ymax=meanProb+sdProb), width = 0.5) +
+  ylim(0, 1) +
   theme_bw() +
   labs(x = 'Year', y = 'Mean Probability of Event Occurance')
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitYearEvents.pdf")

@@ -8,6 +8,9 @@ library(grid)
 library(gridExtra)
 library(lubridate)
 
+## set wd
+setwd("~/WERC-SC/HALE")
+
 read.csv('~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_20161209_edited.csv',
          stringsAsFactors = FALSE) -> catch
 
@@ -27,9 +30,10 @@ is.predEvent <- function(predCaught, birdCaught, otherCaught, trapStatus, baitSt
     TRUE ~ "none")
 }
 
-# create predEvent column based on is.predEvent function
-catch <- mutate(catch, predEvent = is.predEvent(predCaught, birdCaught, otherCaught, TrapStatus, BaitStatus))
-
+# create predEvent column based on is.predEvent function (and remove mouse caught and NA events)
+catch <- mutate(catch, predEvent = is.predEvent(predCaught, birdCaught, otherCaught, TrapStatus, BaitStatus)) %>% 
+  filter(predEvent != 'mouseCaught',
+         predEvent != 'NA')
 
 # save new catch data file with predEvents to GitHub file
 write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent_20161209.csv',
@@ -39,6 +43,11 @@ write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_
 # first remove dates when trap hadn't been checked in >14 days
 catch %>% 
   filter(!TrapChecked)
+
+# order predevents for graphing
+catch$predEvent <- factor(catch$predEvent, 
+                          levels = c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught", "birdOtherCaught", "baitLost", "trapTriggered", "none"))
+
 
 # different pred event counts
 catch_summary <-
@@ -50,10 +59,14 @@ catch_summary
 # histogram of pred events per trapline
 ggplot(catch, aes(predEvent)) +
   geom_bar() +
-  labs(x = 'Predator Event Type', y = 'Number of Events') +
+  labs(x = 'Trap Event Type', y = 'Number of Events (years 2000-2014)') +
   # facet_wrap(~ Trapline, nrow = 4) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle=60, hjust=1))
+  # theme(axis.text.x = element_text(angle=60, hjust=1)) +
+  theme_bw()
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/predEvent_hist_eck10.pdf")
+#stats
+summary(catch$predEvent) # 295,021 obs.
+# (catch$predEvent)
 
 # count of predEvents per trapline per year
 traplinePredEvent <- 

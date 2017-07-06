@@ -4,8 +4,8 @@
 setwd("~/WERC-SC/HALE")
 
 ## load libraries
-library("data.table", lib.loc="~/R/win-library/3.2")
-library("dplyr", lib.loc="~/R/win-library/3.2")
+library(data.table)
+library(dplyr)
 library(lubridate)
 library(mosaic)
 
