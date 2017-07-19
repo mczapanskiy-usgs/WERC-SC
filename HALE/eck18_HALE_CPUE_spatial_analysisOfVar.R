@@ -177,33 +177,33 @@ spatial_models_caughts[[16]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlo
                                       'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-# # vegetation model
-# spatial_models_caughts[[17]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg, 
-#                                rpar=c('ratCaught:(intercept)'='n',
-#                                       'mongooseCaught:(intercept)'='n'),
-#                               iterlim=1, print.level=1,
-#                               data=spatial_caughts)
-# spatial_models_caughts[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + MajCover, 
-#                                rpar=c('ratCaught:(intercept)'='n',
-#                                       'mongooseCaught:(intercept)'='n'),
-#                               iterlim=1, print.level=1,
-#                               data=spatial_caughts)
-# spatial_models_caughts[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + MajClass,
-#                                rpar=c('ratCaught:(intercept)'='n',
-#                                       'mongooseCaught:(intercept)'='n'),
-#                               iterlim=1, print.level=1,
-#                               data=spatial_caughts)
-# spatial_models_caughts[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + MajCover + MajClass,
-#                                rpar=c('ratCaught:(intercept)'='n',
-#                                       'mongooseCaught:(intercept)'='n'),
-#                                iterlim=1, print.level=1,
-#                                data=spatial_caughts)
-# spatial_models_caughts[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 + 
-#                                  DistRoad + DistTrail + DistFence + DistShelter + MajCover,
-#                                rpar=c('ratCaught:(intercept)'='n',
-#                                       'mongooseCaught:(intercept)'='n'),
-#                                iterlim=1, print.level=1,
-#                                data=spatial_caughts)
+# vegetation model
+spatial_models_caughts[[17]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg,
+                               rpar=c('ratCaught:(intercept)'='n',
+                                      'mongooseCaught:(intercept)'='n'),
+                              iterlim=1, print.level=1,
+                              data=spatial_caughts)
+spatial_models_caughts[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + MajCover,
+                               rpar=c('ratCaught:(intercept)'='n',
+                                      'mongooseCaught:(intercept)'='n'),
+                              iterlim=1, print.level=1,
+                              data=spatial_caughts)
+spatial_models_caughts[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + MajClass,
+                               rpar=c('ratCaught:(intercept)'='n',
+                                      'mongooseCaught:(intercept)'='n'),
+                              iterlim=1, print.level=1,
+                              data=spatial_caughts)
+spatial_models_caughts[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + MajCover + MajClass,
+                               rpar=c('ratCaught:(intercept)'='n',
+                                      'mongooseCaught:(intercept)'='n'),
+                               iterlim=1, print.level=1,
+                               data=spatial_caughts)
+spatial_models_caughts[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
+                                 DistRoad + DistTrail + DistFence + DistShelter + MajCover,
+                               rpar=c('ratCaught:(intercept)'='n',
+                                      'mongooseCaught:(intercept)'='n'),
+                               iterlim=1, print.level=1,
+                               data=spatial_caughts)
 
 #### now compare AIC and log likelihood between models
 varsCols <- sapply(spatial_models_caughts, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
@@ -214,7 +214,7 @@ aicWcols <- sapply(spatial_models_caughts, function(m) Weights(AIC(m)))
 
 # combine into one table and save output
 bestSpatialModel_preds <- data.frame(variables = varsCols, AIC = aicCols, `Log Likelihood` = logLikCols, DF = dfCols)
-write.csv(bestSpatialModel_preds, file = '~/WERC-SC/HALE/outputs/bestWLmodel_preds_eck12.5.csv',
+write.csv(bestSpatialModel_preds, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_preds_eck18.csv',
           row.names = FALSE)
 
 
@@ -371,13 +371,13 @@ spatial_models_events[[16]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlop
 #                                        data=spatial_events)
 
 #### now compare AIC and log likelihood between models
-varsCols <- sapply(spatial_models_caughts, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-dfCols <- sapply(spatial_models_caughts, function(m) attr(logLik(m), "df"))
-logLikCols <- sapply(spatial_models_caughts, function(m) attr(logLik(m), "null"))
-aicCols <- sapply(spatial_models_caughts, function(m) AIC(m))
-aicWcols <- sapply(spatial_models_caughts, function(m) Weights(AIC(m)))
+e_varsCols <- sapply(spatial_models_events, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
+e_dfCols <- sapply(spatial_models_events, function(m) attr(logLik(m), "df"))
+e_logLikCols <- sapply(spatial_models_events, function(m) attr(logLik(m), "null"))
+e_aicCols <- sapply(spatial_models_events, function(m) AIC(m))
+e_aicWcols <- sapply(spatial_models_events, function(m) Weights(AIC(m)))
 
 # combine into one table and save output
-bestSpatialModel_preds <- data.frame(variables = varsCols, AIC = aicCols, `Log Likelihood` = logLikCols, DF = dfCols)
-write.csv(bestSpatialModel_preds, file = '~/WERC-SC/HALE/outputs/bestWLmodel_preds_eck12.5.csv',
+bestSpatialModel_events <- data.frame(variables = e_varsCols, AIC = e_aicCols, `weighted AIC` = e_aicWcols, `Log Likelihood` = e_logLikCols, DF = e_dfCols)
+write.csv(bestSpatialModel_events, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_events_eck18.csv',
           row.names = FALSE)

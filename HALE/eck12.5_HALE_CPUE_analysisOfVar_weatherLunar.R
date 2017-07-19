@@ -90,7 +90,8 @@ expanded_data_Caughts_only_WL <- formatData(data_Caughts_only_WL, 'predEvent')
 cpue_WL_models <- list() # model list
 
 cpue_caughts_WL <- mlogit.data(expanded_data_Caughts_only_WL %>% 
-                                 mutate(moon = MoonTime1wk * MoonIllum1wk), 
+                                 mutate(moon = MoonTime1wk * MoonIllum1wk) %>% 
+                                 filter(!is.na(moon) & !is.na(meanTmin)), 
                                choice="choice",
                                alt.var ="x", 
                                id.var = "Trapline",
@@ -252,18 +253,19 @@ write.csv(bestWLmodel_preds, file = '~/WERC-SC/HALE/outputs/bestWLmodel_preds_ec
 ### analyze results for best fit model: model 10 (Season + Year + meanTmax)
 ## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
 myfitted_WL_preds <- fitted(cpue_WL_models[[10]], outcome=FALSE)
-head(myfitted_WL)
-dim(myfitted_WL)
+head(myfitted_WL_preds)
+dim(myfitted_WL_preds)
 dim(expanded_data_Caughts_only_WL)
 
 ## select year, season, and trapline data for the fitted values
 # Copy data and thin it down to one row per chid
-fitted_cpue_WL_preds <- expanded_data_Caughts_only_WL %>%
+fitted_cpue_WL_preds <- cpue_caughts_WL %>%
+  filter(!is.na(meanTmax)) %>% 
   select(chid, Trapline, Year_, Season, Week, meanTmax) %>%
   unique()
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
-fitted_cpue_WL_preds <- cbind(fitted_cpue_WL, myfitted_WL) %>%
-  select(-chid) %>% # thin the fitted values further (i.e. remove replicates and keep the unique combos of Trapline, Year, & Season)
+fitted_cpue_WL_preds <- cbind(fitted_cpue_WL_preds, myfitted_WL_preds) %>%
+  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
   unique()
 
 # ____________________________________________________________________________________________________________________
