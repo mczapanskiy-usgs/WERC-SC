@@ -2,6 +2,7 @@
 ## seasonal and yearly effects on:
 ##   event types (pred, other, none)
 ##   predator events (rat, cat, mongoose)
+## results from 'eck12_HALE_CPUE_analysisOfVar' and 'eck13_HALE_CPUE_analysisOfVar_subsettedFinal'
 
 library(stats)
 library(plyr)

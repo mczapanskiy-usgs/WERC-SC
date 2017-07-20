@@ -573,3 +573,4 @@ fitted_cpue <- cbind(fitted_cpue, myfitted) %>%
 
 write.csv(fitted_cpue, file = '~/WERC-SC/HALE/fitted_cpue_model23.csv',
           row.names = FALSE)
+# results analyzed in 'eck17_HALE_CPUE_SeasonYear_mlogit_analysis'
