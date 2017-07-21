@@ -18,8 +18,12 @@ setwd("~/WERC-SC/HALE")
 
 #### READ IN FITTED RESULTS FROM BEST FIT MODELS
 # ## event type (predator, other, no event) uses base model w/ traplineYear = random effect, season + year = indiv. specif. was best fit
-# read.csv('~/WERC-SC/HALE/fitted_cpue_event_sub.csv',
-#          stringsAsFactors = FALSE) -> fitted_events
+# lunar: 
+read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_L_events_eck12.5.csv',
+         stringsAsFactors = FALSE) -> fitted_L_events
+# weather: 
+read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_W_events_eck12.5.csv',
+         stringsAsFactors = FALSE) -> fitted_W_events
 
 ## pred event data (rat, cat, or mongoose) uses base model w/ Trapline = random effect, season + year = indiv. specif. was best fit
 # lunar: moon time * moon illumination is best fit model
@@ -28,9 +32,12 @@ read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_L_preds_eck12.5.csv',
 # weather: meanTmax is best fit model
 read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_W_preds_eck12.5.csv',
          stringsAsFactors = FALSE) -> fitted_W_preds
-# 
-# # create long versions of fitted results from mlogit model (variable = pred type, value = fitted CPUE probability)
-# fitted_events_lg <- melt(fitted_events, id.vars = c("Trapline", "Year", "Season"),
+
+
+## create long versions of fitted results from mlogit model (variable = pred type, value = fitted CPUE probability)
+fitted_L_events_lg <- melt(fitted_L_events, id.vars = c("Year", "Season", "MoonTime1wk"),
+                          measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
+# fitted_W_events_lg <- melt(fitted_W_events, id.vars = c("Trapline", "Year", "Season"),
 #                          measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
 fitted_L_preds_lg <- melt(fitted_L_preds, id.vars = c("Year", "Season", "moon"),
                         measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
@@ -38,19 +45,33 @@ fitted_W_preds_lg <- melt(fitted_W_preds, id.vars = c("Year", "Season", "meanTma
                           measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
 # dev.off()
 
-lunar <- ggplot(fitted_L_preds_lg, aes(value, moon)) +
+lunar_events <- ggplot(fitted_L_events_lg, aes(value, MoonTime1wk)) +
+  geom_line(aes(colour = Season)) + # geom_hex(aes(colour = Season), fill = aes(colour = Season)) + # 
+  facet_wrap(~ variable, scales = 'free') +
+  labs(y = 'Moon Time 1 Week', x = 'Proability of Trap Event') +
+  theme_bw()
+lunar_events
+
+# temp_events <- ggplot(fitted_W_preds_lg, aes(value, meanTmax)) +
+#   geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
+#   facet_wrap(~ variable, scales = 'free') +
+#   labs(y = 'Weekly Mean Maximum Temperature (C)', x = 'Proability of Predator Type Caught') +
+#   theme_bw()
+# temp_events
+
+lunar_pred <- ggplot(fitted_L_preds_lg, aes(value, moon)) +
   geom_point(aes(colour = Season)) + # geom_hex(aes(colour = Season), fill = aes(colour = Season)) + # 
   facet_wrap(~ variable, scales = 'free') +
   labs(y = 'Moon Illumination * Moon Time', x = 'Proability of Predator Type Caught') +
   theme_bw()
-lunar
+lunar_pred
 
-temp <- ggplot(fitted_W_preds_lg, aes(value, meanTmax)) +
+temp_pred <- ggplot(fitted_W_preds_lg, aes(value, meanTmax)) +
   geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
   facet_wrap(~ variable, scales = 'free') +
   labs(y = 'Weekly Mean Maximum Temperature (C)', x = 'Proability of Predator Type Caught') +
   theme_bw()
-temp
+temp_pred
 
 
 # annual predEvent probabilities

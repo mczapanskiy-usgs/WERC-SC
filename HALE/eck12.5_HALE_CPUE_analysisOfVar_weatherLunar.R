@@ -145,12 +145,11 @@ aicWcolL <- sapply(cpue_L_models, function(m) Weights(AIC(m)))
 bestLmodel_preds <- data.frame(variables = varsColL, AIC = aicColL, `Weighted AIC` = aicWcolL,  `Log Likelihood` = logLikColL, DF = dfColL)
 write.csv(bestLmodel_preds, file = '~/WERC-SC/HALE/outputs/bestLmodel_preds_eck12.5.csv',
           row.names = FALSE)
+
 ### analyze results for best fit model: model 3 (Season + Year + moon)
-## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
 myfitted_L_preds <- fitted(cpue_L_models[[3]], outcome=FALSE)
 head(myfitted_L_preds)
-## select year, season, and trapline data for the fitted values
-# Copy data and thin it down to one row per chid
+# select data and thin it down to one row per chid
 fitted_cpue_L_preds <- cpue_caughts_L %>%
   filter(!is.na(moon)) %>% 
   select(chid, Trapline, Year, Season, Week, moon) %>%
@@ -282,10 +281,8 @@ write.csv(bestWmodel_preds, file = '~/WERC-SC/HALE/outputs/bestWmodel_preds_eck1
           row.names = FALSE)
 
 ### analyze results for best fit model: model 6 (Season + Year + meanTmax)
-## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
 myfitted_W_preds <- fitted(cpue_W_models[[6]], outcome=FALSE)
-## select year, season, and trapline data for the fitted values
-# Copy data and thin it down to one row per chid
+# select data and thin it down to one row per chid
 fitted_cpue_W_preds <- cpue_caughts_W %>%
   filter(!is.na(meanTmax)) %>% 
   select(chid, Trapline, Year, Season, Week, meanTmax) %>%
@@ -303,7 +300,7 @@ write.csv(fitted_cpue_W_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_W_pred
 ### EVENTS ANALYSIS
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
 # LUNAR
-set.seed(20170720)
+set.seed(20170721)
 nb = 1000 # number of bootstraps
 s = 5000 # size of subset
 subset_modelsL_aic <- matrix(NA, ncol=5, nrow=nb) # ncol = number of models
@@ -318,7 +315,7 @@ for (k in 1:nb) {
   # no random effects
   L_data = mlogit.data(LData %>% mutate(trapyr=paste0(Trapline,'-',YearCat),
                                         moon = MoonTime1wk * MoonIllum1wk) %>% 
-                                 filter(!is.na(moon)),
+                                 filter(!is.na(moon)),  # 8150 NAs
                                choice="choice", alt.var ="x", shape="long",
                                id.var = "trapyr",
                                chid.var="chid")
@@ -358,7 +355,7 @@ for (k in 1:nb) {
 bestLmodel_events <- table(apply(subset_modelsL_aicW, MARGIN=1, FUN=which.max),
                             apply(subset_modelsL_aic, MARGIN=1, FUN=which.min))
 bestLmodel_events
-write.csv(bestWLmodel_events, file = '~/WERC-SC/HALE/outputs/bestLmodel_events_eck12.5.csv',
+write.csv(bestLmodel_events, file = '~/WERC-SC/HALE/outputs/bestLmodel_events_eck12.5.csv',
           row.names = FALSE)
 
 ## save model statistics
@@ -372,12 +369,44 @@ logLikColL <- sapply(modelsL_logLik, FUN = mean)
 aicColL <- sapply(modelsL_aic, FUN = mean)
 aicWcolL <- sapply(modelsL_aicW, FUN = mean)
 # combine into one table and save output
-bestLmodel_events <- data.frame(variables = varsColL, AIC = aicColL, `Weighted AIC` = aicWcolL,
+bs_Lmodel_events <- data.frame(variables = varsColL, AIC = aicColL, `Weighted AIC` = aicWcolL,
                                 `Log Likelihood` = logLikColL, DF = dfColL)
+write.csv(bs_Lmodel_events, file = '~/WERC-SC/HALE/outputs/bs_Lmodel_events_eck12.5.csv',
+          row.names = FALSE)
 
-  
+### analyze results for best fit model: model 4 (Season + Year + MoonTime1wk)
+expanded_data_L_events <- formatData(data_rev_WL, 'eventType', subset = 50000)
+L_data_events = mlogit.data(expanded_data_L_events %>% 
+                              mutate(trapyr=paste0(Trapline,'-',YearCat),
+                                     moon = MoonTime1wk * MoonIllum1wk) %>%
+                              filter(!is.na(moon)), # 8150 NAs
+                             choice="choice", alt.var ="x", shape="long",
+                             id.var = "trapyr",
+                             chid.var="chid")
+model_L_events <- mlogit(choice ~ 0 | Season + YearCts + MoonTime1wk,
+                          rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
+                          R=50, halton=NA, panel=TRUE,
+                          reflevel = "noEvent", iterlim=1,
+                          data=L_data_events)
+myfitted_L_events <- fitted(model_L_events, outcome=FALSE)
+head(myfitted_L_events)
+# select data and thin it down to one row per chid
+fitted_cpue_L_events <- L_data_events %>%
+  filter(!is.na(moon)) %>% 
+  select(chid, Trapline, Year, Season, Week, MoonTime1wk) %>%
+  unique()
+dim(myfitted_L_events)
+dim(fitted_cpue_L_events)
+# then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
+fitted_cpue_L_events <- cbind(fitted_cpue_L_events, myfitted_L_events) %>%
+  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
+  unique()
+write.csv(fitted_cpue_L_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_L_events_eck12.5.csv',
+          row.names = FALSE)
+
+# _______________________________________  
 # WEATHER
-set.seed(20170720)
+set.seed(20170721)
 nb = 1000 # number of bootstraps
 s = 5000 # size of subset
 subset_modelsW_aic <- matrix(NA, ncol=12, nrow=nb) # ncol = number of models
@@ -484,35 +513,37 @@ logLikColW <- sapply(modelsW_logLik, FUN = mean)
 aicColW <- sapply(modelsW_aic, FUN = mean)
 aicWcolW <- sapply(modelsW_aicW, FUN = mean)
 # combine into one table and save output
-bestWmodel_events <- data.frame(variables = varsColW, AIC = aicColW, `Weighted AIC` = aicWcolW, `Log Likelihood` = logLikColW, DF = dfColW)
+bs_Wmodel_events <- data.frame(variables = varsColW, AIC = aicColW, `Weighted AIC` = aicWcolW, `Log Likelihood` = logLikColW, DF = dfColW)
+write.csv(bs_Wmodel_events, file = '~/WERC-SC/HALE/outputs/bs_Wmodel_events_eck12.5.csv',
+          row.names = FALSE)
 
 
-
-### analyze results for best fit model: model 9 (Season + Year + meanTmax + meanTmin)
-expanded_data_WL_events <- formatData(data_events_WL, 'eventType', subset = 50000)
-WL_data_events = mlogit.data(expanded_data_WL_events %>% 
-                               mutate(trapyr=paste0(Trapline,'-',YearCat)),
-                      choice="choice", alt.var ="x", shape="long",
-                      id.var = "trapyr",
-                      chid.var="chid")
-model_WL_events <- mlogit(choice ~ 0 | Season + YearCts + meanTmin + meanTmax,
-                      rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
-                      R=50, halton=NA, panel=TRUE,
-                      reflevel = "noEvent", iterlim=1,
-                      data=WL_data_events)
-## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
-myfitted_WL_events <- fitted(model_WL_events, outcome=FALSE)
-head(myfitted_WL_events)
-dim(myfitted_WL_events)
-dim(expanded_data_WL_events)
-
-## select year, season, and trapline data for the fitted values
-# Copy data and thin it down to one row per chid
-fitted_cpue_WL_events <- expanded_data_WL_events %>%
-  select(chid, Trapline, Year_, Season, Week, meanTmax, meanTmin) %>%
+### analyze results for best fit model: model ?? (Season + Year + )
+expanded_data_W_events <- formatData(data_rev_WL, 'eventType', subset = 55000)
+W_data_events = mlogit.data(expanded_data_W_events %>% 
+                              mutate(trapyr=paste0(Trapline,'-',YearCat)) %>%
+                              filter(!is.na(meanTmax)),
+                            choice="choice", alt.var ="x", shape="long",
+                            id.var = "trapyr",
+                            chid.var="chid")
+model_W_events <- mlogit(choice ~ 0 | Season + YearCts + ,
+                         rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
+                         R=50, halton=NA, panel=TRUE,
+                         reflevel = "noEvent", iterlim=1,
+                         data=L_data_events)
+myfitted_W_events <- fitted(model_W_events, outcome=FALSE)
+head(myfitted_W_events)
+# select data and thin it down to one row per chid
+fitted_cpue_W_events <- L_data_events %>%
+  filter(!is.na(moon)) %>% 
+  select(chid, Trapline, Year, Season, Week, ) %>%
   unique()
+dim(myfitted_W_events)
+dim(fitted_cpue_W_events)
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
-fitted_cpue_WL <- cbind(fitted_cpue_WL_events, myfitted_WL_events) %>%
-  select(-chid) %>% # thin the fitted values further (i.e. remove replicates and keep the unique combos of Trapline, Year, & Season)
+fitted_cpue_W_events <- cbind(fitted_cpue_W_events, myfitted_W_events) %>%
+  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
   unique()
+write.csv(fitted_cpue_W_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_L_events_eck12.5.csv',
+          row.names = FALSE)
 
