@@ -25,6 +25,27 @@ spatialData_rev <- spatialData %>%
   mutate(Date = as.Date(Date, "%m/%d/%Y"),
          Year = year(Date),
          trap=paste0(Trapline,TrapNum),
+         majCoverType = mosaic::derivedFactor(
+           "Barren" = grepl("Barren", MajCover, ignore.case = TRUE),
+           "Developed" = grepl("Developed", MajCover, ignore.case = TRUE),
+           "HerbCover" = grepl("Herb Cover", MajCover, ignore.case = TRUE),
+           "ShrubCover" = grepl("Shrub Cover", MajCover, ignore.case = TRUE),
+           "TreeCover" = grepl("Tree Cover", MajCover, ignore.case = TRUE), 
+           .default = "Barren"),
+         majCoverPct = mosaic::derivedFactor(
+           "LowIntensity" = grepl("Low Intensity", MajCover, ignore.case = TRUE),
+           "MedIntensity" = grepl("Medium Intensity", MajCover, ignore.case = TRUE),
+           "HighIntensity" = grepl("High Intensity", MajCover, ignore.case = TRUE),
+           "10-19%" = grepl(">= 10 and < 20%", MajCover, ignore.case = TRUE),
+           "20-29%" = grepl(">= 20 and < 30%", MajCover, ignore.case = TRUE),
+           "30-39%" = grepl(">= 30 and < 40%", MajCover, ignore.case = TRUE),
+           "40-49%" = grepl(">= 40 and < 50%", MajCover, ignore.case = TRUE),
+           "50-59%" = grepl(">= 50 and < 60%", MajCover, ignore.case = TRUE),
+           "60-69%" = grepl(">= 60 and < 70%", MajCover, ignore.case = TRUE),
+           "70-79%" = grepl(">= 70 and < 80%", MajCover, ignore.case = TRUE),
+           "80-89%" = grepl(">= 80 and < 90%", MajCover, ignore.case = TRUE),
+           "90-100%" = grepl(">= 90 and <= 100%", MajCover, ignore.case = TRUE),
+           .default = "0"),
          eventType = mosaic::derivedFactor(
            "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
            "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
@@ -34,7 +55,7 @@ spatialData_rev <- spatialData %>%
            front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
            back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
             .default = "back"))
-  
+# MajClass = replace(MajClass, MajClass == c("Developed-Low Intensity", "Developed-Medium Intensity", "Developed-Open Space"), "Developed"))
 with(spatialData_rev, table(MajCover))
 with(spatialData_rev, table(MajClass))
 

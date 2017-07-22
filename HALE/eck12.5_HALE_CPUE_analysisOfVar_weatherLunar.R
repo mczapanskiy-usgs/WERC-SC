@@ -419,7 +419,7 @@ for (j in 1:nb) {
   ### run all 7 models through the bootstrap
   Wmodels <- list()
   # no random effects
-  W_data = mlogit.data(WData %>% mutate(trapyr=paste0(Trapline,'-',YearCat)) %>% 
+  W_data = mlogit.data(WData %>% mutate(trapyr=paste0(Trapline,'-',Year)) %>% 
                                  filter(!is.na(meanTmax)),
                         choice="choice", alt.var ="x", shape="long",
                         id.var = "trapyr",
