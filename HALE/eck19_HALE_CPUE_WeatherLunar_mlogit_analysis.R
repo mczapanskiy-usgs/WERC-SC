@@ -37,8 +37,8 @@ read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_W_preds_eck12.5.csv',
 ## create long versions of fitted results from mlogit model (variable = pred type, value = fitted CPUE probability)
 fitted_L_events_lg <- melt(fitted_L_events, id.vars = c("Year", "Season", "MoonTime1wk"),
                           measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
-# fitted_W_events_lg <- melt(fitted_W_events, id.vars = c("Trapline", "Year", "Season"),
-#                          measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
+fitted_W_events_lg <- melt(fitted_W_events, id.vars = c("Trapline", "Year", "Season", "meanTmax", "total3monRain"),
+                         measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
 fitted_L_preds_lg <- melt(fitted_L_preds, id.vars = c("Year", "Season", "moon"),
                         measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
 fitted_W_preds_lg <- melt(fitted_W_preds, id.vars = c("Year", "Season", "meanTmax"),
@@ -52,12 +52,21 @@ lunar_events <- ggplot(fitted_L_events_lg, aes(value, MoonTime1wk)) +
   theme_bw()
 lunar_events
 
-# temp_events <- ggplot(fitted_W_preds_lg, aes(value, meanTmax)) +
-#   geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
-#   facet_wrap(~ variable, scales = 'free') +
-#   labs(y = 'Weekly Mean Maximum Temperature (C)', x = 'Proability of Predator Type Caught') +
-#   theme_bw()
-# temp_events
+temp_events <- ggplot(fitted_W_events_lg, aes(value, meanTmax)) +
+  geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
+  facet_wrap(~ variable, scales = 'free') +
+  labs(y = 'Weekly Mean Maximum Temperature (C)', x = 'Proability of Predator Type Caught') +
+  theme_bw()
+temp_events
+
+rain_events <- ggplot(fitted_W_events_lg, aes(value, total3monRain)) +
+  geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
+  facet_wrap(~ variable, scales = 'free') +
+  labs(y = 'Weekly Mean Maximum Temperature (C)', x = 'Proability of Predator Type Caught') +
+  theme_bw()
+rain_events
+
+
 
 lunar_pred <- ggplot(fitted_L_preds_lg, aes(value, moon)) +
   geom_point(aes(colour = Season)) + # geom_hex(aes(colour = Season), fill = aes(colour = Season)) + # 

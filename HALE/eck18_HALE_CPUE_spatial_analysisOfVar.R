@@ -30,7 +30,7 @@ spatialData_rev <- spatialData %>%
            "Developed" = grepl("Developed", MajCover, ignore.case = TRUE),
            "HerbCover" = grepl("Herb Cover", MajCover, ignore.case = TRUE),
            "ShrubCover" = grepl("Shrub Cover", MajCover, ignore.case = TRUE),
-           "TreeCover" = grepl("Tree Cover", MajCover, ignore.case = TRUE), 
+           "TreeCover" = grepl("Tree Cover", MajCover, ignore.case = TRUE),
            .default = "Barren"),
          majCoverPct = mosaic::derivedFactor(
            "LowIntensity" = grepl("Low Intensity", MajCover, ignore.case = TRUE),
@@ -46,6 +46,15 @@ spatialData_rev <- spatialData %>%
            "80-89%" = grepl(">= 80 and < 90%", MajCover, ignore.case = TRUE),
            "90-100%" = grepl(">= 90 and <= 100%", MajCover, ignore.case = TRUE),
            .default = "0"),
+         majClassType = mosaic::derivedFactor(
+           "Barren" = grepl("Barren", MajClass, ignore.case = TRUE),
+           "Developed" = grepl("Developed", MajClass, ignore.case = TRUE),
+           "Introduced" = grepl("Hawai'i Introduced", MajClass, ignore.case = TRUE),
+           "Native" = grepl("Hawai'i Montane|Hawai'i Lowland|Hawai'i Subalpine", MajClass, ignore.case = TRUE),
+           # "Native" = grepl("Hawai'i Lowland", MajClass, ignore.case = TRUE),
+           # "Native" = grepl("Hawai'i Subalpine", MajClass, ignore.case = TRUE),
+           "Plantation" = grepl("Hawai'i Managed", MajClass, ignore.case = TRUE),
+           .default = "Barren"),
          eventType = mosaic::derivedFactor(
            "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
            "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
@@ -204,12 +213,12 @@ spatial_models_caughts[[17]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg
                                       'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-spatial_models_caughts[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + MajCover,
+spatial_models_caughts[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + majCoverType,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-spatial_models_caughts[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + MajClass,
+spatial_models_caughts[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + majClassType,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
