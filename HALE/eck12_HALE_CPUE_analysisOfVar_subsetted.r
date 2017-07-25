@@ -78,13 +78,14 @@ formatData <- function(data, var, subset){
 }
 
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
-set.seed(20170627)
 nb = 1000 # number of bootstraps
 s = 5000 # size of subset
-subset.models.aic <- matrix(NA, ncol=7, nrow=nb) # nrow = number of models
-subset.models.aicW <- matrix(NA, ncol=7, nrow=nb)
+subset_models_aic <- matrix(NA, ncol=7, nrow=nb) # nrow = number of models
+subset_models_aicW <- matrix(NA, ncol=7, nrow=nb)
+subset_models_logLik <- matrix(NA, ncol=7, nrow=nb)
 
 for (k in 1:nb) { 
+  set.seed(k)
   ### create nb iterations of formatted (expanded) data
   Data <- formatData(data_events, 'eventType', s)
   ### run all 7 models through the bootstrap
@@ -130,16 +131,29 @@ for (k in 1:nb) {
                               reflevel = "noEvent", iterlim=1,
                               data=m.data.trapyr)
   ### summarize and rank AICs for each itteration of bootstrap
-  subset.models.aic[k, ] <- ldply(models, .fun=AIC)$V1 
-  subset.models.aicW[k, ] <- Weights(ldply(models, .fun=AIC)$V1)
+  subset_models_aic[k, ] <- ldply(models, .fun=AIC)$V1 
+  subset_models_aicW[k, ] <- Weights(ldply(models, .fun=AIC)$V1)
+  subset_models_logLik[k, ] <- ldply(models, .fun=logLik)$V1
 }
 
 ### examine AIC and AIC weights
-bestModel.aic <- table(apply(subset.models.aic, MARGIN=1, FUN=which.min))
-bestModel.aicW <- table(apply(subset.models.aicW, MARGIN=1, FUN=which.max))
+bestModel <- table(apply(subset_models_aicW, MARGIN=1, FUN=which.max),
+                   apply(subset_models_aic, MARGIN=1, FUN=which.min))
 
-bestModel <- table(apply(subset.models.aicW, MARGIN=1, FUN=which.max),
-                   apply(subset.models.aic, MARGIN=1, FUN=which.min))
+summary(subset_models_aic)
+summary(subset_models_aicW)
 
-summary(subset.models.aic)
-summary(subset.models.aicW)
+models_aic <- data.frame(subset_models_aic)
+models_aicW <- data.frame(subset_models_aicW)
+models_logLik <- data.frame(subset_modelsL_logLik)
+# create table columns
+varsCol <- sapply(models, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
+dfCol <- sapply(models, function(m) attr(logLik(m), "df"))
+logLikCol <- sapply(models_logLik, FUN = mean)
+aicCol <- sapply(models_aic, FUN = mean)
+aicWcol <- sapply(models_aicW, FUN = mean)
+# combine into one table and save output
+bs_model_events <- data.frame(variables = varsCol, AIC = aicCol, `Weighted AIC` = aicWcol,
+                               `Log Likelihood` = logLikCol, DF = dfCol)
+write.csv(bs_model_events, file = '~/WERC-SC/HALE/outputs/bs_model_events_eck12.csv',
+          row.names = FALSE)

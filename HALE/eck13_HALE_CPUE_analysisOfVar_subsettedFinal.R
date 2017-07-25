@@ -76,7 +76,7 @@ data_events <- data_rev %>%
 expanded_data_events <- formatData(data_events, 'eventType', subset=NA) 
 ## subset 'data_events' b/c original dataset is too big
 set.seed(20170628)
-expanded_data_events_subset <- formatData(data_events, 'eventType', subset=55000)
+expanded_data_events_subset <- formatData(data_events, 'eventType', subset=50000)
 
 ### CHOSEN MODEL
 # trapline + yr as random effect, Season + Year as independent-specific events

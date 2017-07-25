@@ -228,22 +228,22 @@ spatial_models_caughts[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg
                                       'mongooseCaught:(intercept)'='n'),
                                iterlim=1, print.level=1,
                                data=spatial_caughts)
-# spatial_models_caughts[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
-#                                  DistRoad + DistTrail + DistFence + DistShelter + MajCover,
-#                                rpar=c('ratCaught:(intercept)'='n',
-#                                       'mongooseCaught:(intercept)'='n'),
-#                                iterlim=1, print.level=1,
-#                                data=spatial_caughts)
+spatial_models_caughts[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
+                                 DistRoad + DistTrail + DistFence + DistShelter + majCoverType + majClassType,
+                               rpar=c('ratCaught:(intercept)'='n',
+                                      'mongooseCaught:(intercept)'='n'),
+                               iterlim=1, print.level=1,
+                               data=spatial_caughts)
 
 #### now compare AIC and log likelihood between models
-varsCols <- sapply(spatial_models_caughts, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-dfCols <- sapply(spatial_models_caughts, function(m) attr(logLik(m), "df"))
-logLikCols <- sapply(spatial_models_caughts, function(m) attr(logLik(m), "null"))
-aicCols <- sapply(spatial_models_caughts, function(m) AIC(m))
-aicWcols <- sapply(spatial_models_caughts, function(m) Weights(AIC(m)))
+p_varsColS <- sapply(spatial_models_caughts, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
+p_dfColS <- sapply(spatial_models_caughts, function(m) attr(logLik(m), "df"))
+p_logLikColS <- sapply(spatial_models_caughts, function(m) attr(logLik(m), "null"))
+p_aicColS <- sapply(spatial_models_caughts, function(m) AIC(m))
+p_aicWcolS <- sapply(spatial_models_caughts, function(m) Weights(AIC(m)))
 
 # combine into one table and save output
-bestSpatialModel_preds <- data.frame(variables = varsCols, AIC = aicCols, `Log Likelihood` = logLikCols, DF = dfCols)
+bestSpatialModel_preds <- data.frame(variables = p_varsColS, AIC = p_aicColS, `Log Likelihood` = p_logLikColS, DF = p_dfColS)
 write.csv(bestSpatialModel_preds, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_preds_eck18.csv',
           row.names = FALSE)
 
@@ -401,11 +401,11 @@ spatial_models_events[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg 
 #                                        data=spatial_events)
 
 #### now compare AIC and log likelihood between models
-e_varsCols <- sapply(spatial_models_events, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-e_dfCols <- sapply(spatial_models_events, function(m) attr(logLik(m), "df"))
-e_logLikCols <- sapply(spatial_models_events, function(m) attr(logLik(m), "null"))
-e_aicCols <- sapply(spatial_models_events, function(m) AIC(m))
-e_aicWcols <- sapply(spatial_models_events, function(m) Weights(AIC(m)))
+e_varsColS <- sapply(spatial_models_events, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
+e_dfColS <- sapply(spatial_models_events, function(m) attr(logLik(m), "df"))
+e_logLikColS <- sapply(spatial_models_events, function(m) attr(logLik(m), "null"))
+e_aicColS <- sapply(spatial_models_events, function(m) AIC(m))
+e_aicWcolS <- sapply(spatial_models_events, function(m) Weights(AIC(m)))
 
 # combine into one table and save output
 bestSpatialModel_events <- data.frame(variables = e_varsCols, AIC = e_aicCols, `weighted AIC` = e_aicWcols, `Log Likelihood` = e_logLikCols, DF = e_dfCols)

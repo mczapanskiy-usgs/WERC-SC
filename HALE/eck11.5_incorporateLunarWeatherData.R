@@ -74,7 +74,7 @@ predEventsPerLineWeek_WL <- weeklyCatches_WL %>%
 # THEN JOIN WITH WEATHER AND LUNAR DATA
 predEventPUE_WL <- merge(trapsPerLineWeek_WL, predEventsPerLineWeek_WL) %>%
   mutate(CPUE = NEvents/NTraps,
-         PeriodEnding = ISOdatetime(Year_, 1, 1, 12, 0, 0, 'US/Hawaii') + weeks(Week)) %>% 
+         PeriodEnding = ISOdatetime(2000, 1, 1, 12, 0, 0, 'US/Hawaii') + weeks(Week)) %>% 
   arrange(Trapline, Year_, Week, predEvent) %>% 
   left_join(select(moonIndex, PeriodEnding, MoonTime1wk, MoonIllum1wk), by = 'PeriodEnding') %>% 
   left_join(select(weatherIndex, WeatherDate, Sta_ID, total3monRain, totalWeekRain, meanRelHum, meanSoilMois, meanSolRad, meanTmin, meanTmax), 
@@ -83,91 +83,3 @@ predEventPUE_WL <- merge(trapsPerLineWeek_WL, predEventsPerLineWeek_WL) %>%
 ## save predEventPUE_WL data file to GitHub folder
 write.csv(predEventPUE_WL, file = '~/WERC-SC/HALE/predEventPUE_WL_11.5.csv',
           row.names = FALSE)
-
-
-
-
-
-# #### WEATHER DATA ANALYSIS
-# # create data table with station ID and date as keys
-# weatherData.dt <- weatherData %>% 
-#   mutate(DummyWeatherDate = WeatherDate) %>%
-#   data.table(key = c('Sta_ID', 'DummyWeatherDate'))
-# # summarize weather data by week
-# cWeekWeather <- trapData[weatherData.dt, roll = -6] %>%
-#   select(-DummyTrapDate) %>%
-#   filter(!is.na(catchID)) %>%
-#   group_by(catchID) %>%
-#   summarize(TotalRain = sum(Rainfall, na.rm = TRUE),
-#             Tmin = mean(Tmin, na.rm = TRUE),
-#             Tmax = mean(Tmax, na.rm = TRUE),
-#             relHum = mean(RelativeHumidity, na.rm = TRUE),
-#             soilMois = mean(SoilMoisture, na.rm = TRUE),
-#             solRad = mean(SolarRadiation, na.rm = TRUE))
-# # attach summarized weather data to trap data
-# catchWeather <- left_join(trapData, cWeekWeather) %>%
-#   select(-DummyTrapDate)
-# 
-# 
-# #### LUNAR DATA
-# timez <- ymd_hm('2000-01-13 12:00', tz = 'US/Hawaii')
-# timezUTC <- with_tz(timez, 'UTC')
-# 
-# bar <- data.frame(t = seq(from = timezUTC - days(3), to = timezUTC, length.out = 10000)) %>%
-#   mutate(sunAlt = sunAngle(t, -156.1552, 20.7204)$altitude,
-#          moonAlt = moonAngle(t, -156.1552, 20.7204)$altitude,
-#          moonOnly = moonAlt > 0 | sunAlt < 0)
-# # plot to validate sun and moon altitidue values
-# ggplot(bar,
-#        aes(x = t)) +
-#   geom_line(aes(y = sunAlt),
-#             color = 'red') +
-#   geom_line(aes(y = moonAlt),
-#             color = 'blue') +
-#   geom_vline(xintercept = as.numeric(ymd_hm('2000-01-12 07:04', tz='US/Hawaii')),
-#              color = 'red') +
-#   geom_vline(xintercept = as.numeric(ymd_hm('2000-01-12 11:16', tz='US/Hawaii')),
-#              color = 'blue') +
-#   geom_vline(xintercept = as.numeric(timezUTC - days(1:3)),
-#              color = 'black',
-#              linetype = 'dashed') +
-#   ylim(0, 90)
-# 
-# #### MOONLIGHT FUNCTION ####
-# # Value: the time (in seconds) of moonlight without sunlight
-# # NOTE: Always use noon (local time) for startDay and endDay
-# moonIndex <- function(startDay, endDay, interval = 60, longitude = -156.1552, latitude = 20.7204) {
-#   startDay <- with_tz(startDay, 'UTC')
-#   endDay <- with_tz(endDay, 'UTC')
-#   interval <- first(interval)
-#   cl <- makeCluster(detectCores())
-#   registerDoParallel(cl)
-#   result <- foreach(s = startDay, e = endDay, 
-#                     .combine = c, 
-#                     .packages = c('oce')) %dopar% {
-#                       t <- seq(from = s, to = e, by = interval)
-#                       sunAlt <- sunAngle(t, longitude, latitude)$altitude
-#                       moon <- moonAngle(t, longitude, latitude)
-#                       moonAlt <- moon$altitude
-#                       moonOnly <- moonAlt > 0 & sunAlt < 0
-#                       moonIllum <- mean(moon$illuminatedFraction[moonOnly])
-#                       sum(moonOnly) * interval * moonIllum
-#                     }
-#   stopCluster(cl)
-#   result
-# }
-# 
-# 
-# # average hours of moonlight/week using moonlight function
-# startDay <- ISOdate(catchWeather$Year_, catchWeather$Month_, catchWeather$Day_, 
-#                     hour = 12, min = 0, sec = 0, 
-#                     tz = 'US/Hawaii') - days(6) 
-# endDay <- ISOdate(catchWeather$Year_, catchWeather$Month_, catchWeather$Day_, 
-#                   hour = 12, min = 0, sec = 0, 
-#                   tz = 'US/Hawaii')
-# 
-# catchLunarWeather <- catchWeather %>% 
-#   mutate(startDay = as.POSIXct(startDay, format = '%Y-%m-%d %H:%M:%S'),
-#          endDay = as.POSIXct(endDay, format = '%Y-%m-%d %H:%M:%S')) %>%
-#   mutate(moonIndex = moonIndex(startDay, endDay))
-
