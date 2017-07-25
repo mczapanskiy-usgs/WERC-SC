@@ -40,7 +40,6 @@ data_rev_WL <- CPUEdata_WL %>%
 data_events_WL <- data_rev_WL %>%
   group_by(MoonTime1wk, MoonIllum1wk, total3monRain, totalWeekRain, meanRelHum, meanSoilMois, meanSolRad,
            meanTmin, meanTmax,Trapline, Week, Year, Season, Month, NTraps, loc, eventType) %>%
-  # group_by(Trapline, Week, Year_, Season, Month_, NTraps, loc, eventType) %>%
   dplyr::summarise(NEvents=sum(NEvents)) %>%
   ungroup %>% 
   mutate(CPUE = NEvents/NTraps) %>% # this line optional
@@ -300,7 +299,6 @@ write.csv(fitted_cpue_W_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_W_pred
 ### EVENTS ANALYSIS
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
 # LUNAR
-set.seed(20170721)
 nb = 1000 # number of bootstraps
 s = 5000 # size of subset
 subset_modelsL_aic <- matrix(NA, ncol=5, nrow=nb) # ncol = number of models
@@ -308,6 +306,7 @@ subset_modelsL_aicW <- matrix(NA, ncol=5, nrow=nb)
 subset_modelsL_logLik <- matrix(NA, ncol=5, nrow=nb)
 
 for (k in 1:nb) { 
+  set.seed(k)
   ### create nb iterations of formatted (expanded) data
   LData <- formatData(data_events_WL, 'eventType', s)
   ### run all 7 models through the bootstrap
@@ -406,7 +405,7 @@ write.csv(fitted_cpue_L_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_L_eve
 
 # _______________________________________  
 # WEATHER
-set.seed(20170724)
+set.seed(1003)
 nb = 5 # number of bootstraps
 s = 5000 # size of subset
 subset_modelsW_aic <- matrix(NA, ncol=12, nrow=nb) # ncol = number of models
@@ -414,6 +413,7 @@ subset_modelsW_aicW <- matrix(NA, ncol=12, nrow=nb)
 subset_modelsW_logLik <- matrix(NA, ncol=12, nrow=nb)
 
 for (j in 1:nb) { 
+  set.seed(j)
   ### create nb iterations of formatted (expanded) data
   WData <- formatData(data_events_WL, 'eventType', s)
   ### run all 7 models through the bootstrap
@@ -495,9 +495,8 @@ for (j in 1:nb) {
 }
 
 ### examine AIC and AIC weights
-# varsColW <- sapply(cpue_W_models, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-bestWmodel_events <- table(apply(subset_modelsW_aic, MARGIN=1, FUN=which.max),
-                           apply(subset_modelsW_aicW, MARGIN=1, FUN=which.min))
+bestWmodel_events <- table(apply(subset_modelsW_aic, MARGIN=1, FUN=which.min),
+                           apply(subset_modelsW_aicW, MARGIN=1, FUN=which.max))
 bestWmodel_events
 write.csv(bestWmodel_events, file = '~/WERC-SC/HALE/outputs/bestWmodel_events_eck12.5.csv',
           row.names = FALSE)

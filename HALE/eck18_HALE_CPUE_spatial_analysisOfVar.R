@@ -223,17 +223,17 @@ spatial_models_caughts[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + majCla
                                       'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-spatial_models_caughts[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + MajCover + MajClass,
+spatial_models_caughts[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + majCoverType + majClassType,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                                iterlim=1, print.level=1,
                                data=spatial_caughts)
-spatial_models_caughts[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
-                                 DistRoad + DistTrail + DistFence + DistShelter + MajCover,
-                               rpar=c('ratCaught:(intercept)'='n',
-                                      'mongooseCaught:(intercept)'='n'),
-                               iterlim=1, print.level=1,
-                               data=spatial_caughts)
+# spatial_models_caughts[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
+#                                  DistRoad + DistTrail + DistFence + DistShelter + MajCover,
+#                                rpar=c('ratCaught:(intercept)'='n',
+#                                       'mongooseCaught:(intercept)'='n'),
+#                                iterlim=1, print.level=1,
+#                                data=spatial_caughts)
 
 #### now compare AIC and log likelihood between models
 varsCols <- sapply(spatial_models_caughts, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
@@ -367,33 +367,33 @@ spatial_models_events[[16]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlop
                                       reflevel = "noEvent",
                                        iterlim=1, print.level=1,
                                        data=spatial_events)
-# # vegetation model
-# spatial_models_events[[17]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg,
-#                                       rpar=c('predatorEvent:(intercept)'='n',
-#                                              'otherEvent:(intercept)'='n'),
-#                                       reflevel = "noEvent",
-#                                       iterlim=1, print.level=1,
-#                                       data=spatial_events)
-# spatial_models_events[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + MajCover,
-#                                       rpar=c('predatorEvent:(intercept)'='n',
-#                                              'otherEvent:(intercept)'='n'),
-#                                       reflevel = "noEvent",
-#                                       iterlim=1, print.level=1,
-#                                       data=spatial_events)
-# spatial_models_events[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + MajClass,
-#                                       rpar=c('predatorEvent:(intercept)'='n',
-#                                              'otherEvent:(intercept)'='n'),
-#                                       reflevel = "noEvent",
-#                                       iterlim=1, print.level=1,
-#                                       data=spatial_events)
-# spatial_models_events[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + MajCover + MajClass,
-#                                       rpar=c('predatorEvent:(intercept)'='n',
-#                                              'otherEvent:(intercept)'='n'),
-#                                       reflevel = "noEvent",
-#                                        iterlim=1, print.level=1,
-#                                        data=spatial_events)
+# vegetation model
+spatial_models_events[[17]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg,
+                                      rpar=c('predatorEvent:(intercept)'='n',
+                                             'otherEvent:(intercept)'='n'),
+                                      reflevel = "noEvent",
+                                      iterlim=1, print.level=1,
+                                      data=spatial_events)
+spatial_models_events[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + majCoverType,
+                                      rpar=c('predatorEvent:(intercept)'='n',
+                                             'otherEvent:(intercept)'='n'),
+                                      reflevel = "noEvent",
+                                      iterlim=1, print.level=1,
+                                      data=spatial_events)
+spatial_models_events[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + MajClassType,
+                                      rpar=c('predatorEvent:(intercept)'='n',
+                                             'otherEvent:(intercept)'='n'),
+                                      reflevel = "noEvent",
+                                      iterlim=1, print.level=1,
+                                      data=spatial_events)
+spatial_models_events[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + majCoverType + MajClassType,
+                                      rpar=c('predatorEvent:(intercept)'='n',
+                                             'otherEvent:(intercept)'='n'),
+                                      reflevel = "noEvent",
+                                       iterlim=1, print.level=1,
+                                       data=spatial_events)
 # spatial_models_events[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
-#                                  DistRoad + DistTrail + DistFence + DistShelter + MajCover,
+#                                  DistRoad + DistTrail + DistFence + DistShelter + majCoverType,
 #                                        rpar=c('predatorEvent:(intercept)'='n',
 #                                               'otherEvent:(intercept)'='n'),
 #                                        reflevel = "noEvent",

@@ -55,14 +55,14 @@ lunar_events
 temp_events <- ggplot(fitted_W_events_lg, aes(value, meanTmax)) +
   geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
   facet_wrap(~ variable, scales = 'free') +
-  labs(y = 'Weekly Mean Maximum Temperature (C)', x = 'Proability of Predator Type Caught') +
+  labs(y = 'Weekly Mean Maximum Temperature (°C)', x = 'Proability of Predator Type Caught') +
   theme_bw()
 temp_events
 
 rain_events <- ggplot(fitted_W_events_lg, aes(value, total3monRain)) +
   geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
   facet_wrap(~ variable, scales = 'free') +
-  labs(y = 'Weekly Mean Maximum Temperature (C)', x = 'Proability of Predator Type Caught') +
+  labs(y = 'Weekly Mean Maximum Temperature (°C)', x = 'Proability of Predator Type Caught') +
   theme_bw()
 rain_events
 
