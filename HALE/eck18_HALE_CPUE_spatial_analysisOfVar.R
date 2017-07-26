@@ -69,10 +69,10 @@ with(spatialData_rev, table(MajCover))
 with(spatialData_rev, table(MajClass))
 
 #### RESTRUCTURE DATA FUNCTION
-formatData <- function(data, var, subset = NA){
+formatSpatialData <- function(data, var, subset = NA){
   if(!(var %in% colnames(data)))
     stop(sprintf('var [%s] not found in data columns', var))
-  data$var <- getElement(data, var)
+  data$var <- getElement(data, var) 
   # Reshape data so that there is one row for every option, for every choice situation.
   # Here are the possible outcomes every time the trap is set:
   events <- unique(data$var)
@@ -229,7 +229,7 @@ spatial_models_caughts[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg
                                iterlim=1, print.level=1,
                                data=spatial_caughts)
 spatial_models_caughts[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
-                                 DistRoad + DistTrail + DistFence + DistShelter + majCoverType + majClassType,
+                                 DistRoad + DistTrail + DistFence + DistShelter + PctVeg + majCoverType + majClassType,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                                iterlim=1, print.level=1,
@@ -407,13 +407,13 @@ spatial_models_events[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg 
                                       reflevel = "noEvent",
                                        iterlim=1, print.level=1,
                                        data=spatial_events)
-# spatial_models_events[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
-#                                  DistRoad + DistTrail + DistFence + DistShelter + majCoverType,
-#                                        rpar=c('predatorEvent:(intercept)'='n',
-#                                               'otherEvent:(intercept)'='n'),
-#                                        reflevel = "noEvent",
-#                                        iterlim=1, print.level=1,
-#                                        data=spatial_events)
+spatial_models_events[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
+                                 DistRoad + DistTrail + DistFence + DistShelter + majCoverType + majClassType,
+                                       rpar=c('predatorEvent:(intercept)'='n',
+                                              'otherEvent:(intercept)'='n'),
+                                       reflevel = "noEvent",
+                                       iterlim=1, print.level=1,
+                                       data=spatial_events)
 
 #### now compare AIC and log likelihood between models
 e_varsColS <- sapply(spatial_models_events, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
@@ -423,19 +423,21 @@ e_aicColS <- sapply(spatial_models_events, function(m) AIC(m))
 e_aicWcolS <- sapply(spatial_models_events, function(m) Weights(AIC(m)))
 
 # combine into one table and save output
-bestSpatialModel_events <- data.frame(variables = e_varsCols, AIC = e_aicCols, `weighted AIC` = e_aicWcols, `Log Likelihood` = e_logLikCols, DF = e_dfCols)
+bestSpatialModel_events <- data.frame(variables = e_varsColS, AIC = e_aicColS, `weighted AIC` = e_aicWcolS, 
+                                      `Log Likelihood` = e_logLikColS, DF = e_dfColS)
 write.csv(bestSpatialModel_events, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_events_eck18.csv',
           row.names = FALSE)
 
-### analyze results for best fit model: model 16 (loc + Season + Year + )
-myfitted_S_events <- fitted(spatial_models_events[[]], outcome=FALSE)
+### analyze results for best fit model: model 16 (loc + Season + Year + + MedSlope + Elevation + Burrows100 + DistRoad + DistTrail + DistFence + DistShelter + majCoverType + majClassType)
+myfitted_S_events <- fitted(spatial_models_events[[21]], outcome=FALSE)
 head(myfitted_S_events)
 # select data and thin it down to one row per chid
 fitted_cpue_S_events <- spatial_caughts %>%
-  select(chid, Trapline, Year, Season, Week, loc, ) %>%
+  select(Trapline, Year, Season, Week, loc, MedSlope, Elevation, Burrows100,
+           DistRoad, DistTrail, DistFence, DistShelter, majCoverType, majClassType) %>%
   unique()
 dim(myfitted_S_events)
-dim(fitted_cpue_S_events)
+dim(exp_spatialData_events)
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
 fitted_cpue_S_events <- cbind(fitted_cpue_S_events, myfitted_S_events) %>%
   select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
