@@ -247,6 +247,21 @@ bestSpatialModel_preds <- data.frame(variables = p_varsColS, AIC = p_aicColS, `L
 write.csv(bestSpatialModel_preds, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_preds_eck18.csv',
           row.names = FALSE)
 
+### analyze results for best fit model: model 16 (loc + Season + Year + MedSlope + Elevation + Burrows100 + DistRoad + DistTrail + DistFence + DistShelter)
+myfitted_S_preds <- fitted(spatial_models_caughts[[16]], outcome=FALSE)
+head(myfitted_S_preds)
+# select data and thin it down to one row per chid
+fitted_cpue_S_preds <- spatial_caughts %>%
+  select(chid, Trapline, Year, Season, Week, loc, MedSlope, Elevation, Burrows100, DistRoad, DistTrail, DistFence, DistShelter) %>%
+  unique()
+dim(myfitted_S_preds)
+dim(fitted_cpue_S_preds)
+# then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
+fitted_cpue_S_preds <- cbind(fitted_cpue_S_preds, myfitted_S_preds) %>%
+  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
+  unique()
+write.csv(fitted_cpue_S_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_preds_eck18.csv',
+          row.names = FALSE)
 
 #_____________________________________________________________________________________________________________________
 # EVENT TYPE DATA
@@ -410,4 +425,20 @@ e_aicWcolS <- sapply(spatial_models_events, function(m) Weights(AIC(m)))
 # combine into one table and save output
 bestSpatialModel_events <- data.frame(variables = e_varsCols, AIC = e_aicCols, `weighted AIC` = e_aicWcols, `Log Likelihood` = e_logLikCols, DF = e_dfCols)
 write.csv(bestSpatialModel_events, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_events_eck18.csv',
+          row.names = FALSE)
+
+### analyze results for best fit model: model 16 (loc + Season + Year + )
+myfitted_S_events <- fitted(spatial_models_events[[]], outcome=FALSE)
+head(myfitted_S_events)
+# select data and thin it down to one row per chid
+fitted_cpue_S_events <- spatial_caughts %>%
+  select(chid, Trapline, Year, Season, Week, loc, ) %>%
+  unique()
+dim(myfitted_S_events)
+dim(fitted_cpue_S_events)
+# then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
+fitted_cpue_S_events <- cbind(fitted_cpue_S_events, myfitted_S_events) %>%
+  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
+  unique()
+write.csv(fitted_cpue_S_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_events_eck18.csv',
           row.names = FALSE)
