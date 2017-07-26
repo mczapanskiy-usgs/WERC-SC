@@ -145,7 +145,7 @@ summary(subset_models_aicW)
 
 models_aic <- data.frame(subset_models_aic)
 models_aicW <- data.frame(subset_models_aicW)
-models_logLik <- data.frame(subset_modelsL_logLik)
+models_logLik <- data.frame(subset_models_logLik)
 # create table columns
 varsCol <- sapply(models, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
 dfCol <- sapply(models, function(m) attr(logLik(m), "df"))

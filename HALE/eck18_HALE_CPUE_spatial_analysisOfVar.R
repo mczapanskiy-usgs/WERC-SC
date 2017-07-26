@@ -395,13 +395,13 @@ spatial_models_events[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + majCove
                                       reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events)
-spatial_models_events[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + MajClassType,
+spatial_models_events[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + majClassType,
                                       rpar=c('predatorEvent:(intercept)'='n',
                                              'otherEvent:(intercept)'='n'),
                                       reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events)
-spatial_models_events[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + majCoverType + MajClassType,
+spatial_models_events[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + majCoverType + majClassType,
                                       rpar=c('predatorEvent:(intercept)'='n',
                                              'otherEvent:(intercept)'='n'),
                                       reflevel = "noEvent",
