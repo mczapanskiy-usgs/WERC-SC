@@ -408,7 +408,7 @@ spatial_models_events[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg 
                                        iterlim=1, print.level=1,
                                        data=spatial_events)
 spatial_models_events[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
-                                 DistRoad + DistTrail + DistFence + DistShelter + majCoverType + majClassType,
+                                 DistRoad + DistTrail + DistFence + DistShelter + PctVeg + majCoverType + majClassType,
                                        rpar=c('predatorEvent:(intercept)'='n',
                                               'otherEvent:(intercept)'='n'),
                                        reflevel = "noEvent",
@@ -434,7 +434,7 @@ head(myfitted_S_events)
 # select data and thin it down to one row per chid
 fitted_cpue_S_events <- spatial_caughts %>%
   select(Trapline, Year, Season, Week, loc, MedSlope, Elevation, Burrows100,
-           DistRoad, DistTrail, DistFence, DistShelter, majCoverType, majClassType) %>%
+           DistRoad, DistTrail, DistFence, DistShelter, PctVeg, majCoverType, majClassType) %>%
   unique()
 dim(myfitted_S_events)
 dim(exp_spatialData_events)

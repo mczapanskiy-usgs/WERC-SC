@@ -405,8 +405,7 @@ write.csv(fitted_cpue_L_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_L_eve
 
 # _______________________________________  
 # WEATHER
-set.seed(1003)
-nb = 5 # number of bootstraps
+nb = 1000 # number of bootstraps
 s = 5000 # size of subset
 subset_modelsW_aic <- matrix(NA, ncol=11, nrow=nb) # ncol = number of models
 subset_modelsW_aicW <- matrix(NA, ncol=11, nrow=nb)
@@ -472,7 +471,7 @@ for (j in 1:nb) {
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
                                  data=W_data) 
-  Wmodels[[10]] <- mlogit(choice ~ 0 | Season + YearCts + totalWeekRain + meanTmin + meanTmax,
+  Wmodels[[10]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + meanTmin,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
