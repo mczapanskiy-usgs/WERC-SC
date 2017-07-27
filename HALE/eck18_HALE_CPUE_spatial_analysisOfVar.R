@@ -15,7 +15,7 @@ library(lubridate)
 
 setwd("~/WERC-SC/HALE")
 
-read.csv('~/WERC-SC/HALE/TrapsGrid.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
+read.csv('~/WERC-SC/HALE/TrapsGrid20170626.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
          stringsAsFactors = FALSE) -> spatialData
 
 # EDIT DATA: remove the mouse events, separate front and backcountry traps, & group predator events (for rerun of mlogit analysis)
@@ -252,13 +252,14 @@ myfitted_S_preds <- fitted(spatial_models_caughts[[16]], outcome=FALSE)
 head(myfitted_S_preds)
 # select data and thin it down to one row per chid
 fitted_cpue_S_preds <- spatial_caughts %>%
-  select(chid, Trapline, Year, Season, Week, loc, MedSlope, Elevation, Burrows100, DistRoad, DistTrail, DistFence, DistShelter) %>%
-  unique()
+  filter(choice == "TRUE") %>% 
+  select(Trapline, Year, Season, Week, predEvent, loc, MedSlope, Elevation, Burrows100, DistRoad, DistTrail, DistFence, 
+         DistShelter, PctVeg, majCoverType, majClassType)
+  # unique()
 dim(myfitted_S_preds)
 dim(fitted_cpue_S_preds)
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
 fitted_cpue_S_preds <- cbind(fitted_cpue_S_preds, myfitted_S_preds) %>%
-  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
   unique()
 write.csv(fitted_cpue_S_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_preds_eck18.csv',
           row.names = FALSE)
@@ -432,15 +433,14 @@ write.csv(bestSpatialModel_events, file = '~/WERC-SC/HALE/outputs/bestSpatialMod
 myfitted_S_events <- fitted(spatial_models_events[[21]], outcome=FALSE)
 head(myfitted_S_events)
 # select data and thin it down to one row per chid
-fitted_cpue_S_events <- spatial_caughts %>%
-  select(Trapline, Year, Season, Week, loc, MedSlope, Elevation, Burrows100,
-           DistRoad, DistTrail, DistFence, DistShelter, PctVeg, majCoverType, majClassType) %>%
-  unique()
+fitted_cpue_S_events <- spatial_events %>%
+  filter(choice == "TRUE") %>% 
+  select(Trapline, Year, Season, Week, predEvent, loc, MedSlope, Elevation, Burrows100,
+           DistRoad, DistTrail, DistFence, DistShelter, PctVeg, majCoverType, majClassType)
 dim(myfitted_S_events)
-dim(exp_spatialData_events)
+dim(fitted_cpue_S_events)
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
 fitted_cpue_S_events <- cbind(fitted_cpue_S_events, myfitted_S_events) %>%
-  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
   unique()
 write.csv(fitted_cpue_S_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_events_eck18.csv',
           row.names = FALSE)

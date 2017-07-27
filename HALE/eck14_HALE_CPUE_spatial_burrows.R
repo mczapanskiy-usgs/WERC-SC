@@ -10,15 +10,48 @@ library(stringr)
 library(ggplot2)
 library(mosaic)
 
-read.csv('~/WERC-SC/HALE/catch_12_spatialCatches_20170109.csv',
-         stringsAsFactors = FALSE) -> catch_spatial
+# read.csv('~/WERC-SC/HALE/catch_12_spatialCatches_20170109.csv',
+#          stringsAsFactors = FALSE) -> catch_spatial
+read.csv('~/WERC-SC/HALE/TrapsGrid20170626.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
+         stringsAsFactors = FALSE) -> spatialCatch
+read.csv('~/WERC-SC/HALE/TraplinePredEventPUE_11_20170118.csv',
+         stringsAsFactors = FALSE) -> CPUEdata
+
+CPUEdata <- CPUEdata %>% 
+  select(catchID, Season)
+
+SpatialCatch_rev <- spatialCatch %>% 
+  mutate(Date = as.Date(Date_, "%m/%d/%Y"),
+         Year = year(Date),
+         Month = month(Date),
+         Season = derivedFactor("offSeason" = Month == 1,
+                                "Pre-laying" = Month >= 2,
+                                "Incubation" = Month >= 5,
+                                "Nestling" = Month >= 7,
+                                "offSeason" = Month >= 11,
+                                .method = "last", 
+                                .default = "offSeason")) %>% 
+  select(-c(OBJECTID, Join_Count, TARGET_FID, Join_Count_1, TARGET_FID_1, Date_))
+
+SpatialCatch_rev <- join(SpatialCatch2, CPUEdata, by = "catchID")
+
+# read.csv('~/WERC-SC/HALE/TrapsGrid.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
+#          stringsAsFactors = FALSE) -> spatialData
+# ## add in "baitType"
+# read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
+#          stringsAsFactors = FALSE) -> baitData
+# baitData <- baitData %>% 
+#   select(catchID, baitType)
+# baitData2 <- join(spatialData, baitData, by = "catchID") 
+
+
 
 ## look at data
 summary(catch_spatial)
 dim(catch_spatial)
 with(catch_spatial, table(predEvent))
 with(catch_spatial, table(Burrows10, predEvent))
-with(catch_spatial, table(Burrows10, predEvent, strYear))
+with(catch_spatial, table(Burrows10, predEvent, Year))
 
 
 # create columns for frequency of burrow counts and for whether or not there are burrows around (e.g.- inside or outside the colony)
