@@ -189,7 +189,7 @@ WLmodels_preds <- data.frame(variables = varsColWL, AIC = aicColWL, `Weighted AI
 write.csv(WLmodels_preds, file = '~/WERC-SC/HALE/outputs/WLmodels_preds_eck12.5.csv',
           row.names = FALSE)
 
-### analyze results for best fit model: model 5 (Season + Year + MoonTime1wk)
+### analyze results for best fit model: model 5 (Season + meanTmax)
 myfitted_WL_preds <- fitted(cpue_WL_models[[5]], outcome=FALSE)
 head(myfitted_WL_preds)
 # select data and thin it down to one row per chid

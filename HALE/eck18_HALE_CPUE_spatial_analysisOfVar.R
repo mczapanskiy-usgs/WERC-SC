@@ -283,13 +283,13 @@ bestSpatialModel_events <- data.frame(variables = e_varsColS, AIC = e_aicColS, `
 write.csv(bestSpatialModel_events, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_events_eck18.csv',
           row.names = FALSE)
 
-### analyze results for best fit model: model 16 (Season + )
-myfitted_S_events <- fitted(spatial_models_events[[]], outcome=FALSE)
+### analyze results for best fit model: model 16 (Season + PctVeg + majCoverType)
+myfitted_S_events <- fitted(spatial_models_events[[9]], outcome=FALSE)
 head(myfitted_S_events)
 # select data and thin it down to one row per chid
 fitted_cpue_S_events <- spatial_events %>%
   filter(choice == "TRUE") %>% 
-  select(Trapline, Year, Season, Week, predEvent, )
+  select(Trapline, Year, Season, Week, predEvent, PctVeg, majCoverType)
 dim(myfitted_S_events)
 dim(fitted_cpue_S_events)
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
