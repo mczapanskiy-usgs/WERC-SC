@@ -1,7 +1,7 @@
 ## this script statistically analyzes the effect of year, season, weather, and lunar effects on 
 ## Event Type (predator, other none) and 
 ## Predator Event Type (cat, rat, mongoose)
-## this analysis builds off of best models from both analyses (model 23 and 45)
+## this analysis builds off of best models from Event Type & Predator Event Type analyses (model 23 and 45 in eck12)
 
 library(stats)
 library(data.table)
@@ -87,456 +87,261 @@ expanded_data_Caughts_only_WL <- formatData(data_Caughts_only_WL, 'predEvent')
 ### PREDS ONLY ANALYSIS: compare 3 random effect options
 
 ## LUNAR
-cpue_L_models <- list() # model list
-
-cpue_caughts_L <- mlogit.data(expanded_data_Caughts_only_WL %>% 
-                                 mutate(moon = MoonTime1wk * MoonIllum1wk) %>% 
-                                 filter(!is.na(moon)), 
-                               choice="choice",
-                               alt.var ="x", 
-                               id.var = "Trapline",
-                               shape="long", 
-                               chid.var="chid")
-cpue_L_models[[1]] <- mlogit(choice ~ 0 | Season + YearCts,
-                            rpar=c('ratCaught:(intercept)'='n',
-                                   'mongooseCaught:(intercept)'='n'),
-                            R=50, halton=NA,
-                            panel=TRUE,
-                            iterlim=1, print.level=1,
-                            data=cpue_caughts_L)
-cpue_L_models[[2]] <- mlogit(choice ~ 0 | Season + YearCts + MoonTime1wk + MoonIllum1wk,
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                              R=50, halton=NA,
-                              panel=TRUE,
-                              iterlim=1, print.level=1,
-                              data=cpue_caughts_L)
-cpue_L_models[[3]] <- mlogit(choice ~ 0 | Season + YearCts + moon,
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                              R=50, halton=NA,
-                              panel=TRUE,
-                              iterlim=1, print.level=1,
-                              data=cpue_caughts_L)
-cpue_L_models[[4]] <- mlogit(choice ~ 0 | Season + YearCts + MoonIllum1wk,
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                              R=50, halton=NA,
-                              panel=TRUE,
-                              iterlim=1, print.level=1,
-                              data=cpue_caughts_L)
-cpue_L_models[[5]] <- mlogit(choice ~ 0 | Season + YearCts + MoonTime1wk,
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                              R=50, halton=NA,
-                              panel=TRUE,
-                              iterlim=1, print.level=1,
-                              data=cpue_caughts_L)
-
-#### now compare AIC and log likelihood between models
-varsColL <- sapply(cpue_L_models, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-dfColL <- sapply(cpue_L_models, function(m) attr(logLik(m), "df"))
-logLikColL <- sapply(cpue_L_models, function(m) attr(logLik(m), "null"))
-aicColL <- sapply(cpue_L_models, function(m) AIC(m))
-aicWcolL <- sapply(cpue_L_models, function(m) Weights(AIC(m)))
-
-# combine into one table and save output
-bestLmodel_preds <- data.frame(variables = varsColL, AIC = aicColL, `Weighted AIC` = aicWcolL,  `Log Likelihood` = logLikColL, DF = dfColL)
-write.csv(bestLmodel_preds, file = '~/WERC-SC/HALE/outputs/bestLmodel_preds_eck12.5.csv',
-          row.names = FALSE)
-
-### analyze results for best fit model: model 5 (Season + Year + MoonTime1wk)
-myfitted_L_preds <- fitted(cpue_L_models[[5]], outcome=FALSE)
-head(myfitted_L_preds)
-# select data and thin it down to one row per chid
-fitted_cpue_L_preds <- cpue_caughts_L %>%
-  filter(!is.na(moon)) %>% 
-  select(chid, Trapline, Year, Season, Week, MoonTime1wk) %>%
-  unique()
-dim(myfitted_L_preds)
-dim(fitted_cpue_L_preds)
-# then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
-fitted_cpue_L_preds <- cbind(fitted_cpue_L_preds, myfitted_L_preds) %>%
-  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
-  unique()
-write.csv(fitted_cpue_L_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_L_preds_eck12.5.csv',
-          row.names = FALSE)
-
-
-# ___________________________________
-## WEATHER
-cpue_W_models <- list() # model list
-
-cpue_caughts_W <- mlogit.data(expanded_data_Caughts_only_WL %>% 
-                                 mutate(moon = MoonTime1wk * MoonIllum1wk) %>% 
+cpue_WL_models <- list() # model list
+cpue_caughts_WL <- mlogit.data(expanded_data_Caughts_only_WL %>% 
+                                 mutate(trapyr=paste0(Trapline,'-',YearCat),
+                                        moon = MoonTime1wk * MoonIllum1wk) %>% 
                                  filter(!is.na(meanTmin)), 
                                choice="choice",
                                alt.var ="x", 
-                               id.var = "Trapline",
+                               id.var = "trapyr",
                                shape="long", 
                                chid.var="chid")
-cpue_W_models[[1]] <- mlogit(choice ~ 0 | Season + YearCts,
-                             rpar=c('ratCaught:(intercept)'='n',
-                                    'mongooseCaught:(intercept)'='n'),
-                             R=50, halton=NA,
-                             panel=TRUE,
-                             iterlim=1, print.level=1,
-                             data=cpue_caughts_W)
-# rain
-cpue_W_models[[2]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + totalWeekRain,
+cpue_WL_models[[1]] <- mlogit(choice ~ 0 | Season,
                             rpar=c('ratCaught:(intercept)'='n',
                                    'mongooseCaught:(intercept)'='n'),
                             R=50, halton=NA,
                             panel=TRUE,
                             iterlim=1, print.level=1,
-                            data=cpue_caughts_W)
-cpue_W_models[[3]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain,
+                            data=cpue_caughts_WL)
+cpue_WL_models[[2]] <- mlogit(choice ~ 0 | Season + moon,
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               R=50, halton=NA,
                               panel=TRUE,
                               iterlim=1, print.level=1,
-                              data=cpue_caughts_W) 
+                              data=cpue_caughts_WL)
+## WEATHER
+# rain
+cpue_WL_models[[3]] <- mlogit(choice ~ 0 | Season + total3monRain,
+                              rpar=c('ratCaught:(intercept)'='n',
+                                     'mongooseCaught:(intercept)'='n'),
+                              R=50, halton=NA,
+                              panel=TRUE,
+                              iterlim=1, print.level=1,
+                              data=cpue_caughts_WL) 
 
-cpue_W_models[[4]] <- mlogit(choice ~ 0 | Season + YearCts + totalWeekRain,
+cpue_WL_models[[4]] <- mlogit(choice ~ 0 | Season + totalWeekRain,
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               R=50, halton=NA,
                               panel=TRUE,
                               iterlim=1, print.level=1,
-                              data=cpue_caughts_W)
+                              data=cpue_caughts_WL)
 # temperature
-cpue_W_models[[5]] <- mlogit(choice ~ 0 | Season + YearCts + meanTmin + meanTmax,
+cpue_WL_models[[5]] <- mlogit(choice ~ 0 | Season + meanTmax,
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               R=50, halton=NA,
                               panel=TRUE,
                               iterlim=1, print.level=1,
-                              data=cpue_caughts_W)
-cpue_W_models[[6]] <- mlogit(choice ~ 0 | Season + YearCts + meanTmax,
+                              data=cpue_caughts_WL)
+cpue_WL_models[[6]] <- mlogit(choice ~ 0 | Season + meanTmin,
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               R=50, halton=NA,
                               panel=TRUE,
                               iterlim=1, print.level=1,
-                              data=cpue_caughts_W)
-cpue_W_models[[7]] <- mlogit(choice ~ 0 | Season + YearCts + meanTmin,
+                              data=cpue_caughts_WL)
+## ALL CLIMATE
+cpue_WL_models[[7]] <- mlogit(choice ~ 0 | Season + moon + totalWeekRain,
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               R=50, halton=NA,
                               panel=TRUE,
                               iterlim=1, print.level=1,
-                              data=cpue_caughts_W)
-# all weather
-# cpue_W_models[[8]] <- mlogit(choice ~ 0 | Season + YearCts + meanRelHum + meanSoilMois + meanSolRad + 
-#                                total3monRain+ totalWeekRain + meanTmin + meanTmax,
-#                              rpar=c('ratCaught:(intercept)'='n',
-#                                     'mongooseCaught:(intercept)'='n'),
-#                              R=50, halton=NA,
-#                              panel=TRUE,
-#                              iterlim=1, print.level=1,
-#                              data=cpue_caughts_W)
-cpue_W_models[[8]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + totalWeekRain + meanTmin + meanTmax,
+                              data=cpue_caughts_WL)
+cpue_WL_models[[8]] <- mlogit(choice ~ 0 | Season + moon + total3monRain,
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               R=50, halton=NA,
                               panel=TRUE,
                               iterlim=1, print.level=1,
-                              data=cpue_caughts_W)
-cpue_W_models[[9]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + meanTmin + meanTmax,
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                              R=50, halton=NA,
-                              panel=TRUE,
-                              iterlim=1, print.level=1,
-                              data=cpue_caughts_W)
-cpue_W_models[[10]] <- mlogit(choice ~ 0 | Season + YearCts + totalWeekRain + meanTmin + meanTmax,
+                              data=cpue_caughts_WL)
+cpue_WL_models[[9]] <- mlogit(choice ~ 0 | Season + moon + meanTmin,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                                R=50, halton=NA,
                                panel=TRUE,
                                iterlim=1, print.level=1,
-                               data=cpue_caughts_W)
+                               data=cpue_caughts_WL)
 
-cpue_W_models[[11]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + meanTmax,
+cpue_WL_models[[10]] <- mlogit(choice ~ 0 | Season + moon + meanTmax,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                                R=50, halton=NA,
                                panel=TRUE,
                                iterlim=1, print.level=1,
-                               data=cpue_caughts_W)
+                               data=cpue_caughts_WL)
 
 
 #### now compare AIC and log likelihood between models
-varsColW <- sapply(cpue_W_models, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-dfColW <- sapply(cpue_W_models, function(m) attr(logLik(m), "df"))
-logLikColW <- sapply(cpue_W_models, function(m) attr(logLik(m), "null"))
-aicColW <- sapply(cpue_W_models, function(m) AIC(m))
-aicWcolW <- sapply(cpue_W_models, function(m) Weights(AIC(m)))
+varsColWL <- sapply(cpue_WL_models, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
+dfColWL <- sapply(cpue_WL_models, function(m) attr(logLik(m), "df"))
+logLikColWL <- sapply(cpue_WL_models, function(m) attr(logLik(m), "null"))
+aicColWL <- sapply(cpue_WL_models, function(m) AIC(m))
+minAic <- min(aicColWL)
+deltAicColWL <- aicColWL - minAic
+aicWcolWL <- Weights(aicColWL)
 
 # combine into one table and save output
-bestWmodel_preds <- data.frame(variables = varsColW, AIC = aicColW, `Weighted AIC` = aicWcolW, `Log Likelihood` = logLikColW, DF = dfColW)
-write.csv(bestWmodel_preds, file = '~/WERC-SC/HALE/outputs/bestWmodel_preds_eck12.5.csv',
+WLmodels_preds <- data.frame(variables = varsColWL, AIC = aicColWL, `Weighted AIC` = aicWcolWL,  `delt AIC` = deltAicColWL,
+                                `Log Likelihood` = logLikColWL, DF = dfColWL)
+write.csv(WLmodels_preds, file = '~/WERC-SC/HALE/outputs/WLmodels_preds_eck12.5.csv',
           row.names = FALSE)
 
-### analyze results for best fit model: model  (Season + Year + )
-myfitted_W_preds <- fitted(cpue_W_models[[]], outcome=FALSE)
+### analyze results for best fit model: model 5 (Season + Year + MoonTime1wk)
+myfitted_WL_preds <- fitted(cpue_WL_models[[5]], outcome=FALSE)
+head(myfitted_WL_preds)
 # select data and thin it down to one row per chid
-fitted_cpue_W_preds <- cpue_caughts_W %>%
+fitted_cpue_WL_preds <- cpue_caughts_WL %>%
   filter(!is.na(meanTmax)) %>% 
-  select(chid, Trapline, Year, Season, Week, ) %>%
+  select(chid, Trapline, Year, Season, Week, meanTmax) %>%
   unique()
-dim(myfitted_W_preds)
-dim(fitted_cpue_W_preds)
+dim(myfitted_WL_preds)
+dim(fitted_cpue_WL_preds)
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
-fitted_cpue_W_preds <- cbind(fitted_cpue_W_preds, myfitted_W_preds) %>%
+fitted_cpue_WL_preds <- cbind(fitted_cpue_WL_preds, myfitted_WL_preds) %>%
   select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
   unique()
-write.csv(fitted_cpue_W_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_W_preds_eck12.5.csv',
+write.csv(fitted_cpue_WL_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds_eck12.5.csv',
           row.names = FALSE)
+
 
 # ____________________________________________________________________________________________________________________
 ### EVENTS ANALYSIS
-#### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
-# LUNAR
+#### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR  CLIMATE ANALYSIS
 nb = 1000 # number of bootstraps
-s = 5000 # size of subset
-subset_modelsL_aic <- matrix(NA, ncol=5, nrow=nb) # ncol = number of models
-subset_modelsL_aicW <- matrix(NA, ncol=5, nrow=nb)
-subset_modelsL_logLik <- matrix(NA, ncol=5, nrow=nb)
+s = 10000 # size of subset
+subset_modelsWL_aic <- matrix(NA, ncol=10, nrow=nb) # ncol = number of models
+subset_modelsWL_aicW <- matrix(NA, ncol=10, nrow=nb)
+subset_modelsWL_logLik <- matrix(NA, ncol=10, nrow=nb)
 
 for (k in 1:nb) { 
   set.seed(k)
   ### create nb iterations of formatted (expanded) data
-  LData <- formatData(data_events_WL, 'eventType', s)
+  WLData <- formatData(data_events_WL, 'eventType', s)
   ### run all 7 models through the bootstrap
-  Lmodels <- list()
-  # no random effects
-  L_data = mlogit.data(LData %>% mutate(trapyr=paste0(Trapline,'-',YearCat),
+  WLmodels <- list()
+  WL_data = mlogit.data(WLData %>% mutate(trapyr=paste0(Trapline,'-',YearCat),
                                         moon = MoonTime1wk * MoonIllum1wk) %>% 
-                                 filter(!is.na(moon)),  # 8150 NAs
+                                 filter(!is.na(meanTmax)),
                                choice="choice", alt.var ="x", shape="long",
                                id.var = "trapyr",
                                chid.var="chid")
-  Lmodels[[1]] <- mlogit(choice ~ 0 | Season + YearCts,
+  ## LUNAR
+  WLmodels[[1]] <- mlogit(choice ~ 0 | Season,
                         rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                         R=50, halton=NA, panel=TRUE,
                         reflevel = "noEvent", iterlim=1,
-                        data=L_data)
-  Lmodels[[2]] <- mlogit(choice ~ 0 | Season + YearCts + MoonTime1wk + MoonIllum1wk,
+                        data=WL_data)
+  WLmodels[[2]] <- mlogit(choice ~ 0 | Season + moon,
                         rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'),
                         R=50, halton=NA, panel=TRUE,
                         reflevel = "noEvent", iterlim=1,
-                        data=L_data)
-  Lmodels[[3]] <- mlogit(choice ~ 0 | Season + YearCts + moon,
-                        rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'),
-                        R=50, halton=NA, panel=TRUE,
-                        reflevel = "noEvent", iterlim=1,
-                        data=L_data)
-  Lmodels[[4]] <- mlogit(choice ~ 0 | Season + YearCts + MoonTime1wk,
-                        rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'),
-                        R=50, halton=NA, panel=TRUE,
-                        reflevel = "noEvent", iterlim=1,
-                        data=L_data)
-  Lmodels[[5]] <- mlogit(choice ~ 0 | Season + YearCts + MoonIllum1wk,
-                        rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
-                        R=50, halton=NA, panel=TRUE,
-                        reflevel = "noEvent", iterlim=1,
-                        data=L_data)
-  ### summarize and rank AICs for each itteration of bootstrap
-  subset_modelsL_aic[k, ] <- ldply(Lmodels, .fun=AIC)$V1
-  subset_modelsL_aicW[k, ] <- Weights(ldply(Lmodels, .fun=AIC)$V1)
-  subset_modelsL_logLik[k, ] <- ldply(Lmodels, .fun=logLik)$V1
-}
-
-### examine AIC and AIC weights
-# varsColW <- sapply(cpue_W_models, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-bestLmodel_events <- table(apply(subset_modelsL_aicW, MARGIN=1, FUN=which.max),
-                            apply(subset_modelsL_aic, MARGIN=1, FUN=which.min))
-bestLmodel_events
-write.csv(bestLmodel_events, file = '~/WERC-SC/HALE/outputs/bestLmodel_events_eck12.5.csv',
-          row.names = FALSE)
-
-## save model statistics
-modelsL_aic <- data.frame(subset_modelsL_aic)
-modelsL_aicW <- data.frame(subset_modelsL_aicW)
-modelsL_logLik <- data.frame(subset_modelsL_logLik)
-# create table columns
-varsColL <- sapply(Lmodels, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-dfColL <- sapply(Lmodels, function(m) attr(logLik(m), "df"))
-logLikColL <- sapply(modelsL_logLik, FUN = mean)
-aicColL <- sapply(modelsL_aic, FUN = mean)
-aicWcolL <- sapply(modelsL_aicW, FUN = mean)
-# combine into one table and save output
-bs_Lmodel_events <- data.frame(variables = varsColL, AIC = aicColL, `Weighted AIC` = aicWcolL,
-                                `Log Likelihood` = logLikColL, DF = dfColL)
-write.csv(bs_Lmodel_events, file = '~/WERC-SC/HALE/outputs/bs_Lmodel_events_eck12.5.csv',
-          row.names = FALSE)
-
-### analyze results for best fit model: model 4 (Season + Year + MoonTime1wk)
-expanded_data_L_events <- formatData(data_rev_WL, 'eventType', subset = 50000)
-L_data_events = mlogit.data(expanded_data_L_events %>% 
-                              mutate(trapyr=paste0(Trapline,'-',YearCat),
-                                     moon = MoonTime1wk * MoonIllum1wk) %>%
-                              filter(!is.na(moon)), # 8150 NAs
-                             choice="choice", alt.var ="x", shape="long",
-                             id.var = "trapyr",
-                             chid.var="chid")
-model_L_events <- mlogit(choice ~ 0 | Season + YearCts + MoonTime1wk,
-                          rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
-                          R=50, halton=NA, panel=TRUE,
-                          reflevel = "noEvent", iterlim=1,
-                          data=L_data_events)
-myfitted_L_events <- fitted(model_L_events, outcome=FALSE)
-head(myfitted_L_events)
-# select data and thin it down to one row per chid
-fitted_cpue_L_events <- L_data_events %>%
-  filter(!is.na(moon)) %>% 
-  select(chid, Trapline, Year, Season, Week, MoonTime1wk) %>%
-  unique()
-dim(myfitted_L_events)
-dim(fitted_cpue_L_events)
-# then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
-fitted_cpue_L_events <- cbind(fitted_cpue_L_events, myfitted_L_events) %>%
-  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
-  unique()
-write.csv(fitted_cpue_L_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_L_events_eck12.5.csv',
-          row.names = FALSE)
-
-# _______________________________________  
-# WEATHER
-nb = 1000 # number of bootstraps
-s = 5000 # size of subset
-subset_modelsW_aic <- matrix(NA, ncol=11, nrow=nb) # ncol = number of models
-subset_modelsW_aicW <- matrix(NA, ncol=11, nrow=nb)
-subset_modelsW_logLik <- matrix(NA, ncol=11, nrow=nb)
-
-for (j in 1:nb) { 
-  set.seed(j)
-  ### create nb iterations of formatted (expanded) data
-  WData <- formatData(data_events_WL, 'eventType', s)
-  ### run all 7 models through the bootstrap
-  Wmodels <- list()
-  # no random effects
-  W_data = mlogit.data(WData %>% mutate(trapyr=paste0(Trapline,'-',Year)) %>% 
-                                 filter(!is.na(meanTmax)),
-                        choice="choice", alt.var ="x", shape="long",
-                        id.var = "trapyr",
-                        chid.var="chid")
-  Wmodels[[1]] <- mlogit(choice ~ 0 | Season + YearCts,
-                                 rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
-                                 R=50, halton=NA, panel=TRUE,
-                                 reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
+                        data=WL_data)
+  ## WEATHER
   # rain
-  Wmodels[[2]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + totalWeekRain,
+  WLmodels[[3]] <- mlogit(choice ~ 0 | Season + total3monRain,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
-  Wmodels[[3]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain,
+                                 data=WL_data) 
+  WLmodels[[4]] <- mlogit(choice ~ 0 | Season  + totalWeekRain,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
-                                 data=W_data) 
-  Wmodels[[4]] <- mlogit(choice ~ 0 | Season + YearCts + totalWeekRain,
-                                 rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
-                                 R=50, halton=NA, panel=TRUE,
-                                 reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
+                                 data=WL_data)
   # temperature
-  Wmodels[[5]] <- mlogit(choice ~ 0 | Season + YearCts + meanTmin + meanTmax,
+  WLmodels[[5]] <- mlogit(choice ~ 0 | Season + YearCts +  meanTmax,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
-  Wmodels[[6]] <- mlogit(choice ~ 0 | Season + YearCts +  meanTmax,
+                                 data=WL_data)
+  WLmodels[[6]] <- mlogit(choice ~ 0 | Season + YearCts + meanTmin,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
-  Wmodels[[7]] <- mlogit(choice ~ 0 | Season + YearCts + meanTmin,
-                                 rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
-                                 R=50, halton=NA, panel=TRUE,
-                                 reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
+                                 data=WL_data)
   # all weather
-  Wmodels[[8]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + totalWeekRain + meanTmin + meanTmax,
+  WLmodels[[7]] <- mlogit(choice ~ 0 | Season + moon + totalWeekRain,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
-  Wmodels[[9]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + meanTmin + meanTmax,
+                                 data=WL_data)
+  WLmodels[[8]] <- mlogit(choice ~ 0 | Season + moon + total3monRain,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
-                                 data=W_data) 
-  Wmodels[[10]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + meanTmin,
+                                 data=WL_data) 
+  WLmodels[[9]] <- mlogit(choice ~ 0 | Season + moon + meanTmin,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
-  Wmodels[[11]] <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + meanTmax,
+                                 data=WL_data)
+  WLmodels[[10]] <- mlogit(choice ~ 0 | Season + moon + meanTmax,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
-                                 data=W_data)
+                                 data=WL_data)
   ### summarize and rank AICs for each itteration of bootstrap
-  subset_modelsW_aic[j, ] <- ldply(Wmodels, .fun=AIC)$V1
-  subset_modelsW_aicW[j, ] <- Weights(ldply(Wmodels, .fun=AIC)$V1)
-  subset_modelsW_logLik[j, ] <- ldply(Wmodels, .fun=logLik)$V1
+  subset_modelsWL_aic[k, ] <- ldply(WLmodels, .fun=AIC)$V1
+  subset_modelsWL_aicW[k, ] <- Weights(ldply(WLmodels, .fun=AIC)$V1)
+  subset_modelsWL_logLik[k, ] <- ldply(WLmodels, .fun=logLik)$V1
 }
 
 ### examine AIC and AIC weights
-bestWmodel_events <- table(apply(subset_modelsW_aic, MARGIN=1, FUN=which.min),
-                           apply(subset_modelsW_aicW, MARGIN=1, FUN=which.max))
-bestWmodel_events
-write.csv(bestWmodel_events, file = '~/WERC-SC/HALE/outputs/bestWmodel_events_eck12.5.csv',
+bestWLmodel_events <- table(apply(subset_modelsWL_aic, MARGIN=1, FUN=which.min),
+                           apply(subset_modelsWL_aicW, MARGIN=1, FUN=which.max))
+bestWLmodel_events
+write.csv(bestWLmodel_events, file = '~/WERC-SC/HALE/outputs/bestWLmodel_events_eck12.5.csv',
           row.names = FALSE)
 
 ## save model statistics
-modelsW_aic <- data.frame(subset_modelsW_aic)
-modelsW_aicW <- data.frame(subset_modelsW_aicW)
-modelsW_logLik <- data.frame(subset_modelsW_logLik)
+modelsWL_aic <- data.frame(subset_modelsWL_aic)
+modelsWL_aicW <- data.frame(subset_modelsWL_aicW)
+modelsWL_logLik <- data.frame(subset_modelsWL_logLik)
 # create table columns
-varsColW <- sapply(Wmodels, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
-dfColW <- sapply(Wmodels, function(m) attr(logLik(m), "df"))
-logLikColW <- sapply(modelsW_logLik, FUN = mean)
-aicColW <- sapply(modelsW_aic, FUN = mean)
-aicWcolW <- sapply(modelsW_aicW, FUN = mean)
+varsColWL_E <- sapply(WLmodels, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
+dfColWL_E <- sapply(WLmodels, function(m) attr(logLik(m), "df"))
+logLikColWL_E <- sapply(modelsWL_logLik, FUN = mean)
+aicColWL_E <- sapply(modelsWL_aic, FUN = mean)
+minAicWL_E <- min(aicColWL_E)
+deltAicColWL_E <- aicColWL_E - minAicWL_E
+aicWcolWL_E <- sapply(modelsW_aicW, FUN = mean)
 # combine into one table and save output
-bs_Wmodel_events <- data.frame(variables = varsColW, AIC = aicColW, `Weighted AIC` = aicWcolW, 
-                               `Log Likelihood` = logLikColW, DF = dfColW)
-write.csv(bs_Wmodel_events, file = '~/WERC-SC/HALE/outputs/bs_Wmodel_events_eck12.5.csv',
+WLmodels_events <- data.frame(variables = varsColWL_E, AIC = aicColWL_E, `delt AIC` = deltAicColWL_E, `Weighted AIC` = aicWcolWL_E, 
+                               `Log Likelihood` = logLikColWL_E, DF = dfColWL_E)
+write.csv(WLmodels_events, file = '~/WERC-SC/HALE/outputs/WLmodels_events_eck12.5.csv',
           row.names = FALSE)
 
 
-### analyze results for best fit model: model 12 (Season + Year + total3monRain + meanTmax)
-expanded_data_W_events <- formatData(data_rev_WL, 'eventType', subset = 55000)
-W_data_events = mlogit.data(expanded_data_W_events %>% 
+### analyze results for best fit model: model ?? (Season + )
+expanded_data_WL_events <- formatData(data_rev_WL, 'eventType', subset = 55000)
+WL_data_events = mlogit.data(expanded_data_WL_events %>% 
                               mutate(trapyr=paste0(Trapline,'-',YearCat)) %>%
                               filter(!is.na(meanTmax)),
                             choice="choice", alt.var ="x", shape="long",
                             id.var = "trapyr",
                             chid.var="chid")
-model_W_events <- mlogit(choice ~ 0 | Season + YearCts + total3monRain + meanTmax,
+model_WL_events <- mlogit(choice ~ 0 | Season + ,
                          rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                          R=50, halton=NA, panel=TRUE,
                          reflevel = "noEvent", iterlim=1,
-                         data=W_data_events)
-myfitted_W_events <- fitted(model_W_events, outcome=FALSE)
-head(myfitted_W_events)
+                         data=WL_data_events)
+myfitted_WL_events <- fitted(model_WL_events, outcome=FALSE)
+head(myfitted_WL_events)
 # select data and thin it down to one row per chid
-fitted_cpue_W_events <- W_data_events %>%
+fitted_cpue_WL_events <- WL_data_events %>%
   filter(!is.na(meanTmax)) %>% 
-  select(chid, Trapline, Year, Season, Week, total3monRain, meanTmax) %>%
+  select(chid, Trapline, Year, Season, Week, ) %>%
   unique()
-dim(myfitted_W_events)
-dim(fitted_cpue_W_events)
+dim(myfitted_WL_events)
+dim(fitted_cpue_WL_events)
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
-fitted_cpue_W_events <- cbind(fitted_cpue_W_events, myfitted_W_events) %>%
+fitted_cpue_WL_events <- cbind(fitted_cpue_WL_events, myfitted_WL_events) %>%
   select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
   unique()
-write.csv(fitted_cpue_W_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_W_events_eck12.5.csv',
+write.csv(fitted_cpue_WL_events, file = '~/WERC-SC/HALE/outputs/fitted_cpue_WL_events_eck12.5.csv',
           row.names = FALSE)
 

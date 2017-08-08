@@ -22,7 +22,7 @@ read.csv('~/WERC-SC/HALE/TrapsGrid20170626.csv', # catch data processed by Ben (
 spatialData_rev <- spatialData %>% 
   filter(predEvent != 'mouseCaught') %>%
   select(6, 10:30) %>% # remove first 5 columns that are unneccessary
-  mutate(Date = as.Date(Date, "%m/%d/%Y"),
+  mutate(Date = as.Date(Date_, "%m/%d/%Y"),
          Year = year(Date),
          trap=paste0(Trapline,TrapNum),
          majCoverType = mosaic::derivedFactor(
@@ -64,9 +64,6 @@ spatialData_rev <- spatialData %>%
            front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
            back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
             .default = "back"))
-# MajClass = replace(MajClass, MajClass == c("Developed-Low Intensity", "Developed-Medium Intensity", "Developed-Open Space"), "Developed"))
-with(spatialData_rev, table(MajCover))
-with(spatialData_rev, table(MajClass))
 
 #### RESTRUCTURE DATA FUNCTION
 formatSpatialData <- function(data, var, subset = NA){
@@ -90,7 +87,9 @@ formatSpatialData <- function(data, var, subset = NA){
   # Do this with the merge function.  The alternative names will be stored in column `x`.
   expanded_data <- merge(events, data)
   expanded_data <- expanded_data %>%
-    mutate(choice = ifelse(x==var, TRUE, FALSE))
+    mutate(choice = ifelse(x==var, TRUE, FALSE),
+           YearCat = as.factor(Year),
+           YearCts = as.numeric(Year))
   return(expanded_data)
 }
 
@@ -108,153 +107,87 @@ exp_spatialData_events<- formatData(spatialData_rev, 'eventType')
 # PREDATOR ONLY DATA
 spatial_models_caughts <- list() # create model list
 
-spatial_caughts <- mlogit.data(exp_spatialData_caughts,
-                      #  %>% filter(loc == "front") %>% filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
+spatial_caughts <- mlogit.data(exp_spatialData_caughts %>% 
+                                 mutate(trapyr=paste0(Trapline,'-',YearCat)),
                     choice="choice",
                     alt.var ="x", 
                     shape="long", 
-                    id.var = "Trapline",
+                    id.var = "trayr",
                     chid.var="chid")
 ## baseline model
-spatial_models_caughts[[1]] <- mlogit(choice ~ 0 | loc, 
+spatial_models_caughts[[1]] <- mlogit(choice ~ 0 | Season, 
                                       rpar=c('ratCaught:(intercept)'='n',
                                              'mongooseCaught:(intercept)'='n'),
                                       iterlim=1, print.level=1,
                                       data=spatial_caughts)
-spatial_models_caughts[[2]] <- mlogit(choice ~ 0 | Season, 
-                                      rpar=c('ratCaught:(intercept)'='n',
-                                             'mongooseCaught:(intercept)'='n'),
-                                      iterlim=1, print.level=1,
-                                      data=spatial_caughts)
-spatial_models_caughts[[3]] <- mlogit(choice ~ 0 | Year, 
-                                      rpar=c('ratCaught:(intercept)'='n',
-                                             'mongooseCaught:(intercept)'='n'),
-                                      iterlim=1, print.level=1,
-                                      data=spatial_caughts)
-spatial_models_caughts[[4]] <- mlogit(choice ~ 0 | loc + Season + Year, 
-                                      rpar=c('ratCaught:(intercept)'='n',
-                                             'mongooseCaught:(intercept)'='n'),
-                                      iterlim=1, print.level=1,
-                                      data=spatial_caughts)
-# loc + Season + Year ****
-AIC(spatial_models_caughts[[1]]) # loc
-AIC(spatial_models_caughts[[2]]) # Season
-AIC(spatial_models_caughts[[3]]) # Year
-AIC(spatial_models_caughts[[4]]) # loc + Season + Year
-
-
 ## slope and elevation model
-spatial_models_caughts[[5]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation, 
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                           iterlim=1, print.level=1,
-                           data=spatial_caughts) 
-spatial_models_caughts[[6]] <- mlogit(choice ~ 0 | loc + Season + Year + Elevation, 
+spatial_models_caughts[[2]] <- mlogit(choice ~ 0 | Season + Elevation, 
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts) 
-spatial_models_caughts[[7]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope, 
+spatial_models_caughts[[3]] <- mlogit(choice ~ 0 | Season + MedSlope, 
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts) 
 ## burrow radius model
-spatial_models_caughts[[8]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows10, 
+spatial_models_caughts[[4]] <- mlogit(choice ~ 0 | Season + Burrows10, 
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-spatial_models_caughts[[9]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows50, 
+spatial_models_caughts[[5]] <- mlogit(choice ~ 0 | Season + Burrows50, 
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-spatial_models_caughts[[10]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows100, 
+spatial_models_caughts[[6]] <- mlogit(choice ~ 0 | Season + Burrows100, 
                               rpar=c('ratCaught:(intercept)'='n',
                                      'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-# distance to structures model
-spatial_models_caughts[[11]] <- mlogit(choice ~ 0 | loc + Season + Year + DistRoad,
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                              iterlim=1, print.level=1,
-                              data=spatial_caughts)
-spatial_models_caughts[[12]] <- mlogit(choice ~ 0 | loc + Season + Year + DistTrail, 
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                              iterlim=1, print.level=1,
-                              data=spatial_caughts)
-spatial_models_caughts[[13]] <- mlogit(choice ~ 0 | loc + Season + Year + DistFence, 
-                              rpar=c('ratCaught:(intercept)'='n',
-                                     'mongooseCaught:(intercept)'='n'),
-                              iterlim=1, print.level=1,
-                              data=spatial_caughts)
-spatial_models_caughts[[14]] <- mlogit(choice ~ 0 | loc + Season + Year + DistShelter, 
-                               rpar=c('ratCaught:(intercept)'='n',
-                                      'mongooseCaught:(intercept)'='n'),
-                              iterlim=1, print.level=1,
-                              data=spatial_caughts)
-spatial_models_caughts[[15]] <- mlogit(choice ~ 0 | loc + Season + Year + DistRoad + DistTrail + DistFence + DistShelter, 
-                               rpar=c('ratCaught:(intercept)'='n',
-                                      'mongooseCaught:(intercept)'='n'),
-                              iterlim=1, print.level=1,
-                              data=spatial_caughts)
-spatial_models_caughts[[16]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + 
-                                 Burrows100 + DistRoad + DistTrail + DistFence + DistShelter, 
-                               rpar=c('ratCaught:(intercept)'='n',
-                                      'mongooseCaught:(intercept)'='n'),
-                              iterlim=1, print.level=1,
-                              data=spatial_caughts)
+
 # vegetation model
-spatial_models_caughts[[17]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg,
+spatial_models_caughts[[7]] <- mlogit(choice ~ 0 | Season + PctVeg,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-spatial_models_caughts[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + majCoverType,
+spatial_models_caughts[[8]] <- mlogit(choice ~ 0 | Season + majCoverType,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                               iterlim=1, print.level=1,
                               data=spatial_caughts)
-spatial_models_caughts[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + majClassType,
-                               rpar=c('ratCaught:(intercept)'='n',
-                                      'mongooseCaught:(intercept)'='n'),
-                              iterlim=1, print.level=1,
-                              data=spatial_caughts)
-spatial_models_caughts[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + majCoverType + majClassType,
+spatial_models_caughts[[9]] <- mlogit(choice ~ 0 | Season + PctVeg + majCoverType,
                                rpar=c('ratCaught:(intercept)'='n',
                                       'mongooseCaught:(intercept)'='n'),
                                iterlim=1, print.level=1,
                                data=spatial_caughts)
-spatial_models_caughts[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
-                                 DistRoad + DistTrail + DistFence + DistShelter + PctVeg + majCoverType + majClassType,
-                               rpar=c('ratCaught:(intercept)'='n',
-                                      'mongooseCaught:(intercept)'='n'),
-                               iterlim=1, print.level=1,
-                               data=spatial_caughts)
+
 
 #### now compare AIC and log likelihood between models
 p_varsColS <- sapply(spatial_models_caughts, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
 p_dfColS <- sapply(spatial_models_caughts, function(m) attr(logLik(m), "df"))
 p_logLikColS <- sapply(spatial_models_caughts, function(m) attr(logLik(m), "null"))
 p_aicColS <- sapply(spatial_models_caughts, function(m) AIC(m))
-p_aicWcolS <- sapply(spatial_models_caughts, function(m) Weights(AIC(m)))
+p_minAicS <- min(p_aicColS)
+p_deltAicColS <- p_aicColS - p_minAicS
+p_aicWcolS <- Weights(p_aicColS)
 
 # combine into one table and save output
-bestSpatialModel_preds <- data.frame(variables = p_varsColS, AIC = p_aicColS, `Log Likelihood` = p_logLikColS, DF = p_dfColS)
+bestSpatialModel_preds <- data.frame(variables = p_varsColS, AIC = p_aicColS, `delt AIC` = p_deltAicColS, `Weighted AIC` = p_aicWcolS,
+                                     `Log Likelihood` = p_logLikColS, DF = p_dfColS)
 write.csv(bestSpatialModel_preds, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_preds_eck18.csv',
           row.names = FALSE)
 
-### analyze results for best fit model: model 16 (loc + Season + Year + MedSlope + Elevation + Burrows100 + DistRoad + DistTrail + DistFence + DistShelter)
-myfitted_S_preds <- fitted(spatial_models_caughts[[16]], outcome=FALSE)
+### analyze results for best fit model: model ?? (Season + )
+myfitted_S_preds <- fitted(spatial_models_caughts[[]], outcome=FALSE)
 head(myfitted_S_preds)
 # select data and thin it down to one row per chid
 fitted_cpue_S_preds <- spatial_caughts %>%
   filter(choice == "TRUE") %>% 
-  select(Trapline, Year, Season, Week, predEvent, loc, MedSlope, Elevation, Burrows100, DistRoad, DistTrail, DistFence, 
-         DistShelter, PctVeg, majCoverType, majClassType)
+  select(Trapline, Year, Season, Week, predEvent, )
   # unique()
 dim(myfitted_S_preds)
 dim(fitted_cpue_S_preds)
@@ -268,151 +201,69 @@ write.csv(fitted_cpue_S_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_pred
 # EVENT TYPE DATA
 spatial_models_events <- list() # create model list
 
-spatial_events <- mlogit.data(exp_spatialData_events,
-                               #  %>% filter(loc == "front") %>% filter(!(Trapline %in% c('KAU', 'KW', 'LAU', 'PUU', 'SS'))),
+spatial_events <- mlogit.data(exp_spatialData_events %>% 
+                                mutate(trapyr=paste0(Trapline,'-',YearCat)),
                                choice="choice",
                                alt.var ="x", 
                                shape="long", 
-                               id.var = "Trapline",
+                               id.var = "trapyr",
                                chid.var="chid")
 ## baseline model
-spatial_models_events[[1]] <- mlogit(choice ~ 0 | loc, 
-                                    rpar=c('predatorEvent:(intercept)'='n',
-                                            'otherEvent:(intercept)'='n'),
-                                    reflevel = "noEvent",
-                                      iterlim=1, print.level=1,
-                                      data=spatial_events)
-spatial_models_events[[2]] <- mlogit(choice ~ 0 | Season, 
+spatial_models_events[[1]] <- mlogit(choice ~ 0 | Season, 
                                      rpar=c('predatorEvent:(intercept)'='n',
                                             'otherEvent:(intercept)'='n'),
                                      reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events)
-spatial_models_events[[3]] <- mlogit(choice ~ 0 | Year, 
-                                     rpar=c('predatorEvent:(intercept)'='n',
-                                            'otherEvent:(intercept)'='n'),
-                                     reflevel = "noEvent",
-                                      iterlim=1, print.level=1,
-                                      data=spatial_events)
-spatial_models_events[[4]] <- mlogit(choice ~ 0 | loc + Season + Year, 
-                                     rpar=c('predatorEvent:(intercept)'='n',
-                                            'otherEvent:(intercept)'='n'),
-                                     reflevel = "noEvent",
-                                      iterlim=1, print.level=1,
-                                      data=spatial_events)
-# loc + Season + Year ****
-AIC(spatial_models_caughts[[1]]) # loc
-AIC(spatial_models_caughts[[2]]) # Season
-AIC(spatial_models_caughts[[3]]) # Year
-AIC(spatial_models_caughts[[4]]) # loc + Season + Year
-
-
 ## slope and elevation model
-spatial_models_events[[5]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation, 
+spatial_models_events[[2]] <- mlogit(choice ~ 0 | loc + Season + Year + Elevation, 
                                      rpar=c('predatorEvent:(intercept)'='n',
                                             'otherEvent:(intercept)'='n'),
                                      reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events) 
-spatial_models_events[[6]] <- mlogit(choice ~ 0 | loc + Season + Year + Elevation, 
-                                     rpar=c('predatorEvent:(intercept)'='n',
-                                            'otherEvent:(intercept)'='n'),
-                                     reflevel = "noEvent",
-                                      iterlim=1, print.level=1,
-                                      data=spatial_events) 
-spatial_models_events[[7]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope, 
+spatial_models_events[[3]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope, 
                                      rpar=c('predatorEvent:(intercept)'='n',
                                             'otherEvent:(intercept)'='n'),
                                      reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events) 
 ## burrow radius model
-spatial_models_events[[8]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows10, 
+spatial_models_events[[4]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows10, 
                                      rpar=c('predatorEvent:(intercept)'='n',
                                             'otherEvent:(intercept)'='n'),
                                      reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events)
-spatial_models_events[[9]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows50, 
+spatial_models_events[[5]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows50, 
                                      rpar=c('predatorEvent:(intercept)'='n',
                                             'otherEvent:(intercept)'='n'),
                                      reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events)
-spatial_models_events[[10]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows100, 
-                                      rpar=c('predatorEvent:(intercept)'='n',
-                                             'otherEvent:(intercept)'='n'),
-                                      reflevel = "noEvent",
-                                       iterlim=1, print.level=1,
-                                       data=spatial_events)
-# distance to structures model
-spatial_models_events[[11]] <- mlogit(choice ~ 0 | loc + Season + Year + DistRoad,
-                                      rpar=c('predatorEvent:(intercept)'='n',
-                                             'otherEvent:(intercept)'='n'),
-                                      reflevel = "noEvent",
-                                       iterlim=1, print.level=1,
-                                       data=spatial_events)
-spatial_models_events[[12]] <- mlogit(choice ~ 0 | loc + Season + Year + DistTrail, 
-                                      rpar=c('predatorEvent:(intercept)'='n',
-                                             'otherEvent:(intercept)'='n'),
-                                      reflevel = "noEvent",
-                                       iterlim=1, print.level=1,
-                                       data=spatial_events)
-spatial_models_events[[13]] <- mlogit(choice ~ 0 | loc + Season + Year + DistFence, 
-                                      rpar=c('predatorEvent:(intercept)'='n',
-                                             'otherEvent:(intercept)'='n'),
-                                      reflevel = "noEvent",
-                                       iterlim=1, print.level=1,
-                                       data=spatial_events)
-spatial_models_events[[14]] <- mlogit(choice ~ 0 | loc + Season + Year + DistShelter, 
-                                      rpar=c('predatorEvent:(intercept)'='n',
-                                             'otherEvent:(intercept)'='n'),
-                                      reflevel = "noEvent",
-                                       iterlim=1, print.level=1,
-                                       data=spatial_events)
-spatial_models_events[[15]] <- mlogit(choice ~ 0 | loc + Season + Year + DistRoad + DistTrail + DistFence + DistShelter, 
-                                      rpar=c('predatorEvent:(intercept)'='n',
-                                             'otherEvent:(intercept)'='n'),
-                                      reflevel = "noEvent",
-                                       iterlim=1, print.level=1,
-                                       data=spatial_events)
-spatial_models_events[[16]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + 
-                                         Burrows100 + DistRoad + DistTrail + DistFence + DistShelter, 
+spatial_models_events[[6]] <- mlogit(choice ~ 0 | loc + Season + Year + Burrows100, 
                                       rpar=c('predatorEvent:(intercept)'='n',
                                              'otherEvent:(intercept)'='n'),
                                       reflevel = "noEvent",
                                        iterlim=1, print.level=1,
                                        data=spatial_events)
 # vegetation model
-spatial_models_events[[17]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg,
+spatial_models_events[[7]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg,
                                       rpar=c('predatorEvent:(intercept)'='n',
                                              'otherEvent:(intercept)'='n'),
                                       reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events)
-spatial_models_events[[18]] <- mlogit(choice ~ 0 | loc + Season + Year + majCoverType,
+spatial_models_events[[8]] <- mlogit(choice ~ 0 | loc + Season + Year + majCoverType,
                                       rpar=c('predatorEvent:(intercept)'='n',
                                              'otherEvent:(intercept)'='n'),
                                       reflevel = "noEvent",
                                       iterlim=1, print.level=1,
                                       data=spatial_events)
-spatial_models_events[[19]] <- mlogit(choice ~ 0 | loc + Season + Year + majClassType,
+spatial_models_events[[9]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + majCoverType,
                                       rpar=c('predatorEvent:(intercept)'='n',
                                              'otherEvent:(intercept)'='n'),
                                       reflevel = "noEvent",
-                                      iterlim=1, print.level=1,
-                                      data=spatial_events)
-spatial_models_events[[20]] <- mlogit(choice ~ 0 | loc + Season + Year + PctVeg + majCoverType + majClassType,
-                                      rpar=c('predatorEvent:(intercept)'='n',
-                                             'otherEvent:(intercept)'='n'),
-                                      reflevel = "noEvent",
-                                       iterlim=1, print.level=1,
-                                       data=spatial_events)
-spatial_models_events[[21]] <- mlogit(choice ~ 0 | loc + Season + Year + MedSlope + Elevation + Burrows100 +
-                                 DistRoad + DistTrail + DistFence + DistShelter + PctVeg + majCoverType + majClassType,
-                                       rpar=c('predatorEvent:(intercept)'='n',
-                                              'otherEvent:(intercept)'='n'),
-                                       reflevel = "noEvent",
                                        iterlim=1, print.level=1,
                                        data=spatial_events)
 
@@ -421,10 +272,11 @@ e_varsColS <- sapply(spatial_models_events, function(m) substr(as.character(form
 e_dfColS <- sapply(spatial_models_events, function(m) attr(logLik(m), "df"))
 e_logLikColS <- sapply(spatial_models_events, function(m) attr(logLik(m), "null"))
 e_aicColS <- sapply(spatial_models_events, function(m) AIC(m))
-e_aicWcolS <- sapply(spatial_models_events, function(m) Weights(AIC(m)))
-
+e_minAicS <- min(e_aicColS)
+e_deltAicColS <- e_aicColS - e_minAicS
+e_aicWcolS <- Weights(e_aicColS)
 # combine into one table and save output
-bestSpatialModel_events <- data.frame(variables = e_varsColS, AIC = e_aicColS, `weighted AIC` = e_aicWcolS, 
+bestSpatialModel_events <- data.frame(variables = e_varsColS, AIC = e_aicColS, `delt AIC` = e_deltAicColS, `weighted AIC` = e_aicWcolS, 
                                       `Log Likelihood` = e_logLikColS, DF = e_dfColS)
 write.csv(bestSpatialModel_events, file = '~/WERC-SC/HALE/outputs/bestSpatialModel_events_eck18.csv',
           row.names = FALSE)
