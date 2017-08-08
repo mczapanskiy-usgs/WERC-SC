@@ -20,7 +20,7 @@ setwd("~/WERC-SC/HALE")
 # ## event type (predator, other, no event) uses base model w/ traplineYear = random effect, season + year = indiv. specif. was best fit
 # lunar: 
 read.csv(file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_preds_eck18.csv',
-         stringsAsFactors = FALSE) -> fitted_L_events
+         stringsAsFactors = FALSE) -> fitted_S_events
 # weather: 
 read.csv(file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_events_eck18.csv',
-         stringsAsFactors = FALSE) -> fitted_W_events
+         stringsAsFactors = FALSE) -> fitted_S_events

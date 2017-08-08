@@ -27,7 +27,6 @@ read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds_eck12.5.csv',
          stringsAsFactors = FALSE) -> fitted_WL_preds
 
 
-
 ## create long versions of fitted results from mlogit model (variable = pred type, value = fitted CPUE probability)
 fitted_WL_events_lg <- melt(fitted_WL_events, id.vars = c("Season", "MoonTime1wk"),
                           measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
@@ -52,12 +51,14 @@ fitted_WL_preds_lg <- melt(fitted_WL_preds, id.vars = c("Year", "Season", "meanT
 
 
 ### PREDATOR ANALYSIS
+## SEASON
 temp_pred <- ggplot(fitted_WL_preds_lg, aes(value, meanTmax)) +
-  geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
+  geom_point(aes(colour = Season), shape = 18) + # geom_density2d(aes(colour = Season)) + #
   facet_wrap(~ variable, scales = 'free') +
-  labs(y = 'Weekly Mean Maximum Temperature (C)', x = 'Proability of Predator Type Caught') +
+  labs(y = 'Weekly Mean Maximum Temperature (°C)', x = 'Proability of Predator Type Caught') +
   theme_bw()
 temp_pred
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitTempPreds_eck19.pdf")
 
 
 # # annual predEvent probabilities
@@ -72,15 +73,6 @@ temp_pred
 #   theme_bw() +
 #   labs(x = 'Year', y = 'Mean Probability of Predator Type Caught')
 # ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitYearPreds.pdf")
-
-
-ggplot(fitted_WL_preds_lg, aes(x=Season, y=meanTmax)) +
-  geom_boxplot() +
-  facet_wrap(~ variable) + #, scales = 'free') +
-  scale_x_discrete(limits = c('Pre-laying', 'Incubation', 'Nestling', 'offSeason')) +
-  theme_bw() +
-  labs(x = 'Season', y = 'Probability of Predator Type Caught')
-ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonPreds_eck17.pdf")
 
 
 # #### SEASON
