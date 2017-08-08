@@ -25,9 +25,9 @@ vegColors <- c("red4",
                "palegreen", "palegreen1", "palegreen2", "palegreen3", "palegreen4",
                "deepskyblue1", "deepskyblue2", "deepskyblue3", "dodgerblue", "dodgerblue1", "dodgerblue2", "dodgerblue3", "dodgerblue4",
                "slateblue1", "slateblue2", "slateblue3", "slateblue4")
-
     
 #### VEGETATION
+## major vegetation cover
 # preds only
 vegCover_preds <- ggplot(arrange(spatial_preds, MajCover), aes(predEvent, fill=majCoverType)) +
   geom_bar(position = "fill") +
@@ -35,6 +35,7 @@ vegCover_preds <- ggplot(arrange(spatial_preds, MajCover), aes(predEvent, fill=m
   labs(y = 'Proportion of Capture Events', x = 'Predator Event Type') +
   theme_bw()  
 vegCover_preds
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/vegCover_preds_eck16.pdf")
 
 allVegCover_preds <- ggplot(arrange(spatial_preds, MajCover), aes(predEvent, fill=MajCover)) +
   geom_bar(position = "fill") +
@@ -42,6 +43,7 @@ allVegCover_preds <- ggplot(arrange(spatial_preds, MajCover), aes(predEvent, fil
   labs(y = 'Proportion of Capture Events', x = 'Predator Event Type') +
   theme_bw()
 allVegCover_preds 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/allVegCover_preds_eck16.pdf")
 
 # event type
 vegCover_events <- ggplot(arrange(catch_spatial, MajCover), aes(eventType, fill=majCoverType)) +
@@ -50,6 +52,7 @@ vegCover_events <- ggplot(arrange(catch_spatial, MajCover), aes(eventType, fill=
   labs(y = 'Proportion of Trap Events', x = 'Event Type') +
   theme_bw()  
 vegCover_events 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/vegCover_events_eck16.pdf")
 
 allVegCover_events <- ggplot(arrange(catch_spatial, MajCover), aes(eventType, fill=MajCover)) +
   geom_bar(position = "fill") +
@@ -57,16 +60,39 @@ allVegCover_events <- ggplot(arrange(catch_spatial, MajCover), aes(eventType, fi
   labs(y = 'Proportion of Trap Events', x = 'Event Type') +
   theme_bw() 
 allVegCover_events 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/allVegCover_events_eck16.pdf")
+
+## percent vegetation cover
+# predator events
+pctVeg_preds <- ggplot(spatial_preds, aes(PctVeg)) +
+  geom_freqpoly(aes(color = predEvent), binwidth = 0.05) + 
+  labs(y = 'Number of Catch Events', x = '% Vegetation Cover') +
+  # scale_fill_manual(values = vegColors) +
+  theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
+pctVeg_preds 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/vegPctCover_preds_eck16.pdf")
+
+# event type
+pctVeg_events <- ggplot(catch_spatial, aes(PctVeg)) +
+  geom_freqpoly(aes(color = eventType), binwidth = 0.05) +
+  labs(y = 'Number of Trap Events', x = '% Vegetation Cover') +
+  # scale_fill_manual(values = vegColors) +
+  theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
+pctVeg_events 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/vegPctCover_events_eck16.pdf")
+
+
+
 
 # all data
-# pctVeg <- ggplot(catch_spatial, aes(predEvent, fill=PctVeg)) +
-#   geom_bar(position = "fill") + ## , stat="bin"
-#   # scale_fill_manual(values = vegColors) +
-#   theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1)) 
-# pctVeg %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+pctVeg <- ggplot(catch_spatial, aes(predEvent, PctVeg)) +
+  geom_boxplot() + ## , stat="bin"
+  # scale_fill_manual(values = vegColors) +
+  theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
+pctVeg 
 
 vegCover <- ggplot(arrange(catch_spatial, MajCover), aes(predEvent, fill=majCoverType)) +
-  geom_bar(position = "fill") +
+  geom_point(position = "fill") +
   # scale_fill_manual(values = vegColors) +
   theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1)) 
 vegCover %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
