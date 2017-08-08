@@ -85,7 +85,6 @@ expanded_data_Caughts_only_WL <- formatData(data_Caughts_only_WL, 'predEvent')
 #### RUN mlogt MODELS
 # ____________________________________________________________________________________________________________________
 ### PREDS ONLY ANALYSIS: compare 3 random effect options
-
 ## LUNAR
 cpue_WL_models <- list() # model list
 cpue_caughts_WL <- mlogit.data(expanded_data_Caughts_only_WL %>% 
@@ -209,10 +208,10 @@ write.csv(fitted_cpue_WL_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_WL_pr
 
 
 # ____________________________________________________________________________________________________________________
-### EVENTS ANALYSIS
+### EVENTS (predator, other, none) ANALYSIS
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR  CLIMATE ANALYSIS
 nb = 1000 # number of bootstraps
-s = 10000 # size of subset
+s = 50000 # size of subset
 subset_modelsWL_aic <- matrix(NA, ncol=10, nrow=nb) # ncol = number of models
 subset_modelsWL_aicW <- matrix(NA, ncol=10, nrow=nb)
 subset_modelsWL_logLik <- matrix(NA, ncol=10, nrow=nb)
@@ -253,12 +252,12 @@ for (k in 1:nb) {
                                  reflevel = "noEvent", iterlim=1,
                                  data=WL_data)
   # temperature
-  WLmodels[[5]] <- mlogit(choice ~ 0 | Season + YearCts +  meanTmax,
+  WLmodels[[5]] <- mlogit(choice ~ 0 | Season + meanTmax,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
                                  data=WL_data)
-  WLmodels[[6]] <- mlogit(choice ~ 0 | Season + YearCts + meanTmin,
+  WLmodels[[6]] <- mlogit(choice ~ 0 | Season + meanTmin,
                                  rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                                  R=50, halton=NA, panel=TRUE,
                                  reflevel = "noEvent", iterlim=1,
@@ -308,7 +307,7 @@ logLikColWL_E <- sapply(modelsWL_logLik, FUN = mean)
 aicColWL_E <- sapply(modelsWL_aic, FUN = mean)
 minAicWL_E <- min(aicColWL_E)
 deltAicColWL_E <- aicColWL_E - minAicWL_E
-aicWcolWL_E <- sapply(modelsW_aicW, FUN = mean)
+aicWcolWL_E <- sapply(modelsWL_aicW, FUN = mean)
 # combine into one table and save output
 WLmodels_events <- data.frame(variables = varsColWL_E, AIC = aicColWL_E, `delt AIC` = deltAicColWL_E, `Weighted AIC` = aicWcolWL_E, 
                                `Log Likelihood` = logLikColWL_E, DF = dfColWL_E)

@@ -1,5 +1,5 @@
 ## this script imports catch data with spatail data and starts
-## spatial analysis of trends in vegetation, structures, and physical features
+## spatial analysis of trends in vegetation and physical features
 
 library(stats)
 library(data.table)
@@ -10,8 +10,10 @@ library(stringr)
 library(ggplot2)
 library(mosaic)
 
-read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv',
-         stringsAsFactors = FALSE) -> catch_spatial
+# read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv',
+#          stringsAsFactors = FALSE) -> catch_spatial
+read.csv('~/WERC-SC/HALE/spatialData_rev_eck18.csv',
+         stringsAsFactors = FALSE) -> catch_spatial 
 
 ## look at data
 summary(catch_spatial)
@@ -19,13 +21,18 @@ dim(catch_spatial)
 with(catch_spatial, table(MedSlope, predEvent))
 
 veg <- catch_spatial %>% 
-  select(Trapline, TrapNum, Year_, Month_, predEvent, Week, PctVeg, MajCover, MajClass) %>% 
+  select(Trapline, TrapNum, Year, Date, predEvent, Week, PctVeg, MajCover, MajClass) %>% 
   mutate(allVeg = "allVeg")
-vegColors <- c("#333333", 
-               "#663333", "#993300", "#993333",  
-               "#CC9900", "#CCCC00", "#CCCC33", "#CCCC66", "#99CC66",
-               "#99CC66", "#339966", "#669966", "#006600", "#006666", "#336666", "#003300", "#003333",
-               "#0000CC", "#000099", "#000066", "#000033")
+# vegColors <- c("#333333", 
+#                "#663333", "#993300", "#993333",  
+#                "#CC9900", "#CCCC00", "#CCCC33", "#CCCC66", "#99CC66",
+#                "#99CC66", "#339966", "#669966", "#006600", "#006666", "#336666", "#003300", "#003333",
+#                "#0000CC", "#000099", "#000066", "#000033")
+vegcolors <- c("red4", 
+               "orangered1", "orangered2", "orangered3",
+               "palegreen", "palegreen1", "palegreen2", "palegreen3", "palegreen4",
+               "deepskyblue1", "deepskyblue2", "deepskyblue3", "dodgerblue", "dodgerblue1", "dodgerblue2", "dodgerblue3", "dodgerblue4",
+               "slateblue1", "slateblue2", "slateblue3", "slateblue4")
     
 ## vegetation (bar fills)
 pctVeg <- ggplot(catch_spatial, aes(predEvent, fill=PctVeg)) +
@@ -49,96 +56,6 @@ vegType <- ggplot(catch_spatial, aes(predEvent, fill=MajClass)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle=60, hjust=1)) 
 vegType %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
-
-## STRUCTURES
-# get frequency of structure distances
-structures <- catch_spatial %>% 
-  select(Trapline, TrapNum, Year_, Month_, predEvent, Week, DistRoad, DistTrail, DistFence, DistShelter) %>% 
-  mutate(roadFreq = percent_rank(DistRoad),
-         trailFreq = percent_rank(DistTrail),
-         fenceFreq = percent_rank(DistFence),
-         shelterFreq = percent_rank(DistShelter))
-# ann_structures <- structures %>% 
-#   group_by(Year_) %>% 
-#   summarize(distRoad = ave(DistRoad),
-#             distTrail = ave(DistTrail),
-#             distFence = ave(DistFence),
-#             distShelter = ave(DistShelter))
-
-##### graph data
-#road
-roadHist <- ggplot(structures, aes(DistRoad)) +
-  geom_histogram(binwidth = 100) +
-  facet_wrap(~ predEvent, scales = "free") +
-  theme_bw()
-roadHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-road <- ggplot(structures, aes(predEvent, DistRoad)) +
-  geom_boxplot() +
-  # facet_wrap((~ predEvent)) +
-  theme_bw()
-road %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-
-roadFreq <- ggplot(structures, aes(DistRoad)) +
-  geom_freqpoly(binwidth = 100) +
-  geom_freqpoly(aes(colour = predEvent), binwidth = 100) +
-  theme_bw()
-roadFreq %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-
-# trail
-trailHist <- ggplot(structures, aes(DistTrail)) +
-  geom_histogram(binwidth = 100) +
-  facet_wrap(~ predEvent, scales = "free") +
-  theme_bw()
-trailHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-trail <- ggplot(structures, aes(predEvent, DistTrail)) +
-  geom_boxplot() +
-  # facet_wrap((~ predEvent)) +
-  theme_bw()
-trail %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-
-trailFreq <- ggplot(structures, aes(DistTrail)) +
-  geom_freqpoly(binwidth = 100) +
-  geom_freqpoly(aes(colour = predEvent), binwidth = 100) +
-  theme_bw()
-trailFreq %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-
-
-# fence
-fenceHist <- ggplot(structures, aes(DistFence)) +
-  geom_histogram(binwidth = 100) +
-  facet_wrap(~ predEvent, scales = "free") +
-  theme_bw()
-fenceHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-fence <- ggplot(structures, aes(predEvent, DistFence)) +
-  geom_boxplot() +
-  # facet_wrap((~ predEvent)) +
-  theme_bw()
-fence %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-
-fenceFreq <- ggplot(structures, aes(DistFence)) +
-  geom_freqpoly(binwidth = 100) +
-  geom_freqpoly(aes(colour = predEvent), binwidth = 100) +
-  theme_bw()
-fenceFreq %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-
-
-# shelter
-shelterHist <- ggplot(structures, aes(DistShelter)) +
-  geom_histogram(binwidth = 100) +
-  facet_wrap(~ predEvent, scales = "free") +
-  theme_bw()
-shelterHist %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-shelter <- ggplot(structures, aes(predEvent, DistShelter)) +
-  geom_boxplot() +
-  # facet_wrap((~ predEvent)) +
-  theme_bw()
-shelter %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
-
-shelterFreq <- ggplot(structures, aes(DistShelter)) +
-  geom_freqpoly(binwidth = 100) +
-  geom_freqpoly(aes(colour = predEvent), binwidth = 100) +
-  theme_bw()
-shelterFreq %+% subset(structures, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
 
 
 ## PHYSICAL FEATURES
