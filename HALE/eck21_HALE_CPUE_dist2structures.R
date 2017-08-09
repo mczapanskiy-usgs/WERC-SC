@@ -5,11 +5,10 @@
 read.csv('~/WERC-SC/HALE/spatialData_rev_eck18.csv',
          stringsAsFactors = FALSE) -> catch_spatial 
 
-
 ## STRUCTURES
 # get frequency of structure distances
 structures <- catch_spatial %>% 
-  select(Trapline, TrapNum, Year_, Month_, predEvent, Week, DistRoad, DistTrail, DistFence, DistShelter) %>% 
+  select(Trapline, TrapNum, Year, predEvent, Week, DistRoad, DistTrail, DistFence, DistShelter) %>% 
   mutate(roadFreq = percent_rank(DistRoad),
          trailFreq = percent_rank(DistTrail),
          fenceFreq = percent_rank(DistFence),
