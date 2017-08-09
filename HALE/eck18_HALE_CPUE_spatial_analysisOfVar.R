@@ -188,8 +188,8 @@ myfitted_S_preds <- fitted(spatial_models_caughts[[2]], outcome=FALSE)
 head(myfitted_S_preds)
 # select data and thin it down to one row per chid
 fitted_cpue_S_preds <- spatial_caughts %>%
-  filter(choice == "TRUE") %>% 
-  select(Trapline, Year, Season, Week, predEvent, Elevation)
+  filter(choice == "TRUE") %>%
+  select(Trapline, Year, Season, Week, Elevation) # predEvent, 
   # unique()
 dim(myfitted_S_preds)
 dim(fitted_cpue_S_preds)
@@ -289,7 +289,7 @@ head(myfitted_S_events)
 # select data and thin it down to one row per chid
 fitted_cpue_S_events <- spatial_events %>%
   filter(choice == "TRUE") %>% 
-  select(Trapline, Year, Season, Week, predEvent, PctVeg, majCoverType)
+  select(Trapline, Year, Season, Week, PctVeg, majCoverType)
 dim(myfitted_S_events)
 dim(fitted_cpue_S_events)
 # then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`

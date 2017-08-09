@@ -20,7 +20,53 @@ setwd("~/WERC-SC/HALE")
 # ## event type (predator, other, no event) uses base model w/ traplineYear = random effect, season + year = indiv. specif. was best fit
 # lunar: 
 read.csv(file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_preds_eck18.csv',
-         stringsAsFactors = FALSE) -> fitted_S_events
+         stringsAsFactors = FALSE) -> fitted_S_preds
 # weather: 
 read.csv(file = '~/WERC-SC/HALE/outputs/fitted_cpue_S_events_eck18.csv',
          stringsAsFactors = FALSE) -> fitted_S_events
+
+fitted_S_events_lg <- melt(fitted_S_events, id.vars = c("Season", "PctVeg", "majCoverType"),
+                            measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
+
+fitted_S_preds_lg <- melt(fitted_S_preds, id.vars = c("Year", "Season", "Elevation"),
+                           measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
+
+
+#### PREDS
+## elevation
+
+#### EVENTS
+## % veg
+pctVeg_events_fitted <- ggplot(fitted_S_events_lg, aes(PctVeg, value)) +
+  geom_point(aes(color = variable, shape = majCoverType)) + 
+  facet_wrap(~ Season) +
+  labs(y = 'Predicted Probability of Catch Events', x = 'Percent Vegetation Cover') +
+  # scale_fill_manual(values = vegColors) +
+  theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
+pctVeg_events_fitted 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/pctVeg_S_events_fitted_eck22.pdf")
+# # summarize dataset by means and SDs
+# fitted_S_events_means <- fitted_S_events_lg %>% 
+#   group_by(value, variable, PctVeg) %>% 
+#   summarize(meanPctVeg = mean(PctVeg, na.rm = TRUE), sdProb = sd(PctVeg, na.rm = TRUE)) %>% 
+#   ungroup
+# pctVeg_events_means <- ggplot(fitted_S_events_means, aes(PctVeg, majCoverType)) +
+#   geom_line(size = 1) +
+#   geom_point(size = 2, shape = 18, aes(color = variable)) + 
+#   geom_errorbar(aes(ymin = meanProb-sdProb, ymax=meanProb+sdProb), width = 0.5) +
+#   # facet_wrap(~ value) +
+#   # labs(y = 'Predicted Probability of Catch Events', x = 'Percent Vegetation Cover') +
+#   # scale_fill_manual(values = vegColors) +
+#   theme_bw() 
+# pctVeg_events_means 
+
+## veg cover
+vegCover_events_fitted <- ggplot(fitted_S_events_lg, aes(majCoverType, value)) +
+  geom_boxplot(aes(color = variable)) +
+  # facet_grid(.~ majCoverType) +
+  labs(y = 'Predicted Probability of Catch Events', x = 'Major Vegetation Type') +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
+vegCover_events_fitted 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/vegCover_events_fitted_eck22.pdf")
+

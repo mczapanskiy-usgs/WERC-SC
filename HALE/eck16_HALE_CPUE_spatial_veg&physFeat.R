@@ -67,7 +67,7 @@ ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/allV
 pctVeg_preds <- ggplot(spatial_preds, aes(PctVeg)) +
   geom_freqpoly(aes(color = predEvent), binwidth = 0.05) + 
   labs(y = 'Number of Catch Events', x = '% Vegetation Cover') +
-  # scale_fill_manual(values = vegColors) +
+  scale_color_brewer(palette = "Set1") +
   theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
 pctVeg_preds 
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/vegPctCover_preds_eck16.pdf")
@@ -76,7 +76,7 @@ ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/vegP
 pctVeg_events <- ggplot(catch_spatial, aes(PctVeg)) +
   geom_freqpoly(aes(color = eventType), binwidth = 0.05) +
   labs(y = 'Number of Trap Events', x = '% Vegetation Cover') +
-  # scale_fill_manual(values = vegColors) +
+  scale_color_brewer(palette = "Dark2") +
   theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
 pctVeg_events 
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/vegPctCover_events_eck16.pdf")
