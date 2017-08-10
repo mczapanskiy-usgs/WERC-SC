@@ -61,7 +61,7 @@ ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/elev
 pctVeg_events_fitted <- ggplot(fitted_S_events_lg, aes(PctVeg, value)) +
   geom_line(size = 0.75, aes(color = variable, linetype = majCoverType)) + 
   facet_wrap(~ Season) +
-  labs(y = 'Predicted Probability of Catch Events', x = 'Percent Vegetation Cover') +
+  labs(y = 'Predicted Probability of Catch Events', x = 'Percent Vegetation Cover', color = 'Event Type', linetype = 'Veg Cover') +
   # scale_fill_manual(values = vegColors) +
   theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
 pctVeg_events_fitted 

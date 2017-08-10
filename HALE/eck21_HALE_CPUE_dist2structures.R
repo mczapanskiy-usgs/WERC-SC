@@ -13,6 +13,90 @@ structures <- catch_spatial %>%
          trailFreq = percent_rank(DistTrail),
          fenceFreq = percent_rank(DistFence),
          shelterFreq = percent_rank(DistShelter))
+
+#### FREQUENCY OF ROAD EVENTS
+# number of events at each distance
+roadDist <- structures %>% 
+  group_by(DistRoad) %>% 
+  count()
+# number of event types at each distance
+roadDist_events <- structures %>% 
+  group_by(DistRoad, predEvent) %>% 
+  count() %>%  
+  rename(nEvent = n)
+# combine and find frequency of events at each distance
+road <- left_join(roadDist_events, roadDist, by = "DistRoad") %>% 
+  mutate(freq = (nEvent/n))
+# graph
+roadFreq <- ggplot(road, aes(DistRoad, freq)) +
+  geom_smooth(method = lm, aes(colour = predEvent)) +  # linear smoothing
+  ylim(c(0,1)) +
+  theme_bw()
+roadFreq %+% subset(road, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+#### FREQUENCY OF TRAIL EVENTS
+# number of events at each distance
+trailDist <- structures %>% 
+  group_by(DistTrail) %>% 
+  count()
+# number of event types at each distance
+trailDist_events <- structures %>% 
+  group_by(DistTrail, predEvent) %>% 
+  count() %>%  
+  rename(nEvent = n)
+# combine and find frequency of events at each distance
+trail <- left_join(trailDist_events, trailDist, by = "DistTrail") %>% 
+  mutate(freq = (nEvent/n))
+# graph
+trailFreq <- ggplot(trail, aes(DistTrail, freq)) +
+  geom_smooth(method = lm, aes(colour = predEvent)) +
+  ylim(c(0,1)) +
+  theme_bw()
+trailFreq %+% subset(trail, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+#### FREQUENCY OF FENCE EVENTS
+# number of events at each distance
+fenceDist <-structures %>% 
+  group_by(DistFence) %>% 
+  count()
+# number of event types at each distance
+fenceDist_events <- structures %>% 
+  group_by(DistFence, predEvent) %>% 
+  count() %>%  
+  rename(nEvent = n)
+# combine and find frequency of events at each distance
+fence <- left_join(fenceDist_events, fenceDist, by = "DistFence") %>% 
+  mutate(freq = (nEvent/n))
+# graph
+fenceFreq <- ggplot(fence, aes(DistFence, freq)) +
+  geom_smooth(method = lm, aes(colour = predEvent)) +
+  ylim(c(0,1)) +
+  theme_bw()
+fenceFreq %+% subset(fence, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+#### FREQUENCY OF SHELTER EVENTS
+# number of events at each distance
+shelterDist <- structures %>% 
+  group_by(DistShelter) %>% 
+  count()
+# number of event types at each distance
+shelterDist_events <- structures %>% 
+  group_by(DistShelter, predEvent) %>% 
+  count() %>%  
+  rename(nEvent = n)
+# combine and find frequency of events at each distance
+shelter <- left_join(shelterDist_events, shelterDist, by = "DistShelter") %>% 
+  mutate(freq = (nEvent/n))
+# graph
+shelterFreq <- ggplot(shelter, aes(DistShelter, freq)) +
+  geom_smooth(method = lm, aes(colour = predEvent)) + # linear smoothing
+  ylim(c(0,1)) +
+  theme_bw()
+shelterFreq %+% subset(shelter, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+
+
+
+
 # ann_structures <- structures %>% 
 #   group_by(Year_) %>% 
 #   summarize(distRoad = ave(DistRoad),
