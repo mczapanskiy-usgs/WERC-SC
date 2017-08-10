@@ -28,26 +28,20 @@ read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds_eck12.5.csv',
 
 
 ## create long versions of fitted results from mlogit model (variable = pred type, value = fitted CPUE probability)
-fitted_WL_events_lg <- melt(fitted_WL_events, id.vars = c("Season", "MoonTime1wk"),
+fitted_WL_events_lg <- melt(fitted_WL_events, id.vars = c("Season", "total3monRain"),
                           measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
 
 fitted_WL_preds_lg <- melt(fitted_WL_preds, id.vars = c("Year", "Season", "meanTmax"),
                         measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
 
 ### EVENT (predator, other, none) ANALYSIS
-# temp_events <- ggplot(fitted_W_events_lg, aes(value, meanTmax)) +
-#   geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
-#   facet_wrap(~ variable, scales = 'free') +
-#   labs(y = 'Weekly Mean Maximum Temperature (°C)', x = 'Proability of Predator Type Caught') +
-#   theme_bw()
-# temp_events
-# 
-# rain_events <- ggplot(fitted_W_events_lg, aes(value, total3monRain)) +
-#   geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
-#   facet_wrap(~ variable, scales = 'free') +
-#   labs(y = 'Weekly Mean Maximum Temperature (°C)', x = 'Proability of Predator Type Caught') +
-#   theme_bw()
-# rain_events
+rain_events <- ggplot(fitted_WL_events_lg, aes(total3monRain, value)) +
+  geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
+  facet_wrap(~ variable) + # , scales = 'free'
+  labs(y = 'Proability of Predator Type Caught', x = 'Total 3 Month Rainfall') +
+  theme_bw()
+rain_events
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitRain_events_eck19.pdf")
 
 
 ### PREDATOR ANALYSIS

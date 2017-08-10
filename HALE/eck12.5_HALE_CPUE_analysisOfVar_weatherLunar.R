@@ -211,7 +211,7 @@ write.csv(fitted_cpue_WL_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_WL_pr
 ### EVENTS (predator, other, none) ANALYSIS
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR  CLIMATE ANALYSIS
 nb = 1000 # number of bootstraps
-s = 50000 # size of subset
+s = 10000 # size of subset
 subset_modelsWL_aic <- matrix(NA, ncol=10, nrow=nb) # ncol = number of models
 subset_modelsWL_aicW <- matrix(NA, ncol=10, nrow=nb)
 subset_modelsWL_logLik <- matrix(NA, ncol=10, nrow=nb)
@@ -315,7 +315,7 @@ write.csv(WLmodels_events, file = '~/WERC-SC/HALE/outputs/WLmodels_events_eck12.
           row.names = FALSE)
 
 
-### analyze results for best fit model: model ?? (Season + )
+### analyze results for best fit model: model ?? (Season + total3monRain)
 expanded_data_WL_events <- formatData(data_rev_WL, 'eventType', subset = 55000)
 WL_data_events = mlogit.data(expanded_data_WL_events %>% 
                               mutate(trapyr=paste0(Trapline,'-',YearCat)) %>%
@@ -323,7 +323,7 @@ WL_data_events = mlogit.data(expanded_data_WL_events %>%
                             choice="choice", alt.var ="x", shape="long",
                             id.var = "trapyr",
                             chid.var="chid")
-model_WL_events <- mlogit(choice ~ 0 | Season + ,
+model_WL_events <- mlogit(choice ~ 0 | Season + total3monRain,
                          rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'), 
                          R=50, halton=NA, panel=TRUE,
                          reflevel = "noEvent", iterlim=1,
@@ -333,7 +333,7 @@ head(myfitted_WL_events)
 # select data and thin it down to one row per chid
 fitted_cpue_WL_events <- WL_data_events %>%
   filter(!is.na(meanTmax)) %>% 
-  select(chid, Trapline, Year, Season, Week, ) %>%
+  select(chid, Trapline, Year, Season, Week, total3monRain) %>%
   unique()
 dim(myfitted_WL_events)
 dim(fitted_cpue_WL_events)
