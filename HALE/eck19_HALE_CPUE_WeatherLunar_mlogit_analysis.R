@@ -36,20 +36,21 @@ fitted_WL_preds_lg <- melt(fitted_WL_preds, id.vars = c("Year", "Season", "meanT
 
 ### EVENT (predator, other, none) ANALYSIS
 rain_events <- ggplot(fitted_WL_events_lg, aes(total3monRain, value)) +
-  geom_point(aes(colour = Season)) + # geom_density2d(aes(colour = Season)) + #
+  geom_point(aes(colour = Season), size = 1, shape = 18) +
   facet_wrap(~ variable) + # , scales = 'free'
   labs(y = 'Proability of Predator Type Caught', x = 'Total 3 Month Rainfall') +
+  
   theme_bw()
 rain_events
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitRain_events_eck19.pdf")
 
-
 ### PREDATOR ANALYSIS
 ## SEASON
-temp_pred <- ggplot(fitted_WL_preds_lg, aes(value, meanTmax)) +
-  geom_point(aes(colour = Season), shape = 18) + # geom_density2d(aes(colour = Season)) + #
-  facet_wrap(~ variable, scales = 'free') +
-  labs(y = 'Weekly Mean Maximum Temperature (°C)', x = 'Proability of Predator Type Caught') +
+temp_pred <- ggplot(fitted_WL_preds_lg, aes(meanTmax, value)) +
+  geom_point(aes(colour = Season), size = 1, shape = 18) + # geom_density2d(aes(colour = Season)) + #
+  facet_wrap(~ variable) +
+  labs(x = 'Weekly Mean Maximum Temperature (°C)', y = 'Proability of Predator Type Caught') +
+  ylim(c(0,1)) +
   theme_bw()
 temp_pred
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitTempPreds_eck19.pdf")
