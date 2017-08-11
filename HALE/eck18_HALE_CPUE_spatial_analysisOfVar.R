@@ -166,6 +166,12 @@ spatial_models_caughts[[9]] <- mlogit(choice ~ 0 | Season + PctVeg + majCoverTyp
                                       'mongooseCaught:(intercept)'='n'),
                                iterlim=1, print.level=1,
                                data=spatial_caughts)
+# distance to nearest shelter
+spatial_models_caughts[[10]] <- mlogit(choice ~ 0 | Season + DistShelter,
+                                      rpar=c('ratCaught:(intercept)'='n',
+                                             'mongooseCaught:(intercept)'='n'),
+                                      iterlim=1, print.level=1,
+                                      data=spatial_caughts)
 
 
 #### now compare AIC and log likelihood between models
@@ -268,6 +274,14 @@ spatial_models_events[[9]] <- mlogit(choice ~ 0 | Season + PctVeg + majCoverType
                                       reflevel = "noEvent",
                                        iterlim=1, print.level=1,
                                        data=spatial_events)
+# distance to nearest shelter
+spatial_models_events[[10]] <- mlogit(choice ~ 0 | Season + DistShelter,
+                                       rpar=c('predatorEvent:(intercept)'='n',
+                                              'otherEvent:(intercept)'='n'),
+                                       reflevel = "noEvent",
+                                       iterlim=1, print.level=1,
+                                       data=spatial_events)
+
 
 #### now compare AIC and log likelihood between models
 e_varsColS <- sapply(spatial_models_events, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))

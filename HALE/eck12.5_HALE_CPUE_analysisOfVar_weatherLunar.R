@@ -206,6 +206,23 @@ fitted_cpue_WL_preds <- cbind(fitted_cpue_WL_preds, myfitted_WL_preds) %>%
 write.csv(fitted_cpue_WL_preds, file = '~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds_eck12.5.csv',
           row.names = FALSE)
 
+### analyze results for 2nd best fit model: model 5 (Season + meanTmax + moon)
+myfitted_WL_preds2 <- fitted(cpue_WL_models[[10]], outcome=FALSE)
+head(myfitted_WL_preds2)
+# select data and thin it down to one row per chid
+fitted_cpue_WL_preds2 <- cpue_caughts_WL %>%
+  filter(!is.na(meanTmax)) %>% 
+  select(chid, Trapline, Year, Season, Week, meanTmax, moon) %>%
+  unique()
+dim(myfitted_WL_preds2)
+dim(fitted_cpue_WL_preds2)
+# then `cbind` the data in `fitted_cpue_WL` with the fitted values in `myfitted`
+fitted_cpue_WL_preds2 <- cbind(fitted_cpue_WL_preds2, myfitted_WL_preds2) %>%
+  select(-chid) %>% # thin the fitted values further (i.e. remove replicates, keep unique combos of variables (Trapline, Year, & Season?)
+  unique()
+write.csv(fitted_cpue_WL_preds2, file = '~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds2_eck12.5.csv',
+          row.names = FALSE)
+
 
 # ____________________________________________________________________________________________________________________
 ### EVENTS (predator, other, none) ANALYSIS

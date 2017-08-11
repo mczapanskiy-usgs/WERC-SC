@@ -25,6 +25,8 @@ read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_events_eck12.5.csv',
 ## pred event data (rat, cat, or mongoose) uses base model w/ Trapline = random effect, season = indiv. specif. was best fit
 read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds_eck12.5.csv',
          stringsAsFactors = FALSE) -> fitted_WL_preds
+read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds2_eck12.5.csv',
+         stringsAsFactors = FALSE) -> fitted_WL_preds2
 
 
 ## create long versions of fitted results from mlogit model (variable = pred type, value = fitted CPUE probability)
@@ -33,6 +35,9 @@ fitted_WL_events_lg <- melt(fitted_WL_events, id.vars = c("Season", "total3monRa
 
 fitted_WL_preds_lg <- melt(fitted_WL_preds, id.vars = c("Year", "Season", "meanTmax"),
                         measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
+fitted_WL_preds2_lg <- melt(fitted_WL_preds2, id.vars = c("Year", "Season", "moon"),
+                           measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
+
 
 ### EVENT (predator, other, none) ANALYSIS
 rain_events <- ggplot(fitted_WL_events_lg, aes(total3monRain, value)) +
@@ -45,7 +50,7 @@ rain_events
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitRain_events_eck19.pdf")
 
 ### PREDATOR ANALYSIS
-## SEASON
+## MEAN MAXIMUM TEMPERATURE
 temp_pred <- ggplot(fitted_WL_preds_lg, aes(meanTmax, value)) +
   geom_point(aes(colour = Season), size = 1, shape = 18) + # geom_density2d(aes(colour = Season)) + #
   facet_wrap(~ variable) +
@@ -54,6 +59,15 @@ temp_pred <- ggplot(fitted_WL_preds_lg, aes(meanTmax, value)) +
   theme_bw()
 temp_pred
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitTempPreds_eck19.pdf")
+## MOON
+temp_pred <- ggplot(fitted_WL_preds2_lg, aes(moon, value)) +
+  geom_point(aes(colour = Season), size = 1, shape = 18) + # geom_density2d(aes(colour = Season)) + #
+  facet_wrap(~ variable) +
+  labs(x = 'Weekly Moon Time (Mean Moon Illumination * Total Moon Time (seconds))', y = 'Proability of Predator Type Caught') +
+  ylim(c(0,1)) +
+  theme_bw()
+temp_pred
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitMoonPreds_eck19.pdf")
 
 
 # # annual predEvent probabilities
