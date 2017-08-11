@@ -36,13 +36,42 @@ bur100_preds <- ggplot(burrows, aes(burFreq100)) +
   facet_wrap(~ predEvent) +
   theme_bw()
 bur100_preds %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
-# proportion of events that are occuring w/in burrow radii vs. outside
-bur100_yr <- ggplot(burrows, aes(predEvent, fill=colony100)) +
-  geom_bar(position = "fill") +
-  theme_bw()
-  # theme(axis.text.x = element_text(angle=60, hjust=1)) 
-bur100_yr %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
 
+## YEAR
+# proportion of events that are occuring w/in burrow radii vs. outside
+yrBurrows_Event <- burrows %>% 
+  group_by(Year, eventType, colony100) %>% 
+  count()
+
+yrBurrows_pred <- burrows %>% 
+  filter(eventType == "predatorEvent") %>% 
+  group_by(Year, predEvent, colony100) %>% 
+  count()
+# summarize(meanBur = mean(Burrows100, na.rm = TRUE), sdBur = sd(Burrows100, na.rm = TRUE))
+  
+bur100_yr_events <- ggplot(yrBurrows_Event, aes(Year, n)) +
+  geom_point(aes(color = colony100), size = 2, shape = 18) +
+  geom_line(aes(color = colony100), size = 1) +
+  facet_wrap(~ eventType) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(y = 'Number of Trap Events', x = 'Year') +
+  xlim(c(2000,2015)) +
+  theme_bw()
+bur100_yr_events 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/bur100_yr_events_eck14.pdf")
+
+bur100_yr_preds <- ggplot(yrBurrows_pred, aes(Year, n)) +
+  geom_point(aes(color = colony100), size = 2, shape = 18) +
+  geom_line(aes(color = colony100), size = 1) +
+  facet_wrap(~ predEvent) +
+  labs(y = 'Number of Predator Events', x = 'Year') +
+  xlim(c(2000,2015)) +
+  theme_bw()
+bur100_yr_preds 
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/bur100_yr_preds_eck14.pdf")
+
+
+## SEASON
 bur100_season_event <- ggplot(burrows, aes(Season, Burrows100)) +
   geom_bar(stat = "identity", aes(color = Season, fill = Season)) +
   facet_wrap(~ eventType) +
@@ -50,14 +79,20 @@ bur100_season_event <- ggplot(burrows, aes(Season, Burrows100)) +
   theme_bw()
 # theme(axis.text.x = element_text(angle=60, hjust=1)) 
 bur100_season_event # %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "trapTriggered", "baitLost", "none"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/bur100_season_event_eck14.pdf")
 
 bur100_season_preds <- ggplot(burrows, aes(Season, Burrows100)) +
   geom_bar(stat = "identity", aes(color = Season, fill = Season)) +
   facet_wrap(~ predEvent) +
   labs(y = 'Number of `Ua`u Burrows within 100m', x = '`Ua`u Season') +
   theme_bw()
+bur100_season_preds %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/bur100_season_preds_eck14.pdf")
+
+
 # theme(axis.text.x = element_text(angle=60, hjust=1)) 
 bur100_season_preds %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/bur100_season_event_eck14.pdf")
 
 
 # ANNUAL TRENDS
