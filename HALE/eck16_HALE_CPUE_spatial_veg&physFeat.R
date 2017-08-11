@@ -150,7 +150,7 @@ elev_p <- left_join(elevation_preds, elevation_p, by = "Elevation") %>%
 elevProp_Preds <- ggplot(elev_p, aes(Elevation, freq)) +
   geom_smooth(method = lm, aes(colour = predEvent)) +  # linear smoothing
   ylim(c(0,1)) +
-  labs(y = 'Frequency of Predator Events', x = 'Elevation (m)', predEvent = 'Predator Event Type') +
+  labs(y = 'Proportion of Predator Events', x = 'Elevation (m)', predEvent = 'Predator Event Type') +
   scale_fill_brewer(palette = "Set1") +
   theme_bw()
 elevProp_Preds

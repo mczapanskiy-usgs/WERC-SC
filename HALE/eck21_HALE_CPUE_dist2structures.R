@@ -3,7 +3,7 @@
 ## and the frequency of trap events
 
 read.csv('~/WERC-SC/HALE/spatialData_rev_eck18.csv',
-         stringsAsFactors = FALSE) -> catch_spatial 
+         stringsAsFactors = FALSE) -> catch_spatial
 
 ## STRUCTURES
 # get frequency of structure distances
@@ -31,8 +31,10 @@ road <- left_join(roadDist_events, roadDist, by = "DistRoad") %>%
 roadFreq <- ggplot(road, aes(DistRoad, freq)) +
   geom_smooth(method = lm, aes(colour = predEvent)) +  # linear smoothing
   ylim(c(0,1)) +
+  labs(y = 'Proportion of Predator Events', x = 'Distance to Road (m)', predEvent = 'Predator Event Type') +
   theme_bw()
 roadFreq %+% subset(road, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/roadFreq_eck21.pdf")
 
 #### FREQUENCY OF TRAIL EVENTS
 # number of events at each distance
@@ -51,8 +53,10 @@ trail <- left_join(trailDist_events, trailDist, by = "DistTrail") %>%
 trailFreq <- ggplot(trail, aes(DistTrail, freq)) +
   geom_smooth(method = lm, aes(colour = predEvent)) +
   ylim(c(0,1)) +
+  labs(y = 'Proportion of Predator Events', x = 'Distance to Trail (m)', predEvent = 'Predator Event Type') +
   theme_bw()
 trailFreq %+% subset(trail, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/trailFreq_eck21.pdf")
 
 #### FREQUENCY OF FENCE EVENTS
 # number of events at each distance
@@ -71,8 +75,10 @@ fence <- left_join(fenceDist_events, fenceDist, by = "DistFence") %>%
 fenceFreq <- ggplot(fence, aes(DistFence, freq)) +
   geom_smooth(method = lm, aes(colour = predEvent)) +
   ylim(c(0,1)) +
+  labs(y = 'Proportion of Predator Events', x = 'Distance to Fence (m)', predEvent = 'Predator Event Type') +
   theme_bw()
 fenceFreq %+% subset(fence, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fenceFreq_eck21.pdf")
 
 #### FREQUENCY OF SHELTER EVENTS
 # number of events at each distance
@@ -91,8 +97,10 @@ shelter <- left_join(shelterDist_events, shelterDist, by = "DistShelter") %>%
 shelterFreq <- ggplot(shelter, aes(DistShelter, freq)) +
   geom_smooth(method = lm, aes(colour = predEvent)) + # linear smoothing
   ylim(c(0,1)) +
+  labs(y = 'Proportion of Predator Events', x = 'Distance to Structure (m)', predEvent = 'Predator Event Type') +
   theme_bw()
 shelterFreq %+% subset(shelter, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "baitLost", "trapTriggered", "none"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/shelterFreq_eck21.pdf")
 
 
 
