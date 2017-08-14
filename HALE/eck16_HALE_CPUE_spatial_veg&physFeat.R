@@ -135,14 +135,14 @@ elevation_preds <- catch_spatial %>%
 elev_p <- left_join(elevation_preds, elevation_p, by = "Elevation") %>% 
   mutate(freq = (nEvent/n))
 # graph
-elevProp_Preds <- ggplot(elev_p, aes(Elevation, freq)) +
+elevProp_Preds <- ggplot(elev, aes(Elevation, freq)) +
   geom_point(aes(color = predEvent), size = 0.5) + 
   geom_smooth(method = lm, aes(colour = predEvent)) +  # linear smoothing
-  ylim(c(0,1)) +
+  ylim(c(0,0.5)) +
   labs(y = 'Proportion of Predator Events', x = 'Elevation (m)', predEvent = 'Predator Event Type') +
   scale_fill_brewer(palette = "Set1") +
   theme_bw()
-elevProp_Preds
+elevProp_Preds %+% subset(elev, predEvent %in% c("ratCaught", "catCaught", "mongooseCaught"))
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/elevProp_preds_eck16.pdf")
 
 

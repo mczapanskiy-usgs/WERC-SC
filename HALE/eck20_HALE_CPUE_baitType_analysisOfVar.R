@@ -17,7 +17,7 @@ setwd("~/WERC-SC/HALE")
 read.csv('~/WERC-SC/HALE/TrapsGrid.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
          stringsAsFactors = FALSE) -> spatialData
 ## add in "baitType"
-read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
+read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv', 
          stringsAsFactors = FALSE) -> baitData
 baitData <- baitData %>% 
   select(catchID, baitType)

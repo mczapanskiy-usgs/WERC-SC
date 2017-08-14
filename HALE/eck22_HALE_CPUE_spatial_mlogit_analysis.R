@@ -39,21 +39,23 @@ fitted_S_preds_sum <- fitted_S_preds_lg %>%
 
 #### PREDS
 ## elevation
-# elev_preds_fitted <- ggplot(fitted_S_preds_lg, aes(Elevation, value)) +
-#   geom_point(aes(color = variable)) +
-#   # facet_grid(.~ majCoverType) +
-#   labs(y = 'Predicted Probability of Predator Events', x = 'Elevation') +
-#   scale_color_brewer(palette = "Set1") +
-#   theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
-# elev_preds_fitted 
+elev_preds_fitted <- ggplot(fitted_S_preds_lg, aes(Elevation, value)) +
+  geom_jitter(aes(color = variable)) +
+  # facet_grid(.~ majCoverType) +
+  labs(y = 'Predicted Probability of Predator Events', x = 'Elevation') +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() ## + theme(axis.text.x = element_text(angle=60, hjust=1))
+elev_preds_fitted
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/elev_preds_fitted_eck22.pdf")
 
-elev_preds_fitted <- ggplot(fitted_S_preds_sum, aes(Elevation, aveProb)) +
+
+elev_preds_fitted_ave <- ggplot(fitted_S_preds_sum, aes(Elevation, aveProb)) +
   geom_errorbar(aes(ymin = aveProb-sdProb, ymax=aveProb+sdProb, color = variable), width = 0.5) +
   geom_point(size = 2, shape = 18, aes(color = variable)) +
   labs(y = 'Mean Predicted Probability of Predator Events', x = 'Elevation', color = 'Predator Event') +
   theme_bw()
-elev_preds_fitted
-ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/elev_preds_fitted_eck22.pdf")
+elev_preds_fitted_ave
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/elev_preds_fitted_ave_eck22.pdf")
 
 
 #### EVENTS
