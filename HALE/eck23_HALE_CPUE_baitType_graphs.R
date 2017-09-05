@@ -12,10 +12,30 @@ library(lubridate)
 setwd("~/WERC-SC/HALE")
 
 # load data types
-read.csv('~/WERC-SC/HALE/TrapsGrid.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
+read.csv('~/WERC-SC/HALE/TrapsGrid20170626.csv', # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
          stringsAsFactors = FALSE) -> spatialData
 read.csv('~/WERC-SC/HALE/catch_11.5_spatialCatches_20170109.csv', 
          stringsAsFactors = FALSE) -> baitData
+
+spatialCatch2 <- spatialCatch %>% 
+  # change date to correct format
+  mutate(Date = as.Date(Date_, "%m/%d/%Y"),
+         Year = year(Date),
+         trap=paste0(Trapline,TrapNum),
+         eventType = mosaic::derivedFactor(
+           "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
+           "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
+           "noEvent" = predEvent =="none",
+           .default = "noEvent"), 
+         location = mosaic::derivedFactor(
+           front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
+           back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
+           .default = "back")) %>%
+  select(-OBJECTID, -Join_Count, -TARGET_FID, -Join_Count_1, -TARGET_FID_1, -trapLocFilename, -StartDate)
+
+write.csv(spatialCatch2, file = '~/WERC-SC/HALE/TrapsGrid20170905.csv',
+          row.names = FALSE) 
+
 
 # add "bait type" to latest data
 baitData <- baitData %>% 
