@@ -27,26 +27,34 @@ obs_mamu <- obs %>%
   mutate(HYadj = HY/(-1.5433 + 0.0098 * jdate), # apply regression to HY birds to account for those that haven't fledged by survey date
          AHYadj = AHY/(1 - (18.7145545 - 0.18445455 * jdate  +  0.00045455 * (jdate^2)))) # apply regression for AHY birds that are still incubting by survey date
 
+
 ## CALUCLATE JUVENILE RATIO FROM ADJUSTED HY AND AHY DETECTION VALUES
 juvRatio <- obs_mamu %>% 
   group_by(YEAR_) %>% 
-  summarise(n = n_distinct(YEAR_),
-            HYsum = sum(HY, na.rm = TRUE),                  # annual total number of HY
-            HYvar = var(HY, na.rm = TRUE),                  # annual variance in HY
-            HYave = mean(HY, na.rm = TRUE),                 # annual mean  number of HY
-            AHYsum = sum(AHY, na.rm = TRUE),                # annual total number of AHY
-            AHYvar = var(AHY, na.rm = TRUE),                # annual variance in AHY
-            AHYave = mean(AHY, na.rm = TRUE),               # annual mean number of AHY
-            cov = cov(HY, AHY),                             # annual covariance of adjusted 
-            HYsumAdj = sum(HYadj, na.rm = TRUE),            # annual total number of HY per year, adjusted
-            HYvarAdj = var(HYadj, na.rm = TRUE),            # annual variance in adjusted number of HY 
-            HYaveAdj = mean(HYadj, na.rm = TRUE),           # annual mean adjusted number of HY 
-            AHYsumAdj = sum(AHYadj, na.rm = TRUE),          # annual total number of AHY, adjusted
-            AHYvarAdj = var(AHYadj, na.rm = TRUE),          # annual variance in adjusted number of AHY
-            AHYaveAdj = mean(AHYadj, na.rm = TRUE),         # annual mean adjusted number of AHY
-            covAdj = cov(HYadj, AHYadj)) %>%                # annual covariance of adjusted HY and AHY
+  summarise(nYr = n_distinct(YEAR_), 
+            nSvy = n_distinct(Surv_No),
+            HYsum = sum(HY, na.rm = TRUE), HYvar = var(HY, na.rm = TRUE), HYave = mean(HY, na.rm = TRUE), HYsd = sd(HY, na.rm = TRUE), # annual sum, variance and mean  number of HY
+            AHYsum = sum(AHY, na.rm = TRUE), AHYvar = var(AHY, na.rm = TRUE), AHYave = mean(AHY, na.rm = TRUE), AHYsd = sd(AHY, na.rm = TRUE), # annual sum, variance, and mean number of AHY
+            cov = cov(HY, AHY, use = "pairwise.complete.obs"), # annual covariance of HY and AHY 
+            HYsumAdj = sum(HYadj, na.rm = TRUE), HYvarAdj = var(HYadj, na.rm = TRUE), HYaveAdj = mean(HYadj, na.rm = TRUE), HYsdAdj = sd(HYadj, na.rm = TRUE), # annual sum, variance, and mean adjusted number of HY 
+            AHYsumAdj = sum(AHYadj, na.rm = TRUE), AHYvarAdj = var(AHYadj, na.rm = TRUE), AHYaveAdj = mean(AHYadj, na.rm = TRUE), AHYsdAdj = sd(AHYadj, na.rm = TRUE), # annual sum, variance, and mean adjusted number of AHY
+            covAdj = cov(HYadj, AHYadj, use = "pairwise.complete.obs")) %>% # annual covariance of adjusted HY and AHY
   mutate(juvRat = HYsum/AHYsum, # juvenile ratio per survey, adjusted 
          juvRatAdj = HYsumAdj/AHYsumAdj, # juvenile ratio per survey
-         juvRatVar = (1/n)*(((HYvar/AHYave^2)+(?^2*AHYvar)/AHYave^4)-(((2*HYave)*cov)/AHYave^3))
-         )
+         juvRatVar = (1/nYr)*(((HYvar/AHYave^2)+(HYave^2*AHYvar)/AHYave^4)-(((2*HYave)*cov)/AHYave^3)),
+         juvRatVarAdj = (1/nYr)*(((HYvarAdj/AHYaveAdj^2)+(HYaveAdj^2*AHYvarAdj)/AHYaveAdj^4)-(((2*HYaveAdj)*covAdj)/AHYaveAdj^3)))
+# save juvenile ratio results and statistics
+write.csv(juvRatio, file = '~/WERC-SC/MAMU/juvRatio2017.csv',
+          row.names = FALSE) 
+
+
+# # select HY and AHY abundances
+# mamu <- obs_mamu %>%
+#   # group_by(YEAR_) %>%
+#   select(HY, AHY, HYadj, AHYadj)
+# # FUNCTION TO APPLY SUM, VARIANCE, MEAN, AND STANDARD DEVIATION OF HY AND AHY ABUNDANCES FROM DATATABLE 'mamu'
+# f <- function(x) {
+#   c(sum = sum(x, na.rm = TRUE), var = var(x, na.rm = TRUE), mean = mean(x, na.rm = TRUE), SD = sd(x, na.rm = TRUE))
+# }
+# mamu_stats <- sapply(mamu, f)
   
