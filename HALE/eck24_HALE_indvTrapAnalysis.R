@@ -33,11 +33,12 @@ gridPreds <- gridEvents %>%
   mutate(quart = ntile(NEvents, 4)) # quart indicates if data is in the bottom (1), top (4), etc. quartile of data
 # save data of frequency of predator events within each grid cell and quartiles
 write.csv(gridPreds, file = '~/WERC-SC/HALE/gridPredFrequenciess20170922.csv',
-          row.names = FALSE) 
-# break predator event data into quartiles and select only the bottom quartile 
-# (e.g.- grid cells with the lowest 25% of predator catches)
-leastGridPreds <- gridPreds %>%
-  filter(quart == 1)
+          row.names = FALSE)
+
+# # break predator event data into quartiles and select only the bottom quartile 
+# # (e.g.- grid cells with the lowest 25% of predator catches)
+# leastGridPreds <- gridPreds %>%
+#   filter(quart == 1)
 # ggplot(leastGridPreds, aes(Grid500, NEvents)) +
 #   geom_bar(stat = "identity") +
 #   theme_bw() +
@@ -55,8 +56,8 @@ gridPredEvent <- spatialCatch %>%
   na.omit()
 # select just predator events (e.g.- only trap events that caught a rat, cat or mongoose)
 gridRat <- gridPredEvent %>%
-  filter(predEvent == "ratCaught") %>% 
-  as.data.frame() %>% 
+  filter(predEvent == "ratCaught") %>%
+  as.data.frame() %>%
   mutate(quart = ntile(NEvents, 4)) # quart indicates if data is in the bottom (1), top (4), etc. quartile of data
 gridCat <- gridPredEvent %>%
   filter(predEvent == "catCaught") %>% 
@@ -66,11 +67,13 @@ gridMongoose <- gridPredEvent %>%
   filter(predEvent == "mongooseCaught") %>% 
   as.data.frame() %>% 
   mutate(quart = ntile(NEvents, 4))
-# # save data of frequency of predator events within each grid cell and quartiles
-# write.csv(gridPreds, file = '~/WERC-SC/HALE/gridPredFrequenciess20170922.csv',
-#           row.names = FALSE) 
-
-
+# save data of frequency of predator events within each grid cell and quartiles
+write.csv(gridRat, file = '~/WERC-SC/HALE/gridRatFreq20171017.csv',
+          row.names = FALSE)
+write.csv(gridCat, file = '~/WERC-SC/HALE/gridCatFreq20171017.csv',
+          row.names = FALSE)
+write.csv(gridMongoose, file = '~/WERC-SC/HALE/gridMongooseFreq20171017.csv',
+          row.names = FALSE)
 
 
 # ___________________________________________________________________________
@@ -93,30 +96,3 @@ write.csv(trapPreds, file = '~/WERC-SC/HALE/trapPredFrequenciess20170922.csv',
 # (e.g.- trap numbers with the lowest 25% of predator catches)
 leastTrapPreds <- trapPreds %>%
   filter(quart == 1)
-
-
-trapPredEvents <- spatialCatch %>%
-  group_by(trap, predEvent) %>% 
-  dplyr::summarise(NEvents = n()) %>% 
-  na.omit()
-# select just predator events (e.g.- only trap events that caught a predator)
-# break trap data (of pred events) into quartiles 
-trapRat <- trapEvents %>%
-  filter(predEvent == "ratCaught") %>% 
-  as.data.frame() %>% 
-  mutate(quart = ntile(NEvents, 4)) # quart indicates if data is in the bottom (1), top (4), etc. quartile of data
-trapCat <- trapEvents %>%
-  filter(predEvent == "catCaught") %>% 
-  as.data.frame() %>% 
-  mutate(quart = ntile(NEvents, 4)) # quart indicates if data is in the bottom (1), top (4), etc. quartile of data
-trapMongoose <- trapEvents %>%
-  filter(predEvent == "mongooseCaught") %>% 
-  as.data.frame() %>% 
-  mutate(quart = ntile(NEvents, 4)) # quart indicates if data is in the bottom (1), top (4), etc. quartile of data
-# # save data of frequency of predator events within each grid cell and quartiles
-# write.csv(trapPreds, file = '~/WERC-SC/HALE/trapPredFrequenciess20170922.csv',
-#           row.names = FALSE) 
-# # select only the bottom quartile of predator events at each trap
-# # (e.g.- trap numbers with the lowest 25% of predator catches)
-# leastTrapPreds <- trapPreds %>%
-#   filter(quart == 1)
