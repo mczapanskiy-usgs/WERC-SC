@@ -1,8 +1,10 @@
 ## this is code Max wrote to help me with looking for ideas on how to "bin" time frames in R
 ## link trap locations to the trapline/trap number for that date
 
-library("data.table", lib.loc="~/R/win-library/3.2")
-library("dplyr", lib.loc="~/R/win-library/3.2")
+setwd("~/WERC-SC/HALE")
+
+library(data.table)
+library(dplyr)
 
 # load trap metadata: 
 # add "filler" start and end dates where there were "NA"s, pull out just neccessary data: trap type and location
@@ -30,6 +32,10 @@ read.csv('~/WERC-SC/HALE/catch_4_duplicateID_20161209.csv',
   as.data.table %>%
   setkeyv(c('Trapline', 'TrapNum', 'date', 'Dummy')) -> trap_catches
 group_by(trap_catches, Trapline, TrapNum, date) %>% summarize(N = n()) %>% ungroup %>% arrange(-N) %>% nrow # 291,995 obs, 4,451 duplicates removed (290,614 obs, which makes sense because there are 3100 duplicate IDs that are not 0 or 1)
+
+# test for duplicates
+unique <- !trap_catches$catchID %in% trap_catches$catchID[duplicated(trap_catches$catchID)]
+summary(unique)
 
 # merge Catches without corresponding trap location
 trap_catches %>%

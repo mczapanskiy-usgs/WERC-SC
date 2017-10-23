@@ -1,8 +1,10 @@
 # this is code Max wrote to help me with looking for ideas on how to "bin" time frames in R
 ## bin "catch weeks" to link 'baitPrev' and 'baitUsed'
 
-library("data.table", lib.loc="~/R/win-library/3.2")
-library("dplyr", lib.loc="~/R/win-library/3.2")
+setwd("~/WERC-SC/HALE")
+
+library(data.table)
+library(dplyr)
 
 # combine original data with revised duplicate data (also add 2014toappend and 2014toappend data)
 read.csv('~/WERC-SC/HALE/catch_1_addDuplicates.csv',
@@ -12,6 +14,10 @@ read.csv('~/WERC-SC/HALE/catch_3_duplicateID.csv',
 catch <- read.csv("catch_3_2011toappend.csv") -> catch_3_2011toappend 
 catch <- read.csv("catch_3_2014toappend.csv") -> catch_3_2014toappend
 rbind(catch_1_addDuplicates, catch_3_duplicateID, catch_3_2011toappend, catch_3_2014toappend) -> catch_duplicateID_all 
+
+# test for duplicates
+unique <- !catch_duplicateID_all$catchID %in% catch_duplicateID_all$catchID[duplicated(catch_duplicateID_all$catchID)]
+summary(unique)
 
 # read.csv('~/WERC-SC/HALE/catch_addDuplicates.csv',  ##catch_duplicateID.csv',
 #          stringsAsFactors = FALSE) %>%

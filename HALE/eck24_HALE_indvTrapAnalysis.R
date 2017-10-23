@@ -15,8 +15,13 @@ library(mosaic)
 
 
 # load data (change directory to the folder holding 'TrapsGrid20170905.csv')
-read.csv('~/WERC-SC/HALE/TrapsGrid20170905.csv',
+read.csv('~/WERC-SC/HALE/TrapsGrid20170626.csv', # TrapsGrid20170905.csv',
          stringsAsFactors = FALSE) -> spatialCatch # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
+
+# test for duplicates
+unique <- !spatialCatch$catchID %in% spatialCatch$catchID[duplicated(spatialCatch$catchID)]
+summary(unique)
+
 
 # ___________________________________________________________________________
 ## GRID
@@ -96,3 +101,4 @@ write.csv(trapPreds, file = '~/WERC-SC/HALE/trapPredFrequenciess20170922.csv',
 # (e.g.- trap numbers with the lowest 25% of predator catches)
 leastTrapPreds <- trapPreds %>%
   filter(quart == 1)
+
