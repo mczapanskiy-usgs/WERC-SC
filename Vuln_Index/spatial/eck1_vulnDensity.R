@@ -1,7 +1,7 @@
-## this script takes creates spatial vulnerability scores for mapping
+## this script creates spatial vulnerability scores for mapping
 ## input: survey densities (spp and spp group names standardized manually) & spp and spp group vulnerability scores
 ## calculates: percent rank of survey density and vulnerability scores for all spp/spp groups
-## output: %rank_density_PCV and %rank_density_PDV for each spp and all spp together
+## output: %rank_density_PCV and %rank_density_PDV for each spp, spp groups, and all spp together
 
 setwd("~/WERC-SC/Vuln_Index/spatial")
 
