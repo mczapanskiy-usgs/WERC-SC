@@ -1,5 +1,6 @@
 ## This script is to analyze the success of individual traps
 ## to help assess traps are obviously not catching and can be removed.
+## in response to Raina's email on 8/29/17  
 
 setwd("~/WERC-SC/HALE")
 
@@ -15,7 +16,7 @@ library(mosaic)
 
 
 # load data (change directory to the folder holding 'TrapsGrid20170905.csv')
-read.csv('~/WERC-SC/HALE/TrapsGrid20170626.csv', # TrapsGrid20170905.csv',
+read.csv('~/WERC-SC/HALE/TrapsGrid20170905.csv',
          stringsAsFactors = FALSE) -> spatialCatch # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
 
 # test for duplicates
