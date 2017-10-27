@@ -90,6 +90,8 @@ write.csv(juvRatio_all, file = '~/WERC-SC/MAMU/juvRatio_all.csv',
           row.names = FALSE) 
 write.csv(juvRatio_2017, file = '~/WERC-SC/MAMU/juvRatio_2017.csv',
           row.names = FALSE) 
+write.csv(obs_mamu_2017, file = '~/WERC-SC/MAMU/JuvenileRatio_AllData_2017.csv',
+          row.names = FALSE) 
 
 rbind(juvRatio_all, juvRatio_2017) -> juvRatio
 
