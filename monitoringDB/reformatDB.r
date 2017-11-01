@@ -1,6 +1,6 @@
-## This script is used to restructure the Seabird Monitoring Database results
+## This script is used to restructure the Seabird Monitoring Database 
 ## data is 'spread' to fit with structure of Marine Mammal database
-## the new structure created here will be uploaded to ScienceBase and Google Fusion
+## the new structure created here will enable database to be uploaded into online format
 
 setwd("~/WERC-SC/monitoringDB")
 
@@ -23,32 +23,38 @@ read.csv('~/WERC-SC/monitoringDB/sppNames.csv',
          stringsAsFactors = FALSE) -> sppNames
 
 
-## reformat study contents data so that theres a separate row for every method/spp combination
+### reformat study contents data so that there's a separate row for every method/spp combination
 studyContents <- gather(studyContents_old, DataCollected, Species, ColonyCount:OtherDataTypeMethod) %>% 
   cSplit('Species', sep=", ", type.convert=FALSE) %>% 
   gather(SppCount, Species, Species_01:Species_24) %>% 
   select(-SppCount, -CreatedDate) %>% 
   filter(!is.na(Species))
-
+## remove commas and spaces from separated Species names
 studyContents$Species <- gsub(",","",studyContents$Species,
                               " ","",studyContents$Species)
 
-
-# bind to species name
+### Add species names to studyContents database by binding with sppName spreadsheet
 studyContents2 <- left_join(studyContents, sppNames, by = c("Species" = "AlphaCode")) %>% 
+  # rename columns to correspond with names in MarMam database
   mutate(AlphaCode = Species,
          Taxa = Family) %>% 
   select(-Family, -Order, -Species)
 
+### reformat metadata to correct for spelling errors
+metadata <- metadata_old %>% 
+  lapply(gsub, pattern = "Straight", replacement = "Strait", fixed = TRUE) %>% 
+  lapply(gsub, pattern = "Kodak", replacement = "Kodiak", fixed = TRUE)
+  
+### Add metadata columns to studyContents database and reformat so there is a separate row for each study region
 studyContents3 <- left_join(studyContents2, metadata_old, by = "SeabirdSurveyID") %>% 
   cSplit('StudyRegion', sep=", ", type.convert=FALSE) %>% 
   gather(regionCount, StudyRegion, StudyRegion_1:StudyRegion_9) %>%
   select(-regionCount) %>% 
   filter(!is.na(StudyRegion)) %>% 
+  # reorder database so it matches format of MarMam database
   select(DataCollectedID, SeabirdSurveyID, AlphaCode, Taxa, SpeciesName, ScientificName, StateName, StudyRegion, MonitorSite, 
          Jurisdiction, DataCollected, StartYear:DataCollectionFrequency, Notes) 
-  
-
+## remove commas and spaces from separated Study Region names
 studyContents3$StudyRegion <- gsub(",","",studyContents3$StudyRegion,
                                    " ","",studyContents3$StudyRegion)
 
