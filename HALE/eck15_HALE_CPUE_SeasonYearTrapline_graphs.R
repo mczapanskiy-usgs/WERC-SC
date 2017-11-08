@@ -28,6 +28,7 @@ catch_spatial$Season <- factor(catch_spatial$Season, levels = c("Pre-laying", "I
 catch_spatial$predEvent <- factor(catch_spatial$predEvent, 
                                   levels = c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught", 
                                             "birdOtherCaught", "baitLost", "trapTriggered", "none"))
+# catch_spatial$Month_ <- as.character(catch_spatial$Month_)
 
 seasonalEvents <- catch_EventPUE %>%
   group_by(Season, predEvent) %>%
@@ -47,8 +48,8 @@ season_box <- ggplot(catch_spatial, aes(Season, CPUE)) +
 # scale_fill_gradient(low = "green", high = "red")
 season_box %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught")) # , "trapTriggered", "baitLost", "none"))
 
+#____________________________________________________________________________________________________________________________
 ### bar graphs of proportion of events happening in different seasons
-
 season_bar <- ggplot(catch_spatial, aes(Season, fill = predEvent)) + # season_bar <- ggplot(arrange(catch_EventPUE, Season), aes(Season, fill = predEvent)) +
   geom_bar(position = "fill") +
   theme_bw() 
@@ -63,6 +64,42 @@ season_bar_pred <- ggplot(catch_spatial, aes(Season, fill = predEvent)) +
 season_bar_pred %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/seasonalProps_preds_eck15.pdf")
 
+#____________________________________________________________________________________________________________________________
+### bar graphs of proportion of events happening in different months
+monthly_barfill <- ggplot(catch_spatial, aes(Month_, fill = predEvent)) + # season_bar <- ggplot(arrange(catch_EventPUE, Season), aes(Season, fill = predEvent)) +
+  geom_bar(position = "fill") +
+  theme_bw() +
+  labs(x = 'Month', y = 'Proportion of Monthly Events') +
+  scale_x_discrete(limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec")) 
+# theme(axis.text.x = element_text(angle=60, hjust=1)) 
+monthly_barfill %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "birdOtherCaught", "trapTriggered", "baitLost", "none"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyPropsFill_eck15.pdf")
+
+
+monthly_barfill_pred <- ggplot(catch_spatial, aes(Month_, fill = predEvent)) +
+  geom_bar(position = "fill") +
+  theme_bw() +
+  labs(x = 'Month', y = 'Proportion of Monthly Events') +
+  scale_x_discrete(limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec")) 
+monthly_barfill_pred %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyPropsFill_preds_eck15.pdf")
+
+monthly_bar_pred <- ggplot(catch_spatial, aes(Month_)) +
+  geom_bar() +
+  # geom_text(stat='bin',aes(label=..count..),vjust=-1) +
+  facet_wrap(~ predEvent) +
+  theme_bw() +
+  labs(x = 'Month', y = 'Frequency of Events') +
+  scale_x_discrete(limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec")) +
+  theme(axis.text.x = element_text(angle=60, hjust=1))
+monthly_bar_pred %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyProps_preds_eck15.pdf")
+
+
+# ggplot(data=diamonds,aes(x=clarity)) + geom_bar() + geom_text(stat='bin',aes(label=..count..),vjust=-1)
+
+
+#____________________________________________________________________________________________________________________________
 ## box plot of CPUE in different seasons
 season_box <- ggplot(catch_EventPUE, aes(Season)) +
   geom_bar(aes(color=predEvent)) + #geom_bar(stat = "identity") +
@@ -72,6 +109,7 @@ season_box <- ggplot(catch_EventPUE, aes(Season)) +
 season_box %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 ggsave(width = 10, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/seasonal_preds_facet_eck15.pdf")
 
+#____________________________________________________________________________________________________________________________
 
 # ## bar graphs of proportion of events happening in different seasons
 # season_bar <- ggplot(catch_EventPUE, aes(Season, fill = predEvent)) + # season_bar <- ggplot(arrange(catch_EventPUE, Season), aes(Season, fill = predEvent)) +
@@ -86,6 +124,7 @@ ggsave(width = 10, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/seaso
 # season_bar_pred %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 
 
+#____________________________________________________________________________________________________________________________
 ### YEAR
 # GRAPH annual average CPUE and SD
 CPUE_yr <- ggplot(annualCPUE, aes(Year_, annCPUE)) +
