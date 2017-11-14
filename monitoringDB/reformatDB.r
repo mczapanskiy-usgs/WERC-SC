@@ -77,8 +77,8 @@ studyContents4 <- studyContents3 %>%
   mutate(SurveyID = paste("s", SeabirdSurveyID, sep = ''),
          EntryID = paste("s", DataCollectedID, sep = ''),
          TaxaSet = mosaic::derivedFactor(
-              "Mammal" = grepl("Otter", "Pinnipeds", "Cetaceans", Taxa, ignore.case = TRUE),
-              .method = "first", .default = "Seabird"),
+              "Mammal" = Taxa %in% c('Otter', 'Pinnipeds', 'Cetaceans'),
+              .default = "Seabird"),
          Species = AlphaCode,
          StudyLocation = StudyRegion) %>% 
   select(-SeabirdSurveyID, -DataCollectedID, -AlphaCode)

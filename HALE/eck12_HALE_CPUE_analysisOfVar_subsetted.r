@@ -80,9 +80,9 @@ formatData <- function(data, var, subset){
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
 nb = 1000 # number of bootstraps
 s = 5000 # size of subset
-subset_models_aic <- matrix(NA, ncol=10, nrow=nb) # nrow = number of models
-subset_models_aicW <- matrix(NA, ncol=10, nrow=nb)
-subset_models_logLik <- matrix(NA, ncol=10, nrow=nb)
+subset_models_aic <- matrix(NA, ncol=13, nrow=nb) # nrow = number of models
+subset_models_aicW <- matrix(NA, ncol=13, nrow=nb)
+subset_models_logLik <- matrix(NA, ncol=13, nrow=nb)
 
 for (k in 1:nb) { 
   set.seed(k)
@@ -130,6 +130,7 @@ for (k in 1:nb) {
                               rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE,
                               reflevel = "noEvent", iterlim=1,
                               data=m.data.trapyr)
+  ## MONTH
   models[[8]] <- mlogit(choice ~ 0 | Month + Trapline + Year,   # no random effects, Year + Trapline + Month = individual-specific variables
                         reflevel = "noEvent", iterlim=1, 
                         data=m.data)
@@ -139,6 +140,21 @@ for (k in 1:nb) {
   models[[10]] <- mlogit(choice ~ 1 | Month,  # no random effects, Month = individual-specific variables
                         reflevel = "noEvent", iterlim=1,
                         data=m.data)
+  # year as random effect
+  models[[11]] <- mlogit(choice ~ 1 | Season + YearCts,
+                        rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'),  R=50, halton=NA, panel=TRUE,
+                        reflevel = "noEvent", iterlim=1,
+                        data=m.data.year)
+  # trapline as random effect
+  models[[12]] <- mlogit(choice ~ 1 | Season + YearCts,
+                        rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE,
+                        reflevel = "noEvent", iterlim=1,
+                        data=m.data.trap)
+  # trapline + yr as random effect
+  models[[13]] <- mlogit(choice ~ 1 | Season + YearCts,
+                        rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE,
+                        reflevel = "noEvent", iterlim=1,
+                        data=m.data.trapyr)
   ### summarize and rank AICs for each itteration of bootstrap
   subset_models_aic[k, ] <- ldply(models, .fun=AIC)$V1 
   subset_models_aicW[k, ] <- Weights(ldply(models, .fun=AIC)$V1)
@@ -164,5 +180,5 @@ aicWcol <- sapply(models_aicW, FUN = mean)
 # combine into one table and save output
 bs_model_events <- data.frame(variables = varsCol, AIC = aicCol, `Weighted AIC` = aicWcol,
                                `Log Likelihood` = logLikCol, DF = dfCol)
-write.csv(bs_model_events, file = '~/WERC-SC/HALE/outputs/bs_model_events_eck12_20171113.csv',
+write.csv(bs_model_events, file = '~/WERC-SC/HALE/outputs/bs_model_events_Month_eck12_20171114.csv',
           row.names = FALSE)
