@@ -12,7 +12,7 @@ library(dplyr)
 library(tidyr)
 library(splitstackshape)
 library(ggplot2)
-# library(mosaic)
+library(mosaic)
 
 ## load data
 read.csv('~/WERC-SC/monitoringDB/SeabirdStudyContents_old.csv',
@@ -21,6 +21,8 @@ read.csv('~/WERC-SC/monitoringDB/SeabirdMetadata_old.csv',
          stringsAsFactors = FALSE) -> metadata_old
 read.csv('~/WERC-SC/monitoringDB/sppNames.csv',
          stringsAsFactors = FALSE) -> sppNames
+read.csv('~/WERC-SC/monitoringDB/MarMamStudyContents_13Nov2017.csv',
+         stringsAsFactors = FALSE) -> studyContents_marMam
 
 
 ### reformat study contents data so that there's a separate row for every method/spp combination
@@ -53,12 +55,49 @@ studyContents3 <- left_join(studyContents2, metadata_old, by = "SeabirdSurveyID"
   filter(!is.na(StudyRegion)) %>% 
   # reorder database so it matches format of MarMam database
   select(DataCollectedID, SeabirdSurveyID, AlphaCode, Taxa, SpeciesName, ScientificName, StateName, StudyRegion, MonitorSite, 
-         Jurisdiction, DataCollected, StartYear:DataCollectionFrequency, Notes) 
+         Jurisdiction, DataCollected, StartYear:DataCollectionFrequency, Notes, Organization, Affiliation) 
 ## remove commas and spaces from separated Study Region names
 studyContents3$StudyRegion <- gsub(",","",studyContents3$StudyRegion,
                                    " ","",studyContents3$StudyRegion)
 
+### join seabird and marine mammal databases
+## make unique SurveyIDs
+studyContents2_marMam <- studyContents_marMam %>% 
+  mutate(SurveyID = paste("m", MarMamSurveyID, sep = ''),
+         EntryID = paste("m", EntryID, sep = ''),
+         SpeciesName = Species..common.,
+         ScientificName = Species..Latin.,
+         DataCollectionSeasons = Season,
+         DataCollectionFrequency = Frequency,
+         StateName = StudyState) %>% 
+  select(-MarMamSurveyID, -Species..common., -Species..Latin., -Season, -Frequency, -StudyState)
+studyContents2_marMam$ScientificName <- gsub("[()]","",studyContents2_marMam$ScientificName)
+
+studyContents4 <- studyContents3 %>% 
+  mutate(SurveyID = paste("s", SeabirdSurveyID, sep = ''),
+         EntryID = paste("s", DataCollectedID, sep = ''),
+         TaxaSet = mosaic::derivedFactor(
+              "Mammal" = grepl("Otter", "Pinnipeds", "Cetaceans", Taxa, ignore.case = TRUE),
+              .method = "first", .default = "Seabird"),
+         Species = AlphaCode,
+         StudyLocation = StudyRegion) %>% 
+  select(-SeabirdSurveyID, -DataCollectedID, -AlphaCode)
+            
+
+studyContents_merged <- bind_rows(studyContents2_marMam, studyContents4) %>% 
+  select(SurveyID, EntryID, TaxaSet, Taxa, SpeciesName, ScientificName, Species, Notes.on.species, 
+         StudyLocation, StudyRegion, StateName, MonitorSite, Jurisdiction,  
+         Organization, Affiliation, DataCollected, SurveyMethod, OtherMethods, 
+         StartYear, EndYear, MissingYear, DataCollectionSeasons, DataCollectionFrequency, Notes) 
+
+
 ## save updated database
 write.csv(studyContents3, file = '~/WERC-SC/monitoringDB/SeabirdStudyContents_new.csv',
+          row.names = FALSE)
+write.csv(studyContents4, file = '~/WERC-SC/monitoringDB/SeabirdStudyContents_2merge.csv',
+          row.names = FALSE)
+write.csv(studyContents2_marMam, file = '~/WERC-SC/monitoringDB/studyContents2_marMam_2merge.csv',
+          row.names = FALSE)
+write.csv(studyContents_merged, file = '~/WERC-SC/monitoringDB/studyContents_merged.csv',
           row.names = FALSE)
 

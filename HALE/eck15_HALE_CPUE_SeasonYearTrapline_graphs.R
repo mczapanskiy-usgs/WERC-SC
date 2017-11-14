@@ -28,7 +28,7 @@ catch_spatial$Season <- factor(catch_spatial$Season, levels = c("Pre-laying", "I
 catch_spatial$predEvent <- factor(catch_spatial$predEvent, 
                                   levels = c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught", 
                                             "birdOtherCaught", "baitLost", "trapTriggered", "none"))
-# catch_spatial$Month_ <- as.character(catch_spatial$Month_)
+
 
 seasonalEvents <- catch_EventPUE %>%
   group_by(Season, predEvent) %>%
@@ -75,7 +75,7 @@ monthly_barfill <- ggplot(catch_spatial, aes(Month_, fill = predEvent)) + # seas
 monthly_barfill %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "birdOtherCaught", "trapTriggered", "baitLost", "none"))
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyPropsFill_eck15.pdf")
 
-
+## just predators
 monthly_barfill_pred <- ggplot(catch_spatial, aes(Month_, fill = predEvent)) +
   geom_bar(position = "fill") +
   theme_bw() +
@@ -84,19 +84,37 @@ monthly_barfill_pred <- ggplot(catch_spatial, aes(Month_, fill = predEvent)) +
 monthly_barfill_pred %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyPropsFill_preds_eck15.pdf")
 
+
+## each predator with a different bar chart
 monthly_bar_pred <- ggplot(catch_spatial, aes(Month_)) +
   geom_bar() +
-  # geom_text(stat='bin',aes(label=..count..),vjust=-1) +
-  facet_wrap(~ predEvent) +
+  facet_wrap(~ predEvent, scales = "free") +
   theme_bw() +
   labs(x = 'Month', y = 'Frequency of Events') +
   scale_x_discrete(limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec")) +
   theme(axis.text.x = element_text(angle=60, hjust=1))
 monthly_bar_pred %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
-ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyProps_preds_eck15.pdf")
+ggsave(width = 12, height = 8, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyProps_preds_scales_eck15.pdf")
 
+## each predator with a different bar chart with frequency N above each bar
+monthlyCatch <- catch_spatial %>% 
+  group_by(Month_, predEvent) %>% 
+  summarize(count = n())  %>% 
+  filter(!is.na(predEvent))
+monthly_bar2_pred <- ggplot(monthlyCatch, aes(x = Month_, y = count)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ predEvent) +
+  theme_bw() +
+  geom_text(aes(label = count, x = Month_, y = count), position = position_dodge(width = 0.5), vjust = -0.6) +
+  labs(x = 'Month', y = 'Frequency of Events') +
+  scale_x_discrete(limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"))
+  # theme(axis.text.x = element_text(angle=60, hjust=1))
+monthly_bar2_pred %+% subset(monthlyCatch, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+ggsave(width = 12, height = 8, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyProps_preds_count_eck15.pdf")
 
-# ggplot(data=diamonds,aes(x=clarity)) + geom_bar() + geom_text(stat='bin',aes(label=..count..),vjust=-1)
+## save monthly predator data
+write.csv(monthlyCatch, file = '~/WERC-SC/HALE/outputs/monthlyCatch.csv',
+          row.names = FALSE)
 
 
 #____________________________________________________________________________________________________________________________

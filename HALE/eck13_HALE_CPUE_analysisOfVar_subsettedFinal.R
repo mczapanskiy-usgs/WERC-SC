@@ -1,7 +1,7 @@
 ## this script statistically analyzes the effect of year, trap location, trap type, and bait type 
 ## on event types: PREDATOR, OTHER, NONE
 ## using the mlogit model on subset of data determined in "eck12_HALE_CPUE_analysisOfVar_subsetted.r"
-## THIS SCRIPT IS CARRIED OVER FROM eck12_HALE_CPUE_analysisOfVar.r
+## THIS SCRIPT IS CARRIED OVER FROM "eck12_HALE_CPUE_analysisOfVar.r"
 
 library(stats)
 library(plyr)

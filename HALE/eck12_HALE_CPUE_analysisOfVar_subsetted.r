@@ -80,9 +80,9 @@ formatData <- function(data, var, subset){
 #### BOOTSTRAP SUBSETS OF EVENTTYPE DATA FOR ANALYSIS
 nb = 1000 # number of bootstraps
 s = 5000 # size of subset
-subset_models_aic <- matrix(NA, ncol=7, nrow=nb) # nrow = number of models
-subset_models_aicW <- matrix(NA, ncol=7, nrow=nb)
-subset_models_logLik <- matrix(NA, ncol=7, nrow=nb)
+subset_models_aic <- matrix(NA, ncol=10, nrow=nb) # nrow = number of models
+subset_models_aicW <- matrix(NA, ncol=10, nrow=nb)
+subset_models_logLik <- matrix(NA, ncol=10, nrow=nb)
 
 for (k in 1:nb) { 
   set.seed(k)
@@ -130,6 +130,15 @@ for (k in 1:nb) {
                               rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE,
                               reflevel = "noEvent", iterlim=1,
                               data=m.data.trapyr)
+  models[[8]] <- mlogit(choice ~ 0 | Month + Trapline + Year,   # no random effects, Year + Trapline + Month = individual-specific variables
+                        reflevel = "noEvent", iterlim=1, 
+                        data=m.data)
+  models[[9]] <- mlogit(choice ~ 1 | Month + YearCts,  # no random effects, Month + Year = individual-specific variables
+                        reflevel = "noEvent", iterlim=1, 
+                        data=m.data)
+  models[[10]] <- mlogit(choice ~ 1 | Month,  # no random effects, Month = individual-specific variables
+                        reflevel = "noEvent", iterlim=1,
+                        data=m.data)
   ### summarize and rank AICs for each itteration of bootstrap
   subset_models_aic[k, ] <- ldply(models, .fun=AIC)$V1 
   subset_models_aicW[k, ] <- Weights(ldply(models, .fun=AIC)$V1)
@@ -155,5 +164,5 @@ aicWcol <- sapply(models_aicW, FUN = mean)
 # combine into one table and save output
 bs_model_events <- data.frame(variables = varsCol, AIC = aicCol, `Weighted AIC` = aicWcol,
                                `Log Likelihood` = logLikCol, DF = dfCol)
-write.csv(bs_model_events, file = '~/WERC-SC/HALE/outputs/bs_model_events_eck12.csv',
+write.csv(bs_model_events, file = '~/WERC-SC/HALE/outputs/bs_model_events_eck12_20171113.csv',
           row.names = FALSE)
