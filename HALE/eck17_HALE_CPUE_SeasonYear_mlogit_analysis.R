@@ -21,14 +21,20 @@ setwd("~/WERC-SC/HALE")
 read.csv('~/WERC-SC/HALE/fitted_cpue_event_sub.csv',
          stringsAsFactors = FALSE) -> fitted_events
 # pred event data (rat, cat, or mongoose) data model 23 w/ Trapline = random effect, season + year = indiv. specif. was best fit
-read.csv('~/WERC-SC/HALE/fitted_cpue_model23.csv',
+read.csv('~/WERC-SC/HALE/fitted_cpue_caughts_model2.csv',
          stringsAsFactors = FALSE) -> fitted_preds
+read.csv('~/WERC-SC/HALE/fitted_cpue_caughts_month_model9.csv',
+         stringsAsFactors = FALSE) -> fitted_preds_month
+
 
 # create long versions of fitted results from mlogit model (variable = pred type, value = fitted CPUE probability)
 fitted_events_lg <- melt(fitted_events, id.vars = c("Trapline", "Year", "Season"),
                         measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
 fitted_preds_lg <- melt(fitted_preds, id.vars = c("Trapline", "Year", "Season"),
                        measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
+fitted_preds_month_lg <- melt(fitted_preds_month, id.vars = c("Trapline", "Year", "Month"),
+                        measure.vars = c("catCaught", "mongooseCaught", "ratCaught")) %>% 
+  mutate(Month = as.factor(Month))
 dev.off()
 
 #### SEASON
@@ -49,6 +55,15 @@ ggplot(fitted_preds_lg, aes(x=Season, y=value)) +
   theme_bw() +
   labs(x = 'Season', y = 'Probability of Predator Type Caught')
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonPreds_eck17.pdf")
+
+ggplot(fitted_preds_month_lg, aes(x=Month, y=value)) +
+  geom_boxplot() +
+  facet_wrap(~ variable) + #, scales = 'free') +
+  theme_bw() +
+  labs(x = 'Month', y = 'Probability of Predator Type Caught') 
+  # scale_x_discrete(limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec")) +
+  # theme(axis.text.x = element_text(angle=60, hjust=1))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonPreds_month_eck17.pdf")
 
 ## tables of mean and SD fitted frequencies
 # seasonal event probabilities

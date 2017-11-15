@@ -61,7 +61,9 @@ formatData <- function(data, var, subset = NA){
   expanded_data <- expanded_data %>% 
     mutate(choice = ifelse(x==var, TRUE, FALSE), 
            YearCat = as.factor(Year),
-           YearCts = as.numeric(Year))
+           YearCts = as.numeric(Year),
+           MonthCat = as.factor(Month),
+           MonthCts = as.numeric(Month))
   return(expanded_data)
 }
 

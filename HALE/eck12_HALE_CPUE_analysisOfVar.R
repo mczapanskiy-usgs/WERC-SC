@@ -68,7 +68,9 @@ formatData_old <- function(data, subset = NA){
   expanded_data <- expanded_data %>%
     mutate(choice = ifelse(x==eventType, TRUE, FALSE), # mutate(choice = ifelse(x==eventCnoC, TRUE, FALSE), # mutate(choice = ifelse(x==predEvent, TRUE, FALSE),  # 
            YearCat = as.factor(Year),
-           YearCts = as.numeric(Year))
+           YearCts = as.numeric(Year),
+           MonthCat = as.factor(Month),
+           MonthCts = as.numeric(Month))
   return(expanded_data)
 }
   
@@ -95,7 +97,9 @@ formatData <- function(data, var, subset = NA){
     expanded_data <- expanded_data %>% 
       mutate(choice = ifelse(x==var, TRUE, FALSE), 
              YearCat = as.factor(Year),
-             YearCts = as.numeric(Year))
+             YearCts = as.numeric(Year),
+             MonthCat = as.factor(Month),
+             MonthCts = as.numeric(Month))
     return(expanded_data)
   }
 
@@ -510,7 +514,7 @@ cpue_preds_models[[7]] <- mlogit(choice ~ 0 | YearCts,
                             data=cpue.caughts2)
 ## MONTH
 # Year = random variable, Season + Year = individual-specific variables
-cpue_preds_models[[8]] <- mlogit(choice ~ 0 | Month + YearCts,
+cpue_preds_models[[8]] <- mlogit(choice ~ 0 | MonthCts + YearCts,
                                  rpar=c('ratCaught:(intercept)'='n',
                                         'mongooseCaught:(intercept)'='n'),
                                  R=50, halton=NA,
@@ -518,7 +522,7 @@ cpue_preds_models[[8]] <- mlogit(choice ~ 0 | Month + YearCts,
                                  iterlim=1, print.level=1,
                                  data=cpue.year.caughts2) 
 # Trapline = random variable, Month + Year = individual-specific variables
-cpue_preds_models[[9]] <- mlogit(choice ~ 0 | Month + YearCts,
+cpue_preds_models[[9]] <- mlogit(choice ~ 0 | MonthCts + YearCts,
                                  rpar=c('catCaught:(intercept)'='n',
                                         'mongooseCaught:(intercept)'='n'),
                                  R=50, halton=NA,
@@ -527,7 +531,7 @@ cpue_preds_models[[9]] <- mlogit(choice ~ 0 | Month + YearCts,
                                  iterlim=1, print.level=1,
                                  data=cpue.trap.caughts2)
 # Year + Trapline = random variable (1 variable), Month + Year = individual-specific variables
-cpue_preds_models[[10]] <- mlogit(choice ~ 0 | Month + YearCts,
+cpue_preds_models[[10]] <- mlogit(choice ~ 0 | MonthCts + YearCts,
                                  rpar=c('ratCaught:(intercept)'='n',
                                         'mongooseCaught:(intercept)'='n'),
                                  R=50, halton=NA,
@@ -535,20 +539,17 @@ cpue_preds_models[[10]] <- mlogit(choice ~ 0 | Month + YearCts,
                                  iterlim=1, print.level=1,
                                  data=cpue.trapyr.caughts2)
 # without any random effects, Trapline, Month, Year = individual-specific variables
-cpue_preds_models[[11]] <- mlogit(choice ~ 0 | Month + YearCts + Trapline,
+cpue_preds_models[[11]] <- mlogit(choice ~ 0 | MonthCts + YearCts + Trapline,
                                  iterlim=1, print.level=1,
                                  data=cpue.caughts2) 
 # without any random effects, Month + Year = individual-specific variables 
-cpue_preds_models[[12]] <- mlogit(choice ~ 0 | Month + YearCts,
+cpue_preds_models[[12]] <- mlogit(choice ~ 0 | MonthCts + YearCts,
                                  iterlim=1, print.level=1,
                                  data=cpue.caughts2)
 # without any random effects, Month = individual-specific variables 
-cpue_preds_models[[13]] <- mlogit(choice ~ 0 | Month,
+cpue_preds_models[[13]] <- mlogit(choice ~ 0 | MonthCts,
                                  iterlim=1, print.level=1,
                                  data=cpue.caughts2)
-
-
-
 
 # now compare AIC and loglik between models
 varsColS <- sapply(cpue_preds_models, function(m) substr(as.character(formula(m)[3]), start = 5, stop = 1e6))
@@ -566,18 +567,9 @@ write.csv(bestCPUE_preds, file = '~/WERC-SC/HALE/outputs/bestCPUE_preds_month_ec
           row.names = FALSE)
 
 
-
-# view model summaries
-summary(cpue.models[[23]])
-AIC(cpue.models[[23]])
-logLik(cpue.models[[23]])
-# ## find odds ratios
-# write.table(exp(coefficients(cpue.models[[23]]))) # not releveant because tells probability of 1 predEvent happening in relation to another
-
-
-### analyze results for model 23 (the best fit for the "caughts_only" data)
+### analyze results for model 2 (the best fit for the "caughts_only" data)
 ## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
-myfitted <- fitted(cpue.models[[23]], outcome=FALSE)
+myfitted <- fitted(cpue_preds_models[[2]], outcome=FALSE)
 # head(myfitted)
 # dim(myfitted)
 # dim(expanded_data.Caughts_only)
@@ -593,6 +585,27 @@ fitted_cpue <- cbind(fitted_cpue, myfitted) %>%
   select(-chid) %>%
   unique()
 
-write.csv(fitted_cpue, file = '~/WERC-SC/HALE/fitted_cpue_model23.csv',
+write.csv(fitted_cpue, file = '~/WERC-SC/HALE/fitted_cpue_caughts_model2.csv',
           row.names = FALSE)
+
+## MONTH
+myfitted_month <- fitted(cpue_preds_models[[9]], outcome=FALSE)
+# head(myfitted_month)
+# dim(myfitted_month)
+# dim(expanded_data.Caughts_only)
+
+## select year, season, and trapline data for the fitted values
+# Copy data and thin it down to one row per chid (i.e. 33543 rows becomes 11181; because myfitted_month (above) is already thinned to 11181 rows)
+fitted_cpue_month <- expanded_data.Caughts_only %>%
+  select(chid, Trapline, Year, Month) %>%
+  unique()
+# then `cbind` the data in `fitted_cpue_month` with the fitted values in `myfitted_month`
+fitted_cpue_month <- cbind(fitted_cpue_month, myfitted_month) %>%
+  # thin the fitted values further (i.e. remove replicates and keep the unique combos of Trapline, Year, & Season)
+  select(-chid) %>%
+  unique()
+
+write.csv(fitted_cpue_month, file = '~/WERC-SC/HALE/fitted_cpue_caughts_month_model9.csv',
+          row.names = FALSE)
+
 # results analyzed in 'eck17_HALE_CPUE_SeasonYear_mlogit_analysis'

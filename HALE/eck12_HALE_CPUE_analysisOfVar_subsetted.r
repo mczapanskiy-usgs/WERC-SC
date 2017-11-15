@@ -141,17 +141,17 @@ for (k in 1:nb) {
                         reflevel = "noEvent", iterlim=1,
                         data=m.data)
   # year as random effect
-  models[[11]] <- mlogit(choice ~ 1 | Season + YearCts,
+  models[[11]] <- mlogit(choice ~ 1 | Month + YearCts,
                         rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'),  R=50, halton=NA, panel=TRUE,
                         reflevel = "noEvent", iterlim=1,
                         data=m.data.year)
   # trapline as random effect
-  models[[12]] <- mlogit(choice ~ 1 | Season + YearCts,
+  models[[12]] <- mlogit(choice ~ 1 | Month + YearCts,
                         rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE,
                         reflevel = "noEvent", iterlim=1,
                         data=m.data.trap)
   # trapline + yr as random effect
-  models[[13]] <- mlogit(choice ~ 1 | Season + YearCts,
+  models[[13]] <- mlogit(choice ~ 1 | Month + YearCts,
                         rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE,
                         reflevel = "noEvent", iterlim=1,
                         data=m.data.trapyr)
