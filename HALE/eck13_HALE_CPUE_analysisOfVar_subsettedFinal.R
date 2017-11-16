@@ -77,7 +77,7 @@ data_events <- data_rev %>%
   as.data.frame()
 expanded_data_events <- formatData(data_events, 'eventType', subset=NA) 
 ## subset 'data_events' b/c original dataset is too big
-set.seed(20170628)
+set.seed(20171115)
 expanded_data_events_subset <- formatData(data_events, 'eventType', subset=50000)
 
 ### CHOSEN MODEL
@@ -101,7 +101,6 @@ cpue_model_events_trapyr <- mlogit(choice ~ 1 | Season + YearCts,
 summary(cpue_model_events_trapyr)
 AIC(cpue_model_events_trapyr)
 logLik(cpue_model_events_trapyr)
-
 ### ANALYZE RESULTS
 ## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
 myfitted <- fitted(cpue_model_events_trapyr, outcome=FALSE)
@@ -118,7 +117,49 @@ fitted_cpue_event_sub <- cbind(fitted_cpue_event_sub, myfitted) %>%
   select(-chid) %>%
   unique()
 
-write.csv(fitted_cpue_event_sub, file = '~/WERC-SC/HALE/fitted_cpue_event_sub.csv',
+write.csv(fitted_cpue_event_sub, file = '~/WERC-SC/HALE/outputs/fitted_cpue_event_sub.csv',
           row.names = FALSE)
+
+### ADDITIONAL MODEL: WITH MONTH INSTEAD OF SEASON 
+# trapline + yr as random effect, Season + Year as independent-specific events
+cpue_events_trapyr_month <- mlogit.data(expanded_data_events_subset %>% 
+                                    mutate(trapyr=paste0(Trapline,'-',YearCat)),  
+                                  choice="choice",
+                                  alt.var ="x", 
+                                  id.var = "trapyr",
+                                  shape="long", 
+                                  chid.var="chid")
+cpue_model_events_trapyr_month <- mlogit(choice ~ 1 | MonthCat + YearCts,
+                                   rpar=c('predatorEvent:(intercept)'='n',
+                                          'otherEvent:(intercept)'='n'),
+                                   R=50, halton=NA,
+                                   panel=TRUE, 
+                                   reflevel = "noEvent",
+                                   iterlim=1, print.level=1,
+                                   data=cpue_events_trapyr_month)
+# view model summaries
+summary(cpue_model_events_trapyr_month)
+AIC(cpue_model_events_trapyr_month)
+logLik(cpue_model_events_trapyr_month)
+### ANALYZE RESULTS
+## get fitted frequencies of each event type on unique combos of Trapline, Year, & Season
+myfitted <- fitted(cpue_model_events_trapyr_month, outcome=FALSE)
+# head(myfitted) # dim(myfitted) # dim(expanded_data.events.subset)
+
+## select year, season, and trapline data for the fitted values
+# Copy data and thin it down to one row per chid
+fitted_cpue_event_sub_month <- expanded_data_events_subset %>%
+  select(chid, Trapline, Year, Month) %>%
+  unique()
+# then `cbind` the data in `fitted_cpue_eventSub` with the fitted values in `myfitted`
+fitted_cpue_event_sub_month <- cbind(fitted_cpue_event_sub_month, myfitted) %>%
+  # thin the fitted values further (i.e. remove replicates and keep the unique combos of Trapline, Year, & Season)
+  select(-chid) %>%
+  unique()
+
+write.csv(fitted_cpue_event_sub_month, file = '~/WERC-SC/HALE/outputs/fitted_cpue_event_sub_month.csv',
+          row.names = FALSE)
+
+
 
 ### graphs and analysis in "eck17_HALE_CPUE_SeasonYear_mlogit_analysis"

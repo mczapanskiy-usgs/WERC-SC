@@ -73,7 +73,9 @@ formatData <- function(data, var, subset){
   expanded_data <- expanded_data %>% 
     mutate(choice = ifelse(x==var, TRUE, FALSE), 
            YearCat = as.factor(Year),
-           YearCts = as.numeric(Year))
+           YearCts = as.numeric(Year),
+           MonthCat = as.factor(Month),
+           MonthCts = as.numeric(Month))
   return(expanded_data)
 }
 
@@ -131,27 +133,27 @@ for (k in 1:nb) {
                               reflevel = "noEvent", iterlim=1,
                               data=m.data.trapyr)
   ## MONTH
-  models[[8]] <- mlogit(choice ~ 0 | Month + Trapline + Year,   # no random effects, Year + Trapline + Month = individual-specific variables
+  models[[8]] <- mlogit(choice ~ 0 | MonthCat + Trapline + Year,   # no random effects, Year + Trapline + Month = individual-specific variables
                         reflevel = "noEvent", iterlim=1, 
                         data=m.data)
-  models[[9]] <- mlogit(choice ~ 1 | Month + YearCts,  # no random effects, Month + Year = individual-specific variables
+  models[[9]] <- mlogit(choice ~ 1 | MonthCat + YearCts,  # no random effects, Month + Year = individual-specific variables
                         reflevel = "noEvent", iterlim=1, 
                         data=m.data)
-  models[[10]] <- mlogit(choice ~ 1 | Month,  # no random effects, Month = individual-specific variables
+  models[[10]] <- mlogit(choice ~ 1 | MonthCat,  # no random effects, Month = individual-specific variables
                         reflevel = "noEvent", iterlim=1,
                         data=m.data)
   # year as random effect
-  models[[11]] <- mlogit(choice ~ 1 | Month + YearCts,
+  models[[11]] <- mlogit(choice ~ 1 | MonthCat + YearCts,
                         rpar=c('predatorEvent:(intercept)'='n', 'otherEvent:(intercept)'='n'),  R=50, halton=NA, panel=TRUE,
                         reflevel = "noEvent", iterlim=1,
                         data=m.data.year)
   # trapline as random effect
-  models[[12]] <- mlogit(choice ~ 1 | Month + YearCts,
+  models[[12]] <- mlogit(choice ~ 1 | MonthCat + YearCts,
                         rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE,
                         reflevel = "noEvent", iterlim=1,
                         data=m.data.trap)
   # trapline + yr as random effect
-  models[[13]] <- mlogit(choice ~ 1 | Month + YearCts,
+  models[[13]] <- mlogit(choice ~ 1 | MonthCat + YearCts,
                         rpar=c('predatorEvent:(intercept)'='n','otherEvent:(intercept)'='n'), R=50, halton=NA, panel=TRUE,
                         reflevel = "noEvent", iterlim=1,
                         data=m.data.trapyr)
@@ -180,5 +182,5 @@ aicWcol <- sapply(models_aicW, FUN = mean)
 # combine into one table and save output
 bs_model_events <- data.frame(variables = varsCol, AIC = aicCol, `Weighted AIC` = aicWcol,
                                `Log Likelihood` = logLikCol, DF = dfCol)
-write.csv(bs_model_events, file = '~/WERC-SC/HALE/outputs/bs_model_events_Month_eck12_20171114.csv',
+write.csv(bs_model_events, file = '~/WERC-SC/HALE/outputs/bs_model_events_Month_eck12_20171115.csv',
           row.names = FALSE)
