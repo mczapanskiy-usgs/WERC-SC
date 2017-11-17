@@ -101,3 +101,30 @@ write.csv(studyContents2_marMam, file = '~/WERC-SC/monitoringDB/studyContents2_m
 write.csv(studyContents_merged, file = '~/WERC-SC/monitoringDB/studyContents_merged.csv',
           row.names = FALSE)
 
+
+
+#### input data from Cora (11/16/17)
+## load data
+read.csv('~/WERC-SC/monitoringDB/BOEMmonitoringDatabase_masterWithMaps.csv',
+         stringsAsFactors = FALSE) -> monitorDB
+read.csv('~/WERC-SC/monitoringDB/BOEMpolygonMergewMaster_16Nov2017_update.csv',
+         header = TRUE) -> map
+read.csv('~/WERC-SC/monitoringDB/MergedMaster_BOEMmonitoringDB_13Nov2017_cajUPDATE16Nov2017.csv',
+         header = TRUE) -> dat
+
+#verify that StudyLocation labels match
+levels(map$StudyLocation)
+levels(dat$StudyLocation)
+diff <- setdiff(map$StudyLocation, dat$StudyLocation)
+
+#Merge into master data set based on shared identifier "StudyLocation"
+masterWmap <- merge(dat, map, "StudyLocation")
+
+#merging with map has reduced the number of cells, suggesting data loss (rows lost during linkage)
+#   same number of StudyLocation levels in data and merged data
+#   manual check also shows that they all match (names)
+levels(masterWmap$StudyLocation)
+
+write.csv(masterWmap, file = "BOEMmonitoringDatabase_masterWithMaps.csv",row.names=FALSE, na="")
+
+

@@ -80,7 +80,7 @@ ggplot(fitted_preds_month_lg, aes(x=Month, y=value)) +
   labs(x = 'Month', y = 'Probability of Predator Type Caught') 
   # scale_x_discrete(limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec")) +
   # theme(axis.text.x = element_text(angle=60, hjust=1))
-ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonPreds_month_eck17.pdf")
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitMonthPreds_eck17.pdf")
 
 ggplot(fitted_preds_month_lg, aes(x=Month, y=value)) +
   geom_boxplot() + 
@@ -89,7 +89,7 @@ ggplot(fitted_preds_month_lg, aes(x=Month, y=value)) +
   labs(x = 'Month', y = 'Probability of Predator Type Caught') 
 # scale_x_discrete(limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec")) +
 # theme(axis.text.x = element_text(angle=60, hjust=1))
-ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitSeasonPreds_month_facetFree_eck17.pdf")
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitMonthPreds_facetFree_eck17.pdf")
 
 ## tables of mean and SD fitted frequencies
 # seasonal event probabilities
