@@ -1,6 +1,7 @@
-## This script compares the data selected for analysis in the report
-## with the data for trap checks >13 days
-## assessing whether the removal of the >13 day data effected the final results
+## This script answers questions by Seth, Raina, and Cathleen in response to the report:
+### 1. compares the data selected for analysis in the report with the data for trap checks >13 days
+#### assessing whether the removal of the >13 day data (in 'eck6_HALE_CPUE_timeSeries') effected the final results
+### 2. Analyzes the frequency and distribution of cat catches in response to Seth's questions
 
 setwd("~/WERC-SC/HALE")
 
@@ -13,47 +14,42 @@ library(tidyr)
 library(ggplot2)
 library(mosaic)
 
-#### load data (change directory to the folder holding 'TrapsGrid20170905.csv')
-## # catch data processed by Ben (elev, slope, prox to roads/trails/fences/structures, veg, etc.) & Jon (grid cells)
-
-read.csv('~/WERC-SC/HALE/TrapsGrid20170905.csv',
-         stringsAsFactors = FALSE) -> spatialCatch 
-read.csv('~/WERC-SC/HALE/outputs/allCatch20171025.csv',
+#### LOAD DATA
+read.csv('~/WERC-SC/HALE/allCatch_25_20171120.csv.csv',
          stringsAsFactors = FALSE) -> allCatch
 
-#### function to identify different predator event types
-## from script 'eck10_HALE_CPUE_eventType.R' writen by M. Czapanskiy
-is.predEvent <- function(predCaught, birdCaught, otherCaught, trapStatus, baitStatus) {
-  case_when(
-    predCaught == "FC" ~ "catCaught",
-    predCaught == "HA" ~ "mongooseCaught",
-    predCaught == "MM" ~ "mouseCaught",
-    predCaught %in% c("RR", "RN", "RB") ~ "ratCaught",
-    birdCaught != "" | otherCaught != "" ~ "birdOtherCaught",
-    trapStatus == 'O' & baitStatus == "N" ~ "baitLost",
-    predCaught == "" & birdCaught == "" & trapStatus == "C" ~ "trapTriggered", ## this includes events when predator escaped
-    TRUE ~ "none")
-}
-
-## create predEvent column based on is.predEvent function (and remove mouse caught and NA events)
-allCatch <- mutate(allCatch, predEvent = is.predEvent(predCaught, birdCaught, otherCaught, TrapStatus, BaitStatus)) %>% 
-  filter(predEvent != 'mouseCaught',
-         predEvent != 'NA') %>% 
-  mutate(eventType = mosaic::derivedFactor(
-      "predatorEvent" = predEvent %in% c('ratCaught', 'catCaught', 'mongooseCaught'),
-      "otherEvent" = predEvent %in% c('birdOtherCaught', 'trapTriggered', 'baitLost'),
-      "noEvent" = predEvent =="none",
-      .default = "noEvent"),
-    loc = mosaic::derivedFactor(
-      front = Trapline %in% c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'),
-      back = Trapline %in% c('HAL', 'KAP', 'KAU', 'KW', 'LAI', 'LAU', 'NAM', 'PAL', 'PUU', 'SS', 'WAI'),
-      .default = "back"))
-
 #### ANALYZING DATA
-### tables
+### TABLES
+catch_over13days <- allCatch %>% 
+  filter(TrapChecked == FALSE)
+
+cats <- allCatch %>% 
+  filter(predCaught == 'FC') %>% 
+  select(-duplicate, -BaitPrevOld, -Dummy, -dateStr, -RatInvalid, -NotRebaited, -BaitPresent)
+write.csv(cats, file = '~/WERC-SC/HALE/outputs/cats20171025.csv',
+          row.names = FALSE)
+
+rats <- allCatch %>% 
+  filter(predCaught %in% c('RR', 'RN', 'RE')) %>% 
+  select(-duplicate, -BaitPrevOld, -Dummy, -dateStr, -RatInvalid, -NotRebaited, -BaitPresent)
+write.csv(rats, file = '~/WERC-SC/HALE/outputs/rats20171025.csv',
+          row.names = FALSE)
+
+mongoose <- allCatch %>% 
+  filter(predCaught == 'HA') %>% 
+  select(-duplicate, -BaitPrevOld, -Dummy, -dateStr, -RatInvalid, -NotRebaited, -BaitPresent)
+write.csv(mongoose, file = '~/WERC-SC/HALE/outputs/mongoose20171025.csv',
+          row.names = FALSE)
+
 table(allCatch$TrapChecked)
 
-### figures
+catch_over13days <- allCatch %>% 
+  filter(TrapChecked == FALSE)
+
+catch_under13days <- allCatch %>% 
+  filter(TrapChecked == TRUE)
+
+### FIGURES
 ## proportion of event types within and outside 13 day check window
 eventRatio <- ggplot(allCatch, aes(TrapChecked, fill = eventType)) +
   geom_bar(position = "fill") +
@@ -80,9 +76,3 @@ ggplot(allCatch, aes(predEvent)) +
   theme_bw()
 ggsave(width = 10, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/predEvent_hist_eck26.pdf")
 
-
-catch_over13days <- allCatch %>% 
-  filter(TrapChecked == FALSE)
-
-catch_under13days <- allCatch %>% 
-  filter(TrapChecked == TRUE)
