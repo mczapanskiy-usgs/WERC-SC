@@ -39,8 +39,10 @@ studyContents$Species <- gsub(",","",studyContents$Species,
 studyContents2 <- left_join(studyContents, sppNames, by = c("Species" = "AlphaCode")) %>% 
   # rename columns to correspond with names in MarMam database
   mutate(AlphaCode = Species,
-         Taxa = Family) %>% 
+         Taxa = Family)
   select(-Family, -Order, -Species)
+studyContents2$StudyRegion <- gsub(",","",studyContents2$StudyRegion,
+                                   " ","",studyContents2$StudyRegion)
 
 ### reformat metadata to correct for spelling errors
 metadata <- metadata_old %>% 
@@ -53,12 +55,20 @@ studyContents3 <- left_join(studyContents2, metadata_old, by = "SeabirdSurveyID"
   gather(regionCount, StudyRegion, StudyRegion_1:StudyRegion_9) %>%
   select(-regionCount) %>% 
   filter(!is.na(StudyRegion)) %>% 
+  mutate(TaxaSet = mosaic::derivedFactor(
+    "Mammal" = AlphaCode %in% c('Otter', 'Pinnipeds', 'Cetaceans'),
+    .default = "Seabird"),
+    Species = AlphaCode,
+    StudyLocation = StudyRegion) %>% 
   # reorder database so it matches format of MarMam database
-  select(DataCollectedID, SeabirdSurveyID, AlphaCode, Taxa, SpeciesName, ScientificName, StateName, StudyRegion, MonitorSite, 
-         Jurisdiction, DataCollected, StartYear:DataCollectionFrequency, Notes, Organization, Affiliation) 
+  select(DataCollectedID, SeabirdSurveyID, TaxaSet, Taxa, SpeciesName, ScientificName, Species, StateName, StudyLocation, StudyRegion, MonitorSite, 
+         Jurisdiction, DataCollected, StartYear:DataCollectionFrequency, Notes, Organization, Affiliation, -AlphaCode) 
 ## remove commas and spaces from separated Study Region names
-studyContents3$StudyRegion <- gsub(",","",studyContents3$StudyRegion,
-                                   " ","",studyContents3$StudyRegion)
+
+studyContents3$Taxa = case_when(studyContents3$Species == "Pinnipeds" ~ "Pinniped",
+                                studyContents3$Species == "Otter" ~ "SeaOtter",
+                                studyContents3$Species == "Cetaceans" ~ "Cetacean",
+                                TRUE ~ as.character(studyContents3$Taxa))
 
 ### join seabird and marine mammal databases
 ## make unique SurveyIDs
@@ -75,13 +85,8 @@ studyContents2_marMam$ScientificName <- gsub("[()]","",studyContents2_marMam$Sci
 
 studyContents4 <- studyContents3 %>% 
   mutate(SurveyID = paste("s", SeabirdSurveyID, sep = ''),
-         EntryID = paste("s", DataCollectedID, sep = ''),
-         TaxaSet = mosaic::derivedFactor(
-              "Mammal" = Taxa %in% c('Otter', 'Pinnipeds', 'Cetaceans'),
-              .default = "Seabird"),
-         Species = AlphaCode,
-         StudyLocation = StudyRegion) %>% 
-  select(-SeabirdSurveyID, -DataCollectedID, -AlphaCode)
+         EntryID = paste("s", DataCollectedID, sep = '')) %>% 
+  select(-SeabirdSurveyID, -DataCollectedID)
             
 
 studyContents_merged <- bind_rows(studyContents2_marMam, studyContents4) %>% 
@@ -103,28 +108,28 @@ write.csv(studyContents_merged, file = '~/WERC-SC/monitoringDB/studyContents_mer
 
 
 
-#### input data from Cora (11/16/17)
-## load data
-read.csv('~/WERC-SC/monitoringDB/BOEMmonitoringDatabase_masterWithMaps.csv',
-         stringsAsFactors = FALSE) -> monitorDB
-read.csv('~/WERC-SC/monitoringDB/BOEMpolygonMergewMaster_16Nov2017_update.csv',
-         header = TRUE) -> map
-read.csv('~/WERC-SC/monitoringDB/MergedMaster_BOEMmonitoringDB_13Nov2017_cajUPDATE16Nov2017.csv',
-         header = TRUE) -> dat
-
-#verify that StudyLocation labels match
-levels(map$StudyLocation)
-levels(dat$StudyLocation)
-diff <- setdiff(map$StudyLocation, dat$StudyLocation)
-
-#Merge into master data set based on shared identifier "StudyLocation"
-masterWmap <- merge(dat, map, "StudyLocation")
-
-#merging with map has reduced the number of cells, suggesting data loss (rows lost during linkage)
-#   same number of StudyLocation levels in data and merged data
-#   manual check also shows that they all match (names)
-levels(masterWmap$StudyLocation)
-
-write.csv(masterWmap, file = "BOEMmonitoringDatabase_masterWithMaps.csv",row.names=FALSE, na="")
+# #### input data from Cora (11/16/17)
+# ## load data
+# read.csv('~/WERC-SC/monitoringDB/BOEMmonitoringDatabase_masterWithMaps.csv',
+#          stringsAsFactors = FALSE) -> monitorDB
+# read.csv('~/WERC-SC/monitoringDB/BOEMpolygonMergewMaster_16Nov2017_update.csv',
+#          header = TRUE) -> map
+# read.csv('~/WERC-SC/monitoringDB/MergedMaster_BOEMmonitoringDB_13Nov2017_cajUPDATE16Nov2017.csv',
+#          header = TRUE) -> dat
+# 
+# #verify that StudyLocation labels match
+# levels(map$StudyLocation)
+# levels(dat$StudyLocation)
+# diff <- setdiff(map$StudyLocation, dat$StudyLocation)
+# 
+# #Merge into master data set based on shared identifier "StudyLocation"
+# masterWmap <- merge(dat, map, "StudyLocation")
+# 
+# #merging with map has reduced the number of cells, suggesting data loss (rows lost during linkage)
+# #   same number of StudyLocation levels in data and merged data
+# #   manual check also shows that they all match (names)
+# levels(masterWmap$StudyLocation)
+# 
+# write.csv(masterWmap, file = "BOEMmonitoringDatabase_masterWithMaps.csv",row.names=FALSE, na="")
 
 
