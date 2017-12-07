@@ -8,28 +8,27 @@ library(jpeg)
 library(plyr)
 library(dplyr)
 
-## load data and toolboxes
-PVscores <- read.csv("PCV&PDVscores_MS.csv") ## matrix of cumulative PV, CPV, and DPV before 1-10 ranking
-  PVscores <-   PVscores[complete.cases(PVscores), ] # remove blank observations at bottom of matrix
-PVscores_old <- read.csv("PCV&PDVscores_old.csv")
-  PVscores_old <-   PVscores_old[complete.cases(PVscores_old), ]
-scores <- read.csv("PV.CV.DVscores.csv") ## matrix of final PV, CV, and DV
+#### load data
+### PCV, PDV scores
+PVscores <- read.csv("PCV&PDVscores_20171207.csv") ## matrix of cumulative PV, CPV, and DPV before 1-10 ranking
+PVscores <-   PVscores[complete.cases(PVscores), ] %>% # remove blank observations at bottom of matrix
+  mutate(AlphaCode = factor(AlphaCode, levels = AlphaCode[order(TaxNumCl)])) 
+# PVscores_old <- read.csv("PCV&PDVscores_old.csv")
+#   PVscores_old <-   PVscores_old[complete.cases(PVscores_old), ]
+### PV, CV, DV scores
+scores <- read.csv("PV.CV.DVscores_20171207.csv") %>% ## matrix of final PV, CV, and DV
+  mutate(AlphaCode = factor(AlphaCode, levels = AlphaCode[order(TaxNumCl)])) # will keep original order of species
 
 
-## establish color palettes
+#### establish color palettes
 cbbPalette <- c("#666666", "#66FF00", "#FF0033", "#56B4E9", "#0072B2", "#6600CC", "#E69F00", "#009E73", "#D55E00", "#FF33CC", "#000000") # http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/
 # cbbPalette <- c("#FF33CC", "#6600CC", "#FF0033", "#D55E00", "#E69F00", "#66FF00", "#009E73", "#0072B2", "#56B4E9", "#666666", "#000000") # http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/
-#  cbbPalette <- c("#000000", "#0072B2") ### select colors if only graphing a couple species groups
 
-## graph PCV vs PDV with species names as points
-PVscores$AlphaCode <- factor(PVscores$AlphaCode, levels = PVscores$AlphaCode[order(PVscores$Order)]) # will keep original order of species
-x1 <- ggplot(PVscores, 
-             aes(PDVbest, 
-                 PCVbest, 
+#### graph PCV vs PDV with species names as points
+PVscores$AlphaCode <- factor(PVscores$AlphaCode, levels = PVscores$AlphaCode[order(PVscores$TaxNumCl)]) # will keep original order of species
+x1 <- ggplot(PVscores, aes(PDVbest, PCVbest, 
                  label=as.character(AlphaCode))) + # SHOULD MAKE LETTERS BOLD
-  geom_text(aes(color=Taxomony), 
-            size=3, 
-            face="bold") +
+  geom_text(aes(color=Taxonomy), size=3, face="bold") +
             # , subset = .(Taxomony %in% c("Pelicans", "Cormorants"))) +  ## select only a couple spp groups- *change the color options accordingly*
   scale_x_continuous(name="Population Displacement Vulnerability", limits=c(5,200)) +
   scale_y_continuous(name="Population Collision Vulnerability", limits=c(5,300)) +
@@ -38,22 +37,22 @@ x1 <- ggplot(PVscores,
 x1
 ggsave("PCVvsPDV_20170523.pdf", width = 12, height = 8)
 
-# PVscores_old$AlphaCode <- factor(PVscores_old$AlphaCode, levels = PVscores_old$AlphaCode[order(PVscores_old$Order)]) # will keep original order of species
-# x2 <- ggplot(PVscores_old, 
-#              aes(PDVbest, 
-#                  PCVbest, 
-#                  label=as.character(AlphaCode))) + 
-#   geom_text(aes(color=Taxomony), 
-#             size=3, 
-#             face="bold") +
-#   # , subset = .(Taxomony %in% c("Pelicans", "Cormorants"))) +  ## select only a couple spp groups- *change the color options accordingly*
-#   scale_x_continuous(name="Population Displacement Vulnerability", limits=c(5,200)) +
-#   scale_y_continuous(name="Population Collision Vulnerability", limits=c(5,300)) +
-#   theme_bw(base_size = 14) + 
-#   scale_colour_manual(values=cbbPalette) # + scale_colour_brewer(palette = "Set1") 
-# x2
-# ggsave("PCVvsPDV_old.pdf", width = 12, height = 8)
-# 
+
+
+#### graph PVvCV and PVvDV
+# scores$AlphaCode <- factor(scores$AlphaCode, levels = scores$AlphaCode[order(scores$TaxNumCl)]) # will keep original order of species
+CV <- ggplot(scores,aes(PVbest, CVbest, label=as.character(AlphaCode))) +
+  geom_text(aes(color=Taxonomy),
+            size=3,
+            face="bold") +
+  # , subset = .(Taxomony %in% c("Pelicans", "Cormorants"))) +  ## select only a couple spp groups- *change the color options accordingly*
+  scale_x_continuous(name="Population Displacement Vulnerability", limits=c(5,200)) +
+  scale_y_continuous(name="Population Collision Vulnerability", limits=c(5,300)) +
+  theme_bw(base_size = 14) +
+  scale_colour_manual(values=cbbPalette) # + scale_colour_brewer(palette = "Set1")
+CV
+ggsave("PCVvsPDV_old.pdf", width = 12, height = 8)
+
 
 
 

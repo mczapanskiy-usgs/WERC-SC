@@ -68,6 +68,8 @@ pyle_full <- left_join(pyle_rev, pyle_coords_rev, by="Island") %>%
   select(-ID, -NWRNAME, -FWS_UNIT) %>% 
   mutate(spp_island = paste(Species, Island, sep = '_'))
 
+write.csv(pyle_full, file = '~/WERC-SC/MHIatlas/Pyle&Pyle2017_rev.csv',
+          row.names = FALSE)
 
 ### Fefer, Stewart I., D. Hu, M. B. Naughton. 1983. Catolog of Hawaiian Seabird Colonies. U.S. Fish and Wildlife Service, Pacific Islands Office. Honolulu, Hawaii.
 fefer_rev <- fefer %>% 
@@ -77,20 +79,11 @@ fefer_rev <- fefer %>%
       .$Breeding_pairs == "+" ~ "confirmed, unknown number",
       .$Breeding_pairs == "?" ~ "suspected breeding"),
     Island = case_when(
-      .$Colony == "Kahoolawe" ~ "Kahoolawe",
-      .$Colony == "Kekepa Island" ~ "Kekepa",
-      .$Colony == "Kaohikaipu Island" ~ "Kaohikaipu",
-      .$Colony == "Kapapa Island" ~ "Kapapa",
-      .$Colony == "Kuala Island" ~ "Kaula",
-      .$Colony == "Lehua Island" ~ "Lehua",
-      .$Colony == "Manana Island" ~ "Manana",
-      .$Colony == "Mokolii Island" ~ "Mokolii",
-      .$Colony == "Mokuauia Island" ~ "Mokuauia",
-      .$Colony == "Mokulua Islands" ~ "Mokuluas",
-      .$Colony == "Moku Manu" ~ "MokuManu",
-      .$Colony == "Niihau" ~ "Niihau",
-      .$Colony == "Molokini" ~ "Molokini",
-      .$Colony == "Kahoolawe" ~ "Kahoolawe",
+      .$Colony == "Kahoolawe" ~ "Kahoolawe", .$Colony == "Kekepa Island" ~ "Kekepa", .$Colony == "Kaohikaipu Island" ~ "Kaohikaipu",
+      .$Colony == "Kapapa Island" ~ "Kapapa", .$Colony == "Kuala Island" ~ "Kaula", .$Colony == "Lehua Island" ~ "Lehua",
+      .$Colony == "Manana Island" ~ "Manana", .$Colony == "Mokolii Island" ~ "Mokolii", .$Colony == "Mokuauia Island" ~ "Mokuauia",
+      .$Colony == "Mokulua Islands" ~ "Mokuluas", .$Colony == "Moku Manu" ~ "MokuManu", .$Colony == "Niihau" ~ "Niihau",
+      .$Colony == "Molokini" ~ "Molokini", .$Colony == "Kahoolawe" ~ "Kahoolawe",
       .$Colony == "Popoia Island" ~ "Popoia",
       .$Colony == "Puu Koae" ~ "Mokolii",
       .$Island == "Kauaii" ~ "Kauai",
@@ -102,6 +95,11 @@ fefer_rev <- fefer %>%
     Breeding_pairs = as.numeric(Breeding_pairs),
     Survey_date = as.Date(as.character(Survey_date), format = "%m/%d/%Y"))
 
+write.csv(fefer_rev, file = '~/WERC-SC/MHIatlas/Fefer1983_rev.csv',
+          row.names = FALSE)
+
+
+#### combine databases?
 fefer_islandSum <- fefer_rev %>% 
   group_by(Database, Island, Species) %>% 
   summarise(Breeding_pairs = sum(Breeding_pairs)) %>% 
@@ -117,11 +115,7 @@ DB_merged <- full_join(pyle_full, fefer_islandSum, by = "spp_island") %>%
          Breeding_pairs1983 = Breeding_pairs.y) %>% 
   select(Island, Species, Breeding_pairs1983, Breeding_pairs2017, ID1, Xcoor, Ycoor, 
          -Island.x, -Island.y, -Species.x, -Species.y, -comments, -Database.x, -Database.y)
-      
-write.csv(fefer_rev, file = '~/WERC-SC/MHIatlas/Fefer1983_rev.csv',
-          row.names = FALSE)
-write.csv(pyle_rev, file = '~/WERC-SC/MHIatlas/Pyle&Pyle2017_rev.csv',
-          row.names = FALSE)
+
       
 
 # Fefer (1983) Survey_type codes
