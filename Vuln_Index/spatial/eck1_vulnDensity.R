@@ -15,10 +15,11 @@ read.csv('~/WERC-SC/Vuln_Index/spatial/SoCAvulnScores_20171214.csv',
          stringsAsFactors = FALSE) -> vulnScores
 read.csv('~/WERC-SC/Vuln_Index/spatial/SoCAvulnPcts_20171215.csv',
          stringsAsFactors = FALSE) %>% 
-  mutate(PCV = PCV*100,
-         PDV = PDV*100) -> vulnPcts
+  mutate(PCV100 = PCV*100,
+         PDV100 = PDV*100) -> vulnPcts
 read.csv('~/WERC-SC/Vuln_Index/spatial/SoCA5minDensities.csv',
          stringsAsFactors = FALSE) -> densities
+
 densities <- select(densities, -ALL_BIRDS)
 
 ### create species name string
@@ -43,12 +44,18 @@ densities_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to lo
   merge(vulnRanks, by.x = "species", by.y = "SurveySpp") %>%  # merge with vulnRanks table
   mutate(rankDensPCV = densityRank*PCVrank,
          rankDensPDV = densityRank*PDVrank)
-## percents
-density_pct_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to long format (tidyr)
+## percents (lowest possible to highest possible)
+# with % rank of density
+densRank_pct_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to long format (tidyr)
   mutate(densityRank = percent_rank(dens)) %>% # add percent rank of all survey densities
   merge(vulnPcts, by.x = "species", by.y = "SurveySpp") %>%  # merge with vulnRanks table
-  mutate(pctDensPCV = densityRank*PCV,
-         pctDensPDV = densityRank*PDV)
+  mutate(pctDensPCV = densityRank*PCV100,
+         pctDensPDV = densityRank*PDV100)
+# with density (not % ranked)
+density_pct_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to long format (tidyr)
+  merge(vulnPcts, by.x = "species", by.y = "SurveySpp") %>%  # merge with vulnRanks table
+  mutate(pctDensPCV = dens*PCV100,
+         pctDensPDV = dens*PDV100)
 
 ### create tables to import into ARC
 ## PERCENT RANK
@@ -65,22 +72,37 @@ ranksDensityPDV <- select(densities_long, species, TGRIDALB_I, rankDensPDV) %>%
   mutate(ALL_PDV_density = rowSums(.[2:66])) %>% 
   setnames(old = c(spp), new = c(PDVspp))
 
-## PERCENTAGES BASED ON SCORE RANGES
+### PERCENTAGES BASED ON SCORE RANGES
+## with % rank of density
 # PCV
-pctDensityPCV <- select(density_pct_long, species, TGRIDALB_I, pctDensPCV) %>% 
+pctDensRankPCV <- select(densRank_pct_long, species, TGRIDALB_I, pctDensPCV) %>% 
   spread(species, pctDensPCV) %>% 
   replace(is.na(.), 0) %>%
   mutate(ALL_PCV_density = rowSums(.[2:66])) %>% 
   setnames(old = c(spp), new = c(PCVspp))
 # PDV
-pctDensityPDV <- select(density_pct_long, species, TGRIDALB_I, pctDensPDV) %>% 
+pctDensRankPDV <- select(densRank_pct_long, species, TGRIDALB_I, pctDensPDV) %>% 
+  spread(species, pctDensPDV) %>% 
+  replace(is.na(.), 0) %>%
+  mutate(ALL_PDV_density = rowSums(.[2:66])) %>% 
+  setnames(old = c(spp), new = c(PDVspp))
+## with density (not % ranked)
+# PCV
+pctDensPCV <- select(density_pct_long, species, TGRIDALB_I, pctDensPCV) %>% 
+  spread(species, pctDensPCV) %>% 
+  replace(is.na(.), 0) %>%
+  mutate(ALL_PCV_density = rowSums(.[2:66])) %>% 
+  setnames(old = c(spp), new = c(PCVspp))
+# PDV
+pctDensPDV <- select(density_pct_long, species, TGRIDALB_I, pctDensPDV) %>% 
   spread(species, pctDensPDV) %>% 
   replace(is.na(.), 0) %>%
   mutate(ALL_PDV_density = rowSums(.[2:66])) %>% 
   setnames(old = c(spp), new = c(PDVspp))
 
 ranksDensity <- inner_join(ranksDensityPCV, ranksDensityPDV, by = "TGRIDALB_I")
-pctDensity <- inner_join(pctDensityPCV, pctDensityPDV, by = "TGRIDALB_I")
+pctDensRank <- inner_join(pctDensityPCV, pctDensityPDV, by = "TGRIDALB_I")
+pctDensity <- inner_join(pctDensPCV, pctDensPDV, by = "TGRIDALB_I")
 
 ### save ranksDensityPCV and ranksDensityPDV data file to GitHub file
 ## PERCENT RANKS
@@ -94,13 +116,24 @@ write.csv(ranksDensityPDV, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensityPDV_
 write.csv(ranksDensity, file = '~/WERC-SC/Vuln_Index/spatial/ranksDensity_soCal_20170602.csv',
           row.names = FALSE) 
 
-## PERCENTAGES BASED ON SCORE RANGES
+## PERCENTAGES BASED ON SCORE RANGES BY DENSITY PERCENT RANK
 # PCV
-write.csv(pctDensityPCV, file = '~/WERC-SC/Vuln_Index/spatial/pctDensityPCV_soCal_20171215.csv',
+write.csv(pctDensRankPCV, file = '~/WERC-SC/Vuln_Index/spatial/pctDensRankPCV_soCal_20171215.csv',
           row.names = FALSE) 
 # PDV 
-write.csv(pctDensityPDV, file = '~/WERC-SC/Vuln_Index/spatial/pctDensityPDV_soCal_20171215.csv',
+write.csv(pctDensRankPDV, file = '~/WERC-SC/Vuln_Index/spatial/pctDensRankPDV_soCal_20171215.csv',
           row.names = FALSE) 
 # BOTH
-write.csv(pctDensity, file = '~/WERC-SC/Vuln_Index/spatial/pctDensity_soCal_20171215.csv',
+write.csv(pctDensRank, file = '~/WERC-SC/Vuln_Index/spatial/pctDensRank_soCal_20171215.csv',
+          row.names = FALSE) 
+
+## PERCENTAGES BASED ON SCORE RANGES BY DENSITY (NOT % RANKED)
+# PCV
+write.csv(pctDensPCV, file = '~/WERC-SC/Vuln_Index/spatial/pctDensPCV_soCal_20171215.csv',
+          row.names = FALSE) 
+# PDV 
+write.csv(pctDensPDV, file = '~/WERC-SC/Vuln_Index/spatial/pctDensPDV_soCal_20171215.csv',
+          row.names = FALSE) 
+# BOTH
+write.csv(pctDensity, file = '~/WERC-SC/Vuln_Index/spatial/pctDens_soCal_20171215.csv',
           row.names = FALSE) 
