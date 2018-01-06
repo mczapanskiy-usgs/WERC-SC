@@ -15,21 +15,18 @@ read.csv('~/WERC-SC/Vuln_Index/spatial/SoCAvulnScores_20171214.csv',
          stringsAsFactors = FALSE) -> vulnScores
 read.csv('~/WERC-SC/Vuln_Index/spatial/SoCAvulnPcts_20180104.csv',
          stringsAsFactors = FALSE) %>% 
-  mutate(PCV100 = PCV*100,
-         PDV100 = PDV*100, 
-         PV100 = PCV*100,
-         DV100 = PDV*100,
-         CV100 = PCV*100) -> vulnPcts
+  mutate(PCV100 = PCV*100, PDV100 = PDV*100, 
+         PV100 = PV*100, DV100 = DV*100, CV100 = CV*100) -> vulnPcts
 read.csv('~/WERC-SC/Vuln_Index/spatial/SoCA5minDensities.csv',
          stringsAsFactors = FALSE) -> densities
 
 densities <- select(densities, -ALL_BIRDS)
 
 ### create species name string
-## scores
-spp <- as.vector(vulnScores$SurveySpp)
-PCVspp <- paste(spp, "PCV", "density", sep = "_")
-PDVspp <- paste(spp, "PDV", "density", sep = "_") 
+# ## scores
+# spp <- as.vector(vulnScores$SurveySpp)
+# PCVspp <- paste(spp, "PCV", "density", sep = "_")
+# PDVspp <- paste(spp, "PDV", "density", sep = "_") 
 ## percents
 spp <- as.vector(vulnPcts$SurveySpp)
 PCVspp <- paste(spp, "PCV", "density", sep = "_")
@@ -38,10 +35,10 @@ PVspp <- paste(spp, "PV", "density", sep = "_")
 CVspp <- paste(spp, "CV", "density", sep = "_")
 DVspp <- paste(spp, "DV", "density", sep = "_") 
 
-### vuln score percent rank
-vulnRanks <- mutate(vulnScores,
-                    PCVrank = percent_rank(PCV), 
-                    PDVrank = percent_rank(PDV))
+# ### vuln score percent rank
+# vulnRanks <- mutate(vulnScores,
+#                     PCVrank = percent_rank(PCV), 
+#                     PDVrank = percent_rank(PDV))
 
 ### density percent rank and merge with vulnRanks
 # ## scores -> percent rank
@@ -62,9 +59,9 @@ density_pct_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to 
   merge(vulnPcts, by.x = "species", by.y = "SurveySpp") %>%  # merge with vulnRanks table
   mutate(pctDensPCV = dens*PCV100,
          pctDensPDV = dens*PDV100, 
-         pctDensPV = dens*PCV100,
-         pctDensCV = dens*PDV100,
-         pctDensDV = dens*PDV100)
+         pctDensPV = dens*PV100,
+         pctDensCV = dens*CV100,
+         pctDensDV = dens*DV100)
 
 ### create tables to import into ARC
 # ## PERCENT RANK
@@ -98,23 +95,23 @@ density_pct_long <- gather(densities, species, dens, ASSP:XAMU) %>% # change to 
 
 ## with density (not % ranked)
 # PV
-pctDensPV <- select(density_pct_long, species, TGRIDALB_I, pctDensPV) %>% 
+pct_DensPV <- select(density_pct_long, species, TGRIDALB_I, pctDensPV) %>% 
   spread(species, pctDensPV) %>% 
   replace(is.na(.), 0) %>%
   mutate(ALL_PV_density = rowSums(.[2:66])) %>% 
-  setnames(old = c(spp), new = c(PCVspp))
+  setnames(old = c(spp), new = c(PVspp))
 # CV
-pctDensCV <- select(density_pct_long, species, TGRIDALB_I, pctDensCV) %>% 
+pct_DensCV <- select(density_pct_long, species, TGRIDALB_I, pctDensCV) %>% 
   spread(species, pctDensCV) %>% 
   replace(is.na(.), 0) %>%
   mutate(ALL_CV_density = rowSums(.[2:66])) %>% 
-  setnames(old = c(spp), new = c(PCVspp))
+  setnames(old = c(spp), new = c(CVspp))
 # DV
-pctDensDV <- select(density_pct_long, species, TGRIDALB_I, pctDensDV) %>% 
+pct_DensDV <- select(density_pct_long, species, TGRIDALB_I, pctDensDV) %>% 
   spread(species, pctDensDV) %>% 
   replace(is.na(.), 0) %>%
   mutate(ALL_DV_density = rowSums(.[2:66])) %>% 
-  setnames(old = c(spp), new = c(PDVspp))
+  setnames(old = c(spp), new = c(DVspp))
 # PCV
 pctDensPCV <- select(density_pct_long, species, TGRIDALB_I, pctDensPCV) %>% 
   spread(species, pctDensPCV) %>% 
@@ -131,9 +128,11 @@ pctDensPDV <- select(density_pct_long, species, TGRIDALB_I, pctDensPDV) %>%
 # ranksDensity <- inner_join(ranksDensityPCV, ranksDensityPDV, by = "TGRIDALB_I")
 # pctDensRank <- inner_join(pctDensityPCV, pctDensityPDV, by = "TGRIDALB_I")
 pct_PCVPDV_Density <- inner_join(pctDensPCV, pctDensPDV, by = "TGRIDALB_I")
-pct_Density <- inner_join(pctDensPV, pctDensCV, pctDensDV, by = "TGRIDALB_I")
+pct_Density <- inner_join(pct_DensPV, pct_DensCV, by = "TGRIDALB_I") %>%
+  inner_join(., pct_DensDV, by = "TGRIDALB_I")
+  
 
-pctDensityAll <- pctDensity %>% 
+pct_DensityAll <- pct_Density %>% 
   select(TGRIDALB_I, ALL_PV_density, ALL_CV_density, ALL_DV_density)
 
 ### save ranksDensityPCV and ranksDensityPDV data file to GitHub file
@@ -168,4 +167,8 @@ write.csv(pctDensPDV, file = '~/WERC-SC/Vuln_Index/spatial/pctDensPDV_soCal_2017
           row.names = FALSE) 
 # BOTH
 write.csv(pctDensity, file = '~/WERC-SC/Vuln_Index/spatial/pctDens_soCal_20171215.csv',
+          row.names = FALSE) 
+
+# PV, CV, DV 
+write.csv(pct_DensityAll, file = '~/WERC-SC/Vuln_Index/spatial/pctDens_3vuln_soCal_20180105.csv',
           row.names = FALSE) 
