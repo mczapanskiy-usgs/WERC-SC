@@ -1,5 +1,5 @@
 ## this script analyzes (graphically and statistically) spatial results of mlogit models
-## seasonal and yearly effects on:
+## seasonal, monthly, and yearly effects on:
 ##   event types (pred, other, none)
 ##   predator events (rat, cat, mongoose)
 ## results from 'eck12_HALE_CPUE_analysisOfVar' and 'eck13_HALE_CPUE_analysisOfVar_subsettedFinal'
@@ -104,6 +104,14 @@ seasonPreds <- fitted_preds %>%
   summarize(mRat = mean(ratCaught, na.rm = T), sdRat = sd(ratCaught, na.rm = T),
             mCat = mean(catCaught, na.rm = T), sdCat = sd(catCaught, na.rm = T),
             mMong = mean(mongooseCaught, na.rm = T), sdMong = sd(mongooseCaught, na.rm = T))
+
+# montly event probabilities
+monthEvents <- fitted_events_month %>% 
+  group_by(Month) %>% 
+  summarize(mNone = mean(noEvent, na.rm = T), sdNone = sd(noEvent, na.rm = T),
+            mPred = mean(predatorEvent, na.rm = T), sdPred = sd(predatorEvent, na.rm = T),
+            mOther = mean(otherEvent, na.rm = T), sdOther = sd(otherEvent, na.rm = T))
+
 # save tables
 write.table(seasonEvents, file = '~/WERC-SC/HALE/outputs/seasonEvents.csv',
             row.names = FALSE)

@@ -25,6 +25,8 @@ vegColors <- c("red4",
                "palegreen", "palegreen1", "palegreen2", "palegreen3", "palegreen4",
                "deepskyblue1", "deepskyblue2", "deepskyblue3", "dodgerblue", "dodgerblue1", "dodgerblue2", "dodgerblue3", "dodgerblue4",
                "slateblue1", "slateblue2", "slateblue3", "slateblue4")
+
+predColors <- c("#F8766D", "#FFCC00", "#7CAE00")
     
 #### VEGETATION
 ## create dataset of proportion of traps located in different veg types
@@ -140,7 +142,7 @@ elevProp_Preds <- ggplot(elev, aes(Elevation, freq)) +
   geom_smooth(method = lm, aes(colour = predEvent)) +  # linear smoothing
   ylim(c(0,0.5)) +
   labs(y = 'Proportion of Predator Events', x = 'Elevation (m)', predEvent = 'Predator Event Type') +
-  scale_fill_brewer(palette = "Set1") +
+  scale_colour_manual(values=predColors) +
   theme_bw()
 elevProp_Preds %+% subset(elev, predEvent %in% c("ratCaught", "catCaught", "mongooseCaught"))
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/elevProp_preds_eck16.pdf")

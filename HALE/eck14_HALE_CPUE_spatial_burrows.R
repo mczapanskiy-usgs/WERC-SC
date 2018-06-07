@@ -26,7 +26,8 @@ burrows <- catch_spatial %>%
          colony100 = mosaic::derivedFactor("in" = Burrows100 >=1,
                                            "out" = Burrows100 == 0,
                                            .method = "last", 
-                                           .default = "out"))  # HOW DO I REMOVE THE NAs?
+                                           .default = "out"),
+         filler = 1)
 write.csv(burrows, file = '~/WERC-SC/HALE/catch_burrows.csv',
           row.names = FALSE) 
 
@@ -36,6 +37,18 @@ bur100_preds <- ggplot(burrows, aes(burFreq100)) +
   facet_wrap(~ predEvent) +
   theme_bw()
 bur100_preds %+% subset(burrows, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+
+bur100_events <- ggplot(burrows, aes(eventType, fill = colony100)) +
+  geom_bar(position = "fill") + 
+  theme_bw()
+bur100_events
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/burrow100_events_eck14.pdf")
+
+bur100 <- ggplot(burrows, aes(filler, fill = colony100)) +
+  geom_bar(position = "fill") + 
+  theme_bw()
+bur100 
+ggsave(width = 3, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/allBurrow100_events_eck14.pdf")
 
 ## YEAR
 # proportion of events that are occuring w/in burrow radii vs. outside
