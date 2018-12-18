@@ -19,11 +19,13 @@ setwd("~/WERC-SC/HALE")
 #### READ IN FITTED RESULTS FROM BEST FIT MODELS
 ## event type (predator, other, no event) uses base model w/ traplineYear = random effect, 
 # coefficients: season, meanTmax
-read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_events_eck12.5.csv',
+read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_events_yr_eck12.5.csv',
          stringsAsFactors = FALSE) -> fitted_WL_events
+read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_events_mo_eck12.5.csv',
+         stringsAsFactors = FALSE) -> fitted_WL_events_mo
 
 ## pred event data (rat, cat, or mongoose) uses base model w/ Trapline = random effect, season = indiv. specif. was best fit
-read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds_eck12.5.csv',
+read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds_yr_eck12.5.csv',
          stringsAsFactors = FALSE) -> fitted_WL_preds
 read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds2_eck12.5.csv',
          stringsAsFactors = FALSE) -> fitted_WL_preds2
@@ -32,6 +34,8 @@ read.csv('~/WERC-SC/HALE/outputs/fitted_cpue_WL_preds2_eck12.5.csv',
 ## create long versions of fitted results from mlogit model (variable = pred type, value = fitted CPUE probability)
 fitted_WL_events_lg <- melt(fitted_WL_events, id.vars = c("Season", "total3monRain"),
                           measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
+fitted_WL_events_mo_lg <- melt(fitted_WL_events_mo, id.vars = c("Month", "total3monRain"),
+                            measure.vars = c("noEvent", "predatorEvent", "otherEvent"))
 
 fitted_WL_preds_lg <- melt(fitted_WL_preds, id.vars = c("Year", "Season", "meanTmax"),
                         measure.vars = c("catCaught", "mongooseCaught", "ratCaught"))
@@ -43,11 +47,20 @@ fitted_WL_preds2_lg <- melt(fitted_WL_preds2, id.vars = c("Year", "Season", "moo
 rain_events <- ggplot(fitted_WL_events_lg, aes(total3monRain, value)) +
   geom_point(aes(colour = Season), size = 1, shape = 18) +
   facet_wrap(~ variable) + # , scales = 'free'
-  labs(y = 'Proability of Predator Type Caught', x = 'Total 3 Month Rainfall') +
+  labs(y = 'Proability of Event Type ', x = 'Total 3 Month Rainfall') +
   
   theme_bw()
 rain_events
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitRain_events_eck19.pdf")
+
+rain_events_mo <- ggplot(fitted_WL_events_mo_lg, aes(total3monRain, value)) +
+  geom_point(aes(colour = Month), size = 1, shape = 18) +
+  facet_wrap(~ variable) + # , scales = 'free'
+  labs(y = 'Proability of Event Type ', x = 'Total 3 Month Rainfall') +
+  
+  theme_bw()
+rain_events_mo
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/fitRain_events_mo_eck19.pdf")
 
 ### PREDATOR ANALYSIS
 ## MEAN MAXIMUM TEMPERATURE

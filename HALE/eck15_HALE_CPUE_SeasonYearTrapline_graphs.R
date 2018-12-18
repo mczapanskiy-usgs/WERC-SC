@@ -50,6 +50,24 @@ season_box %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaug
 
 #____________________________________________________________________________________________________________________________
 ### bar graphs of proportion of events happening in different seasons
+month_bar <- ggplot(catch_spatial, aes(Month_, fill = predEvent)) + # season_bar <- ggplot(arrange(catch_EventPUE, Season), aes(Season, fill = predEvent)) +
+  geom_bar(position = "fill") +
+  scale_x_discrete(name = "Month", limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) +
+  theme_bw() 
+month_bar %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "birdOtherCaught", "trapTriggered", "baitLost", "none"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthProps_eck15.pdf")
+
+## preds only
+month_bar_pred <- ggplot(catch_spatial, aes(Month_, fill = predEvent)) +
+  geom_bar(position = "fill") +
+  scale_x_discrete(name = "Month", limits = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) +
+  theme_bw()
+month_bar_pred %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
+ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthProps_preds_eck15.pdf")
+
+
+#____________________________________________________________________________________________________________________________
+### bar graphs of proportion of events happening in different seasons
 season_bar <- ggplot(catch_spatial, aes(Season, fill = predEvent)) + # season_bar <- ggplot(arrange(catch_EventPUE, Season), aes(Season, fill = predEvent)) +
   geom_bar(position = "fill") +
   theme_bw() 
@@ -63,6 +81,7 @@ season_bar_pred <- ggplot(catch_spatial, aes(Season, fill = predEvent)) +
   theme_bw()
 season_bar_pred %+% subset(catch_spatial, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/seasonalProps_preds_eck15.pdf")
+
 
 #____________________________________________________________________________________________________________________________
 ### bar graphs of proportion of events happening in different months

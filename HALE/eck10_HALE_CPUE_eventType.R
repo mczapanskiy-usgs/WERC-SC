@@ -44,7 +44,7 @@ write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_
 catch %>% 
   filter(!TrapChecked)
 
-# order predevents for graphing
+# order predEvents for graphing
 catch$predEvent <- factor(catch$predEvent, 
                           levels = c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught", "birdOtherCaught", "baitLost", "trapTriggered", "none"))
 
@@ -60,12 +60,13 @@ catch_summary
 ggplot(catch, aes(predEvent)) +
   geom_bar() +
   labs(x = 'Trap Event Type', y = 'Number of Events (years 2000-2014)') +
+  # scale_y_continuous(trans='log10') + 
   # facet_wrap(~ Trapline, nrow = 4) +
   # theme(axis.text.x = element_text(angle=60, hjust=1)) +
   theme_bw()
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/predEvent_hist_eck10.pdf")
 #stats
-summary(catch$predEvent) # 295,021 obs.
+summary(catch$predEvent) # 259,021 obs.
 # (catch$predEvent)
 
 # count of predEvents per trapline per year
