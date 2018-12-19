@@ -12,15 +12,19 @@ library(lubridate)
 library(mosaic)
 library(oce)
 library(suncalc)
-library(rnoaa)
+library(circular)
+# library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE.csv') -> metadata
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE.csv') -> metadata_raw
 read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>% 
   select(-Notes) -> sites
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_catches.csv') -> catches_raw
+
 
 ### STANDARDIZE LOCATIONS FOR ALL SITES
-metadata <- metadata %>% 
+## for CPUE metatdata
+metadata <- metadata_raw %>% 
   mutate(Site= mosaic::derivedFactor(
     "SWcorner" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
     "SR2" = (island=="SR" & site=="2"),
@@ -36,64 +40,64 @@ metadata <- metadata %>%
     "GC" = (island=="ANI" & site=="GC"),
     .default = ""),
     Date = mdy(date, tz = "US/Pacific")) %>% 
-  select(-date, -site) %>% 
-  left_join(sites, by = c("Site" = "Site", "island" = "Island"))  # add latitude and longitude to metadata
+  select(-date, -site) %>%
+  # add latitude and longitude to metadata
+  left_join(sites, by = c("Site" = "Site", "island" = "Island"))  
 
-### CALCULATE MOON INDEX  
-metadata2 <- metadata %>% 
-  mutate(App_sunset_2 = getSunlightTimes(date = Date, lat = Lat, long = Long, keep = "sunset", tz = "US/Pacific")),
-         Moon_rise_2 = getMoonTimes(date = Date, lat = lat, long = long, keep = c("rise"), tz = "US/Pacific"),
-         Moon_Set_2 = getMoonTimes(date = Date, lat = lat, long = long, keep = c("set"), tz = "US/Pacific"), 
-         Moon_fract_2 = moonAngle(Date, lat = lat, long = long, tz = "US/Pacific", phase()),
-         moon_time_2 = ,
-         moon_index_2 = ,
-         WS_midnight_2 = ))
+# for catch data
+catches <- catches_raw %>% 
+  select(date, island, site, capture.time, species, recapture., Notes) %>% 
+  mutate(Site= mosaic::derivedFactor(
+    "SWcorner" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
+    "SR2" = (island=="SR" & site=="2"),
+    "SR3" = (island=="SR" & site=="3"),
+    "LittleScorpionHeadland" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
+    "HighTerrace" = (island=="SR" & site=="SR High Terrace-East"),
+    "AP" = (island=="SBI" & site=="Arch Point" |island=="SBI" & site=="AP"),
+    "ESP" = (island=="SBI" & site=="Eseal Point" |island=="SBI" & site=="ESP"),
+    "ShagOverlook" = (island=="SBI" & site=="Shag Overlook"),
+    "NatureTrailPlot" = (island=="SBI" & site=="Nature Trail Plot"), 
+    "WebstersPoint" = (island=="SBI" & site=="Webster's Point"), 
+    "PI1" = (island=="PI" & site=="1"| island=="PI" & site==""), 
+    "GC" = (island=="ANI" & site=="GC"),
+    .default = ""),
+    Date = mdy(date, tz = "US/Pacific")) %>% 
+  select(-date, -site)
 
-# moonIndex4 <- function(startDay, endDay, interval = 60, longitude = -156.1552, latitude = 20.7204) {
-#   startDay <- with_tz(startDay, 'UTC')
-#   endDay <- with_tz(endDay, 'UTC')
-#   interval <- first(interval)
-#   cl <- makeCluster(detectCores())
-#   registerDoParallel(cl)
-#   result <- foreach(s = startDay, e = endDay, 
-#                     .combine = rbind, 
-#                     .packages = c('oce')) %dopar% {
-#                       t <- seq(from = s, to = e, by = interval)
-#                       period = as.numeric(difftime(e, s, units = 'days'))
-#                       sunAlt <- sunAngle(t, longitude, latitude)$altitude
-#                       moon <- moonAngle(t, longitude, latitude)
-#                       moonAlt <- moon$altitude
-#                       moonOnly <- moonAlt > 0 & sunAlt < 0
-#                       moonIllum <- mean(moon$illuminatedFraction[moonOnly])
-#                       moonTime = sum(moonOnly) * interval / period
-#                       data.frame(moonTime = moonTime, moonIllum = moonIllum)
-#                     }
-#   stopCluster(cl)
-#   result
-# }
-# 
-# endDates = seq(from = ymd_hm('2000-01-01 12:00', tz = 'US/Hawaii'),
-#                to = ymd_hm('2014-12-31 12:00', tz = 'US/Hawaii'),
-#                by = '1 days')
-# startDates1dy = endDates - days(1)
-# startDates1wk = endDates - days(6)
-# startDates2wk = endDates - days(13)
-# moonIndex1dy = moonIndex4(startDates1dy, endDates)
-# moonIndex1wk = moonIndex4(startDates1wk, endDates)
-# moonIndex2wk = moonIndex4(startDates2wk, endDates)
-# 
-# result <- data.frame(PeriodEnding = endDates,
-#                      MoonTime1dy = moonIndex1dy$moonTime,
-#                      MoonIllum1dy = moonIndex1dy$moonIllum,
-#                      MoonTime1wk = moonIndex1wk$moonTime,
-#                      MoonIllum1wk = moonIndex1wk$moonIllum,
-#                      MoonTime2wk = moonIndex2wk$moonTime,
-#                      MoonIllum2wk = moonIndex2wk$moonIllum)
-# 
-# write.csv(result, file = '~/WERC-SC/HALE/catch_11.5_moonIndex.csv', row.names = FALSE) # 'WERC-SC/HALE/MoonIndex_v2.csv'
+### MAKE SUN AND MOON DATAFRAME
+## create dataframe site lat/long and date
+forSunMoon <- metadata %>% 
+  transmute(site, date = as.Date(Date), lat = Lat, lon = Long)
+## create new dataframe for moon and sun data
+Moon <- getMoonTimes(data = forSunMoon, keep = c("rise", "set"), tz = "UTC") %>% 
+  mutate(moonRise = with_tz(rise, tz = "US/Pacific"),
+         moonSet = with_tz(set, tz = "US/Pacific")) %>% 
+  select(-c(rise, set))
+moonPhase <- getMoonIllumination(date = metadata$Date, keep = c("fraction", "phase")) %>% 
+   select(-date)
+Sun <-  getSunlightTimes(data = forSunMoon, keep = "sunset", tz = "UTC") %>% 
+  mutate(sunset = with_tz(sunset, tz = "US/Pacific")) %>% 
+  select(-c(site, date, lat, lon))
+## combine sun and moon data for each date and site
+SunMoon <- bind_cols(Moon, Sun, moonPhase) %>% 
+  mutate(Date = as.POSIXct(date, tz = "US/Pacific"),
+         j_moonRise = as.numeric(moonRise),
+         j_moonSet = as.numeric(moonSet),
+         j_sunset = as.numeric(sunset))
+
+
+### CPUE
+## number of catches for each species and night
+catches_t <- catches %>% 
+   mutate(capture.time2 = hm(capture.time),
+          capture_DateTime = as.POSIXct(paste(Date, capture.time2), format="%Y-%m-%d %H:%M:%S"))
+
+# catches_sum <- catches %>% 
+#   group_by(Date, Site) %>% 
+#   count(species)
   
-#### CPUE
+  
 ## only birds caught before cutoff point
 ## Sum spp counts
 # divided by species
-#
+
