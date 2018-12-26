@@ -47,8 +47,8 @@ read.csv('~/WERC-SC/HALE/catch_5_duplicateID_withtraploc_20161209.csv',
            as.numeric %>% 
            floor) %>% # mutate(prevCheckInterval = difftime(lead(date), date, units = 'days') %>% as.numeric %>% floor) %>% 
   ungroup %>%
-  mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14) %>% 
-  filter(TrapChecked = "TRUE") -> catch_traploc_weekChecks # change the number to adjust the "effort" interval
+  mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14)  -> catch_traploc_weekChecks_w14 # change the number to adjust the "effort" interval
+# %>% filter(TrapChecked = "TRUE")
 
 ## remove entries with unknown BaitStatus (for Raina to review)
 catch_traploc_weekChecks %>%
@@ -57,7 +57,7 @@ catch_traploc_weekChecks %>%
 write.csv(catch_unkBaitStatus, '~/WERC-SC/HALE/catch_6_unk_BaitStatus_20161209.csv',
             row.names = FALSE)
 ## save catch output
-write.csv(catch_traploc_weekChecks, file = '~/WERC-SC/HALE/catch_6_traploc_weekChecks_20161209.csv',
+write.csv(catch_traploc_weekChecks_w14, file = '~/WERC-SC/HALE/catch_6_traploc_weekChecks_w14_20181226.csv',
           row.names = FALSE) 
 
 ## stats
