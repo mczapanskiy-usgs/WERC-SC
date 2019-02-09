@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates moon phase, net time, and CPUE
-# created: Dec 10, 2018 E Kelsey
-# last edited: 
+# created: Dec 10, 2018 by: E Kelsey
+# last edited: Feb 2, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -14,14 +14,14 @@ library(mosaic)
 library(oce)
 library(foreach)
 library(doParallel)
-# library(suncalc)
+library(stats)
 library(circular)
 # library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
 read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE.csv') -> metadata_raw
 read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>% 
-  select(-Notes) -> sites
+  select(-Notes) -> sites_tbl
 read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_catches.csv') -> catches_raw
 
 
@@ -45,9 +45,9 @@ metadata <- metadata_raw %>%
     Date = mdy(date, tz = "US/Pacific")) %>% 
   select(-date, -site) %>%
   # add latitude and longitude to metadata
-  left_join(sites, by = c("Site" = "Site", "island" = "Island"))  
+  left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island"))  
 
-write.csv(metadata, file = '~/WERC-SC/ASSP_share/metadata.csv', row.names = FALSE) # 'WERC-SC/ASSP_share/metadata.csv'
+write.csv(metadata, file = '~/WERC-SC/ASSP_share/metadata.csv', row.names = FALSE) 
 
 # for catch data
 catches <- catches_raw %>% 
@@ -95,10 +95,32 @@ SunMoon <- function(startDay, endDay, longitude, latitude, interval = 60) {
   result
 }
 
+
+
+
 startDates = metadata$Date[1:10]
 endDates = startDates + days(1)
 latitude = metadata$Lat[1:10]
 longitude = metadata$Long[1:10]
+
+s <- with_tz(startDates[1], 'UTC')
+e <- with_tz(endDates[1], 'UTC')
+x <- longitude[1]
+y <- latitude[1]
+interval = 60
+interval <- first(interval)
+t <- seq(from = s, to = e, by = interval)
+
+int <- c(s, e)
+
+moonrise <- uniroot(SunMoon, moonAngle(t, x, y, useRefraction = TRUE), interval = int, lower = 1, upper = 2)
+
+sun <- uniroot(t, sunAngle(t, x, y, useRefraction = TRUE)$altitude)
+moon <- moonAngle(t, x, y, useRefraction = TRUE)$altitude
+
+test2 <- data.frame(sun = sun, moon = moon)
+
+moonrise <- filter(test2, floor(moon))
 sunMoon_vec = SunMoon(startDates, endDates, longitude, latitude)
 
 
@@ -110,7 +132,7 @@ result <- data.frame(PeriodEnding = endDates,
                      MoonTime2wk = moonIndex2wk$moonTime,
                      MoonIllum2wk = moonIndex2wk$moonIllum)
 
-
+rm(suncalc)
 
 # ## create dataframe site lat/long and date
 # forSunMoon <- metadata %>%
