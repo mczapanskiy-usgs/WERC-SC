@@ -12,13 +12,16 @@ library(dplyr)
 library(lubridate)
 library(mosaic)
 library(oce)
-library(suncalc)
 library(foreach)
 library(doParallel)
 library(stats)
+library(suncalc)
+l# library(rnoaa)
+
+library(maptools)
+library(suncalc)
 library(circular)
 library(StreamMetabolism)
-library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
 read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE.csv') -> metadata_raw
@@ -55,48 +58,67 @@ metadata <- metadata_raw %>%
 ## Calculate moon time
 # FUNCTION (from MFC "moonIndex_v2.R")
 moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) { 
-  startDay <- with_tz(startDay, 'UTC')
-  endDay <- with_tz(endDay, 'UTC')
-  interval <- first(interval)
-  cl <- makeCluster(detectCores())
-  registerDoParallel(cl)
-  result <- foreach(s = startDay, e = endDay, 
-                    x = longitude, y = latitude,
-                    .combine = bind_rows, 
-                    .packages = c('oce')) %dopar% {
-                      t <- seq(from = s, to = e, by = interval)
-                      period = as.numeric(difftime(e, s, units = 'days'))
-                      sunAlt <- sunAngle(t, x, y, useRefraction = TRUE)$altitude
-                      moon <- moonAngle(t, x, y, useRefraction = TRUE)
-                      moonAlt <- moon$altitude
-                      moonOnly <- moonAlt > 0 & sunAlt < 0
-                      moonIllum <- mean(moon$illuminatedFraction[moonOnly])
-                      moonTime = sum(moonOnly) * interval / period
-                      data.frame(moonTime = moonTime, moonIllum = moonIllum)
+                      startDay <- with_tz(startDay, 'UTC')
+                      endDay <- with_tz(endDay, 'UTC')
+                      interval <- first(interval)
+                      cl <- makeCluster(detectCores())
+                      registerDoParallel(cl)
+                      result <- foreach(s = startDay, e = endDay, 
+                                        x = longitude, y = latitude,
+                                        .combine = bind_rows, 
+                                        .packages = c('oce')) %dopar% {
+                                          t <- seq(from = s, to = e, by = interval)
+                                          period = as.numeric(difftime(e, s, units = 'days'))
+                                          sunAlt <- sunAngle(t, x, y, useRefraction = TRUE)$altitude
+                                          moon <- moonAngle(t, x, y, useRefraction = TRUE)
+                                          moonAlt <- moon$altitude
+                                          moonOnly <- moonAlt > 0 & sunAlt < 0
+                                          moonIllum <- mean(moon$illuminatedFraction[moonOnly])
+                                          moonTime = (sum(moonOnly) * interval / period)/60
+                                          moonIndex = moonTime * moonIllum
+                                          data.frame(moonTime = moonTime, moonIllum = moonIllum, moonIndex = moonIndex)
+                                        }
+                      stopCluster(cl)
+                      result
                     }
-  stopCluster(cl)
-  result
-}
+# create dataframe to run moonCalc function on 
+moon_vec = metadata %>% 
+  transmute(startDates = Date, endDates = startDates + days(1), latitude = Lat, longitude = Long)
+# run moonCalc function
+moonIndex <- moonCalc(startDates, endDates, longitude, latitude)
 
-# test function
-startDates = metadata$Date[1:10]
-endDates = startDates + days(1)
-latitude = metadata$Lat[1:10]
-longitude = metadata$Long[1:10]
+## calculate sunset
+# create datafram to run sunset function on
+sun_vec <- metadata %>% 
+  transmute(date = as_date(Date), lat = Lat, lon = Long) 
+# run sunset function
+sunset <- getSunlightTimes(data = sun_vec,
+                           keep = c("sunset"), tz = "PST8PDT") %>% 
+  mutate(Date = as.POSIXct(date))
 
-moon_vec = moonCalc(startDates, endDates, longitude, latitude)
-
-# add moon vect to metadata
-metadata_2 = metadata %>% 
-  mutate(endDate = Date + days(1),
-    moon_vec = moonCalc(Date, endDates, Long, Lat))
+### add moonIndex and sunset to metadata
 
 
-## calculate sunset, moon rise, and moon set
-test_vec <- data.frame(startDate = startDates, endDate = endDates, lat = latitude, lon = longitude)
-# sunset
-test_sun <- test_vec %>% 
-  sunrise.set(lat, lon, startDate, timezone = "PST8PDT", num.days = 1)
+# # sunset
+# test_sun <- test_vec %>% 
+# sunrise.set(latitude, longitude, startDates, timezone = "PST8PDT", num.days = 1)
+# # Error in sunrise.set(., latitude, longitude, startDates, timezone = "PST8PDT",  : unused argument (startDates)
+
+# sunrise.set <- function(latitude, longitude, startDates, timezone, num.days=1){
+#         #this needs to be longitude latitude#
+#         lat.long <- matrix(c(longitude, latitude), nrow=1)
+#         day <- as.POSIXct(startDates, tz=timezone)
+#        sequence <- seq(from=day, length.out=num.days , by="days")
+#         sunrise <- sunriset(lat.long, sequence, direction="sunrise", POSIXct=TRUE)
+#         sunset <- sunriset(lat.long, sequence, direction="sunset", POSIXct=TRUE)
+#         ss <- data.frame(sunrise, sunset)
+#         ss <- ss[,-c(1,3)]
+#         colnames(ss)<-c("sunrise", "sunset")
+#         return(ss)
+# }
+# 
+# sunrise_vec <- sunrise.set(startDates, longitude, latitude, timezone = "PST8PDT")
+
 # moon rise and set
 test_moon <- test_vec %>% 
   getMoonTimes(date = startDates, lat = lat, lon = lon, tz = "PST8PDT", keep = c("rise", "set")) %>% 
