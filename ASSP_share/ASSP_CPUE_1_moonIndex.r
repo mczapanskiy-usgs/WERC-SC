@@ -95,7 +95,7 @@ moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) {
               }
 # create dataframe to run moonCalc function on 
 moon_vec = metadata %>% 
-  transmute(startDates = Date, endDates = startDates + days(1), latitude = Lat, longitude = Long)
+  transmute(startDates = Date, endDates = startDates + days(1), latitude = Lat, longitude = Long, Site = Site)
 # run moonCalc function
 moonI <- moonCalc(moon_vec$startDates, moon_vec$endDates, moon_vec$latitude, moon_vec$longitude) 
 # add dates and location back into datatable
@@ -103,25 +103,29 @@ moonIndex <- moonI %>%
   bind_cols(moon_vec) %>% # STOP CODE AFTER THIS LINE #
   # after checking that dates line up, remove "startDate", also remove "endDates" because not needed
   select(-startDate, -endDates) %>% 
-  mutate(startDates = as.Date(startDates))
+  mutate(startDates = as.Date(startDates), 
+         seq = 1:n())
 
 ## calculate sunset
 # create datafram to run sunset function on
 sun_vec <- metadata %>% 
-  transmute(date = as_date(Date), lat = Lat, lon = Long) 
+  transmute(date = as_date(Date), lat = Lat, lon = Long, Site = Site) 
 # run sunset function
 sunsetTime <- getSunlightTimes(data = sun_vec,
                            keep = c("sunset"), tz = "PST8PDT") %>% 
-  mutate(std_ending = sunset + hours(5) + minutes(18)) # 5.3 hours after sunset
+  mutate(std_ending = sunset + hours(5) + minutes(18),
+         latitude = lat,
+         longitude = lon) %>% # 5.3 hours after sunset # , seq = 1:n())
+  select(-date, -lat, -lon)
 # make sunset dataframe by breaking up sunset time and date
-sunset = sunsetTime %>% 
+Sunset = sunsetTime %>% 
   mutate_at(vars(sunset), funs("startDates" = date(.), "sunset" = as.hms(.)))
   
 
 ### add moonIndex and sunset to metadata
 moonIndex_sunset <- moonIndex %>% 
-  left_join(sunset, by = "startDates") %>%
-  arrange(sunset, moonIllum, moonTime, moonIndex, startDates, std_ending, latitude, longitude)
+  left_join(Sunset, by = c("startDates", "latitude", "longitude", "Site")) %>%
+  arrange(seq, sunset, moonIllum, moonTime, moonIndex, startDates, Site, std_ending, latitude, longitude)
 
 
 # # sunset
