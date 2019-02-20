@@ -16,22 +16,28 @@ library(foreach)
 library(doParallel)
 library(stats)
 library(suncalc)
-
-# library(hms)
+# library(chron)
 # library(rnoaa)
 # library(maptools)
 # library(circular)
 # library(StreamMetabolism)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_2018.csv') %>% 
-  mutate(net_open = as.character(net.open),
-         net_close = as.character(net.close)) %>% 
-  select(-net.open, -net.close)-> metadata_raw
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_2014-2018.csv') %>% 
-  mutate(net_open = as.character(net.open),
-         net_close = as.character(net.close)) %>% 
-  select(-net.open, -net.close) -> metadata_raw_AD
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_2018.csv', na.strings=c("","NA")) -> metadata_raw
+
+metadata_raw$net_open <- times(as.numeric(metadata_raw$net_open))
+convertToDateTime
+        # mutate(net_open = as.character(net_open), net_close = as.character(net_close))
+  #        net_open2 = as.character(net_open2), net_close2 = as.character(net_close2),
+  #        net_open3 = as.character(net_open3), net_close3 = as.character(net_close3),
+  #        net_open4 = as.character(net_open4), net_close4 = as.character(net_close4),
+  #        net_open5 = as.character(net_open5), net_close5 = as.character(net_close5))
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_2014-2018.csv', na.strings=c("","NA")) -> metadata_raw_AD  %>% 
+  # mutate(net_open = as.character(net_open), net_close = as.character(net_close), 
+  #        net_open2 = as.character(net_open2), net_close2 = as.character(net_close2),
+  #        net_open3 = as.character(net_open3), net_close3 = as.character(net_close3),
+  #        net_open4 = as.character(net_open4), net_close4 = as.character(net_close4),
+  #        net_open5 = as.character(net_open5), net_close5 = as.character(net_close5))
 read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>% 
   select(-Notes) -> sites_tbl
 
@@ -39,26 +45,42 @@ read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>%
 metadata_comb <- metadata_raw %>% 
   bind_rows(metadata_raw_AD)
 
-
 ### STANDARDIZE LOCATIONS FOR ALL SITES
 ## for CPUE metatdata
 metadata <- metadata_comb %>% 
-  mutate(Site= mosaic::derivedFactor(
-    "SWcorner" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
-    "SR2" = (island=="SR" & site=="2"),
-    "SR3" = (island=="SR" & site=="3"),
-    "LittleScorpionHeadland" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
-    "HighTerrace" = (island=="SR" & site=="SR High Terrace-East"),
-    "AP" = (island=="SBI" & site=="Arch Point" |island=="SBI" & site=="AP"),
-    "ESP" = (island=="SBI" & site=="Eseal Point" |island=="SBI" & site=="ESP"),
-    "ShagOverlook" = (island=="SBI" & site=="Shag Overlook"),
-    "NatureTrailPlot" = (island=="SBI" & site=="Nature Trail Plot"), 
-    "WebstersPoint" = (island=="SBI" & site=="Webster's Point"), 
-    "PI1" = (island=="PI" & site=="1"| island=="PI" & site==""), 
-    "GC" = (island=="ANI" & site=="GC"),
-    .default = ""),
-    Date = mdy(date, tz = "US/Pacific")) %>% 
-  select(-date, -site) %>%
+  mutate(net_open = strftime(net_open, format = "%H:%M"),
+         net_close = strftime(net_close, format = "%H:%M"))
+         
+         Site= mosaic::derivedFactor(
+        "SWcorner" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
+        "SR2" = (island=="SR" & site=="2"),
+        "SR3" = (island=="SR" & site=="3"),
+        "LittleScorpionHeadland" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
+        "HighTerrace" = (island=="SR" & site=="SR High Terrace-East"),
+        "AP" = (island=="SBI" & site=="Arch Point" |island=="SBI" & site=="AP"),
+        "ESP" = (island=="SBI" & site=="Eseal Point" |island=="SBI" & site=="ESP"),
+        "ShagOverlook" = (island=="SBI" & site=="Shag Overlook"),
+        "NatureTrailPlot" = (island=="SBI" & site=="Nature Trail Plot"), 
+        "WebstersPoint" = (island=="SBI" & site=="Webster's Point"), 
+        "PI1" = (island=="PI" & site=="1"| island=="PI" & site==""), 
+        "GC" = (island=="ANI" & site=="GC"),
+        .default = ""),
+        Date = mdy(date, tz = "US/Pacific"),
+        net_open = hms(net_open),
+        net_closed = hms(net_closed),
+        App_sunset_old = App_sunset,
+        Moon_rise_old = Moon_rise,
+        Moon_Set_old = Moon_Set,
+        Moon_fract_old = Moon_fract,
+        moon_time_old = moon_time,
+        moon_min_old = moon_min,
+        moon_index_old = moon_index,
+        WS_midnight_old = WS_midnight,
+        std_captured_old = std_captured,
+        raw_CPUE_old = raw_CPUE, 
+        std_CPUE_old = std_CPUE,
+        birds_min_area_old = birds.min.area) %>% 
+  select(-site, -std_ending, -std_min) %>%
   # add latitude and longitude to metadata
   left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island"))  
 
@@ -95,9 +117,9 @@ moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) {
               }
 # create dataframe to run moonCalc function on 
 moon_vec = metadata %>% 
-  transmute(startDates = Date, endDates = startDates + days(1), latitude = Lat, longitude = Long, Site = Site)
+  transmute(startDates = Date, endDates = startDates + days(1), Lat, Long, Site = Site)
 # run moonCalc function
-moonI <- moonCalc(moon_vec$startDates, moon_vec$endDates, moon_vec$latitude, moon_vec$longitude) 
+moonI <- moonCalc(moon_vec$startDates, moon_vec$endDates, moon_vec$Lat, moon_vec$Long) 
 # add dates and location back into datatable
 moonIndex <- moonI %>% 
   bind_cols(moon_vec) %>% # STOP CODE AFTER THIS LINE #
@@ -113,9 +135,9 @@ sun_vec <- metadata %>%
 # run sunset function
 sunsetTime <- getSunlightTimes(data = sun_vec,
                            keep = c("sunset"), tz = "PST8PDT") %>% 
-  mutate(std_ending = sunset + hours(5) + minutes(18),
-         latitude = lat,
-         longitude = lon) %>% # 5.3 hours after sunset # , seq = 1:n())
+  mutate(std_ending = sunset + hours(5) + minutes(18), # standard ending = 5.3 hours after sunset
+         Lat = lat,
+         Long = lon) %>% # 
   select(-date, -lat, -lon)
 # make sunset dataframe by breaking up sunset time and date
 Sunset = sunsetTime %>% 
@@ -124,9 +146,14 @@ Sunset = sunsetTime %>%
 
 ### add moonIndex and sunset to metadata
 moonIndex_sunset <- moonIndex %>% 
-  left_join(Sunset, by = c("startDates", "latitude", "longitude", "Site")) %>%
-  arrange(seq, sunset, moonIllum, moonTime, moonIndex, startDates, Site, std_ending, latitude, longitude)
-
+  left_join(Sunset, by = c("startDates", "Lat", "Long", "Site")) %>%
+  mutate(Date = date(startDates)) %>% 
+  select(seq, sunset, moonIllum, moonTime, moonIndex, Date, Site, std_ending, Lat, Long)
+  
+metadata_SunMoon <- metadata %>% 
+  mutate(Date = mdy(date)) %>%
+  left_join(moonIndex_sunset, by = c("Date", "Site", "Lat", "Long")) %>% 
+  
 
 # # sunset
 # test_sun <- test_vec %>% 
