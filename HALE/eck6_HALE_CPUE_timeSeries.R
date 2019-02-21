@@ -1,8 +1,10 @@
 ## this code is to analyze the time series' of the HALE pred control data
 ## how frequently are traps checked?  How often are they skipped?  Can we analyze effort /week?
 
-library("data.table", lib.loc="~/R/win-library/3.2")
-library("dplyr", lib.loc="~/R/win-library/3.2")
+setwd("~/WERC-SC/HALE")
+
+library(data.table)
+library(dplyr)
 
 # write RatInvalid loop function to call to later
 is.RatInvalid <- function(predCaught, TrapStatus) {

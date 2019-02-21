@@ -1,12 +1,15 @@
 ## this code is used to classify bait types for HALE pred control data
 ## cat food, dog food, cat&dog food, cat/dog food + scent, other
 
-library("data.table", lib.loc="~/R/win-library/3.2")
-library("dplyr", lib.loc="~/R/win-library/3.2")
+library(data.table)
+library(dplyr)
 library(mosaic)
 
-read.csv('~/WERC-SC/HALE/catch_6_traploc_weekChecks_20161209.csv',
+read.csv('~/WERC-SC/HALE/catch_6_traploc_weekChecks_w14_20181226.csv',
          stringsAsFactors = FALSE) %>%
+  
+# read.csv('~/WERC-SC/HALE/catch_6_traploc_weekChecks_20161209.csv',
+#          stringsAsFactors = FALSE) %>%
 
   # remove "not rebaited" data (traps where BaitStatus = N and Comments said not rebaited)
   mutate(baitType = mosaic::derivedFactor(
@@ -26,5 +29,7 @@ read.csv('~/WERC-SC/HALE/catch_6_traploc_weekChecks_20161209.csv',
     .method = "first",
     .default = "Other")) -> catch_traploc_weeks_baitType
 
-write.csv(catch_traploc_weeks_baitType, file = '~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_20161209.csv',
-          row.names = FALSE)  
+write.csv(catch_traploc_weeks_baitType, file = '~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_w14_20190220.csv',
+          row.names = FALSE)
+# write.csv(catch_traploc_weeks_baitType, file = '~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_20161209_edited.csv',
+#           row.names = FALSE)  

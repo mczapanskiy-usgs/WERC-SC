@@ -1,7 +1,7 @@
 ### this script identifies the different "predator event" types
 
-library("data.table", lib.loc="~/R/win-library/3.2")
-library("dplyr", lib.loc="~/R/win-library/3.2")
+library(data.table)
+library(dplyr)
 library(mosaic)
 library(ggplot2)
 library(grid)
@@ -11,8 +11,10 @@ library(lubridate)
 ## set wd
 setwd("~/WERC-SC/HALE")
 
-read.csv('~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_20161209_edited.csv',
+read.csv('~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_w14_20190220.csv',
          stringsAsFactors = FALSE) -> catch
+# read.csv('~/WERC-SC/HALE/catch_7_traploc_weeks_baitTypes_20161209_edited.csv',
+#          stringsAsFactors = FALSE) -> catch
 
 catch$otherCaught <- as.character(catch$otherCaught)
 catch$otherCaught[is.na(catch$otherCaught)] <- ""
@@ -36,8 +38,10 @@ catch <- mutate(catch, predEvent = is.predEvent(predCaught, birdCaught, otherCau
          predEvent != 'NA')
 
 # save new catch data file with predEvents to GitHub file
-write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent_20161209.csv',
+write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_predEvent_w14_20190220.csv',
           row.names = FALSE) 
+# write.csv(catch, file = '~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_edited_predEvent_20161209.csv',
+#           row.names = FALSE) 
 
 ### summary stats and graphs of predEvent data
 # first remove dates when trap hadn't been checked in >14 days
