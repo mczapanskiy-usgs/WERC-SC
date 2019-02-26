@@ -81,10 +81,11 @@ write.csv(predEventPUE, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.
 write.csv(CPUEgrid, file = '~/WERC-SC/HALE/TraplinePredEventPUE_zeros_11_20161209.csv',
           row.names = FALSE) 
 # weekly catch for each trap, with season code
-write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches_w14_20161209.csv',
+write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches_20161209.csv',
           row.names = FALSE)
-# write.csv(weeklyCatches, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_weeklyCatches_20161209.csv',
-#           row.names = FALSE) 
+# for ScienceBase
+write.csv(catch, file = '~/WERC-SC/HALE/catch_11_traploc_baitTypes_predEvent_w14_20190221.csv',
+          row.names = FALSE)
 
 # final datasheets for spatial analysis
 spatialCatch <- catch %>% 

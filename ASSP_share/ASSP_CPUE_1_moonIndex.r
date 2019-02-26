@@ -25,19 +25,21 @@ library(chron)
 # library(StreamMetabolism)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_2018.csv', na.strings=c("","NA")) -> metadata_raw 
-  # mutate(net_open = chron::times(net_open), net_close = chron::times(net_close),
-  #        net_open2 = chron::times(net_open2), net_close2 = chron::times(net_close2),
-  #        net_open3 = chron::times(net_open3), net_close3 = chron::times(net_close3),
-  #        net_open4 = chron::times(net_open4), net_close4 = chron::times(net_close4),
-  #        net_open5 = chron::times(net_open5), net_close5 = chron::times(net_close5))
-  
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_2014-2018.csv', na.strings=c("","NA")) -> metadata_raw_AD 
-  # mutate(net_open = chron::times(net_open), net_close = chron::times(net_close),
-  #        net_open2 = chron::times(net_open2), net_close2 = chron::times(net_close2),
-  #        net_open3 = chron::times(net_open3), net_close3 = chron::times(net_close3),
-  #        net_open4 = chron::times(net_open4), net_close4 = chron::times(net_close4),
-  #        net_open5 = chron::times(net_open5), net_close5 = chron::times(net_close5)) 
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_2018.csv') %>% # , na.strings=c("","NA")
+  mutate(net_open = as.POSIXct(paste(date, net_open), format="%m/%d/%Y %H:%M"),
+         net_close = as.POSIXct(paste(date, net_close), format="%m/%d/%Y %H:%M"),
+         nextDay = net_close + 24*60*60, # create a new column of the day netting effort ended
+         hour = as.numeric(hour(net_close)),
+         net_close_new = if_else(hour <= 12, nextDay, net_close)) %>% 
+  select(-net_close, -X, -X.1, -nextDay, -hour) -> metadata_raw 
+
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_2014-2018.csv', na.strings=c("","NA")) %>% 
+  mutate(net_open = as.POSIXct(paste(date, net_open), format="%m/%d/%Y %H:%M"),
+         net_close = as.POSIXct(paste(date, net_close), format="%m/%d/%Y %H:%M"),
+         nextDay = net_close + 24*60*60, # create a new column of the day netting effort ended
+         hour = as.numeric(hour(net_close)),
+         net_close_new = if_else(hour <= 12, nextDay, net_close))%>% 
+  select(-net_close, -nextDay, -hour) -> metadata_raw_AD 
   
 read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>% 
   select(-Notes) -> sites_tbl
@@ -154,48 +156,8 @@ metadata_SunMoon <- metadata %>%
 
 
 ### SUM TIME AND CALCULATE CPUE
-# metadata_SunMoon$net_open <- format(as.POSIXct(metadata_SunMoon$net_open), format = "%H:%M:%S")
-# 
-# metadata_SunMoon <- metadata_SunMoon %>% 
-#   separate(net_open, into = c("date", "time"))
-# 
-# metadata_SunMoon$net_close <- strptime(as.character(metadata_SunMoon$net_close), format = "%H:%M:%S")
-metadata_SunMoon$net_open2 <- strptime(as.character(metadata_SunMoon$net_open2, "%H:%M:%S", tz = ""), format = "%H:%M%S")
-metadata_SunMoon$net_close2 <- strptime(as.character(metadata_SunMoon$net_close2), format = "%H:%M%S")
-metadata_SunMoon$net_open3 <- strptime(as.character(metadata_SunMoon$net_open3), format = "%H:%M%S")
-metadata_SunMoon$net_close3 <- strptime(as.character(metadata_SunMoon$net_close3), format = "%H:%M%S")
-metadata_SunMoon$net_open4 <- strptime(as.character(metadata_SunMoon$net_open4), format = "%H:%M%S")
-metadata_SunMoon$net_close4 <- strptime(as.character(metadata_SunMoon$net_close4), format = "%H:%M%S")
-metadata_SunMoon$net_open5 <- strptime(as.character(metadata_SunMoon$net_open5), format = "%H:%M%S")
-metadata_SunMoon$net_close5 <- strptime(as.character(metadata_SunMoon$net_close5), format = "%H:%M%S")
-
 metadata_SunMoon_CPUE <- metadata_SunMoon %>% 
-  mutate(net_open = minute(net_open), net_close = minute(net_close))
+  mutate(duration = as.numeric(difftime(net_close_new, net_open, units="mins")))
 
+# select(App_sunset, Moon_rise, Moon_Set, moonFrac, moonMin, moonIndex, Date, Island, Site, std_ending, Lat, Long)
 
-
-         net_open2 = as.POSIXct(net_open2), net_close2 = as.POSIXct(net_close2), 
-         net_open3 = chron::times(net_open3), net_close3 = chron::times(net_close3),
-         net_open4 = chron::times(net_open4), net_close4 = chron::times(net_close4),
-         net_open5 = chron::times(net_open5), net_close5 = chron::times(net_close5)
-    
-    duration = dminutes(net_open, net_close))
-         
-         # + net_open2 + net_close2 + net_open3 + net_close3 + net_open4 + net_close4 + net_open5 + net_close5)
-
-
-
-
-%>% 
-  select(App_sunset, Moon_rise, Moon_Set, moonFrac, moonMin, moonIndex, Date, Island, Site, std_ending, Lat, Long)
-
-# metadata_raw$net_open <- strptime(as.character(metadata_raw$net_open), format = "%T")
-# metadata_raw$net_close <- strptime(as.character(metadata_raw$net_close), format = "%T")
-# metadata_raw$net_open2 <- strptime(as.character(metadata_raw$net_open2), format = "%T")
-# metadata_raw$net_close2 <- strptime(as.character(metadata_raw$net_close2), format = "%T")
-# metadata_raw$net_open3 <- strptime(as.character(metadata_raw$net_open3), format = "%T")
-# metadata_raw$net_close3 <- strptime(as.character(metadata_raw$net_close3), format = "%T")
-# metadata_raw$net_open4 <- strptime(as.character(metadata_raw$net_open4), format = "%T")
-# metadata_raw$net_close4 <- strptime(as.character(metadata_raw$net_close4), format = "%T")
-# metadata_raw$net_open5 <- strptime(as.character(metadata_raw$net_open5), format = "%T")
-# metadata_raw$net_close5 <- strptime(as.character(metadata_raw$net_close5), format = "%T")
