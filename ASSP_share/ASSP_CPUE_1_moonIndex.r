@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: Feb 2, 2019
+# last edited: Feb 27, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -22,25 +22,25 @@ library(chron)
 
 ### READ IN BANDING CPUE DATA
 read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_2018.csv', na.strings=c("","NA")) %>% 
-  mutate(net_open = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
-         net_close = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
+  mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
+         net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:
-         nextDay_open = net_open + 24*60*60, nextDay_close = net_close + 24*60*60, 
+         nextDay_open = net_open_old + 24*60*60, nextDay_close = net_close_old + 24*60*60, 
          # pull out the hour of the open/close event, if before 12 then it was after midnight:
-         hour_open = as.numeric(hour(net_open)), hour_close = as.numeric(hour(net_close)),
-         net_open_new = if_else(hour_open <= 12, nextDay_open, net_open),
-         net_close_new = if_else(hour_close <= 12, nextDay_close, net_close)) %>% 
+         hour_open = as.numeric(hour(net_open_old)), hour_close = as.numeric(hour(net_close_old)),
+         net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
+         net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
   select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close) -> metadata_raw 
 
 read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_2014-2018.csv', na.strings=c("","NA")) %>% 
-  mutate(net_open = as.POSIXct(paste(date, net_open), format="%Y-%m-%d  %H:%M"),
-         net_close = as.POSIXct(paste(date, net_close), format="%Y-%m-%d  %H:%M"),
+  mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
+         net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:
-         nextDay_open = net_open + 24*60*60, nextDay_close = net_close + 24*60*60,
+         nextDay_open = net_open_old + 24*60*60, nextDay_close = net_close_old + 24*60*60, 
          # pull out the hour of the open/close event, if before 12 then it was after midnight:
-         hour_open = as.numeric(hour(net_open)), hour_close = as.numeric(hour(net_close)),
-         net_open_new = if_else(hour_open <= 12, nextDay_open, net_open),
-         net_close_new = if_else(hour_close <= 12, nextDay_close, net_close))%>% 
+         hour_open = as.numeric(hour(net_open_old)), hour_close = as.numeric(hour(net_close_old)),
+         net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
+         net_close = if_else(hour_close <= 12, nextDay_close, net_close_old))%>% 
   select(-nextDay_close, -nextDay_open, -hour_open, -hour_close) -> metadata_raw_AD 
   
 read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>% 
@@ -120,65 +120,17 @@ moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) {
                 stopCluster(cl)
                 result
 }
-
-moonIndexF <- function(date, lon, lat) {
-  if(class(date) != 'Date') stop('date must be a Date object')
-
-  d <- data.frame(t = ISOdate(year(date), month(date), day(date), tz = 'UTC') + seq(0, 24*3600, length = 24*3600),
-                  moonalt = oce::moonAngle(t, lon, lat)$altitude,
-                  sunalt = oce::sunAngle(t, lon, lat)$altitude) %>%
-    mutate(absma = abs(moonalt),
-           abssa = abs(sunalt),
-           moonslope = sign(lead(moonalt) - moonalt),
-           sunslope = sign(lead(sunalt) - sunalt))
-
-  moonrise <- d %>%
-    filter(moonslope > 0) %>%
-    arrange(absma) %>%
-    slice(1) %>%
-    select(t) %>%
-    first
-
-  moonset <- d %>%
-    filter(moonslope < 0) %>%
-    arrange(absma) %>%
-    slice(1) %>%
-    select(t) %>%
-    first
-
-  sunrise <- d %>%
-    filter(sunslope > 0) %>%
-    arrange(abssa) %>%
-    slice(1) %>%
-    select(t) %>%
-    first
-
-  sunset <- d %>%
-    filter(sunslope < 0) %>%
-    arrange(abssa) %>%
-    slice(1) %>%
-    select(t) %>%
-    first
-
-  browser()
-
-  diameter <- moonAngle(d$t[1], lon, lat)$diameter
-  illumination <- moonAngle(d$t[1], lon, lat)$illuminatedFraction
-  moontime <- difftime(max(moonrise, sunset), min(moonset, sunrise), units = 'hours') %>% as.numeric
-
-  diameter * illumination * moontime
-}
-
 # create dataframe to run moonCalc function on 
 moon_vec = metadata %>% 
   group_by(date, Lat, Long, Site, nightID) %>%
   count(nightID) %>% 
   ungroup %>% 
-  transmute(date = as.Date(date), startDates = lubridate::ymd(date), endDates = startDates + lubridate::days(1), Lat, Long, nightID = nightID) %>% #
+  transmute(date = as.Date(date), startDates = lubridate::ymd(date), endDates = startDates + lubridate::days(1), 
+            Lat, Long, nightID = nightID) %>% #
   mutate(startDates = as.POSIXct(startDates), endDates = as.POSIXct(endDates))
 # run moonCalc function
 moon <- moonCalc(moon_vec$startDates, moon_vec$endDates, moon_vec$Lat, moon_vec$Long) 
-moonIn <- moonIndexF(moon_vec$date, lon, lat)
+
 # add dates and location back into datatable
 moonIndex <- moon %>% 
   bind_cols(moon_vec) %>% # STOP CODE AFTER THIS LINE AND CHECK THAT DATES LINE UP #
@@ -215,28 +167,81 @@ moonIndex_sunset <- moonIndex %>%
   select(nightID, App_sunset, moonFrac, moonMin, moonIndex, Date, Site, std_ending, Lat, Long)
 ## add combined sun moon dataset to metadata  
 metadata_SunMoon <- metadata %>% 
-  # mutate(Date = mdy(date)) %>%
-  left_join(moonIndex_sunset, by = c("nightID", "Lat", "Long")) 
+  left_join(moonIndex_sunset, by = c("nightID", "Site", "Lat", "Long")) 
 
 
-### SUM TIME AND CALCULATE CPUE
-metadata_SunMoon_CPUE <- metadata_SunMoon %>% 
-  mutate(duration_std = difftime(std_ending, net_open_new, units="mins"), # as.numeric(difftime(std_ending, net_open_new, units="mins")),
-         duration_raw = difftime(net_close_new, net_open_new, units="mins"), # as.numeric(difftime(net_close_new, net_open_new, units="mins")),
-         duration_min = if_else(std_ending <= net_open_new, "0",
-                                if_else(std_ending <= net_close_new, duration_std, duration_raw)))
-           # duration_min = if_else(std_ending < net_close_new, as.numeric(difftime(std_ending, net_open_new, units="mins")),
-           #                                                    as.numeric(difftime(net_close_new, net_open_new, units="mins"))))
+### SUM TIME 
+# create table with just one row per net night
+metadata_unique <- metadata_SunMoon %>% 
+  distinct(nightID) %>% 
+  mutate(seq = 1:n())
+# sum up net time for all net open/close intervals
+metadata_SunMoon_sum <- metadata_SunMoon %>% 
+  mutate(minutes_std_raw = as.character(difftime(std_ending, net_open, units="mins")), 
+         minutes_raw = as.character(difftime(net_close, net_open, units="mins")), 
+         minutes_std = if_else(std_ending <= net_open, "0", 
+                                if_else(std_ending <= net_close, minutes_std_raw, minutes_raw)),
+         minutes_raw = as.numeric(minutes_raw),
+         minutes_std = as.numeric(minutes_std)) %>% 
+  group_by(nightID) %>% 
+  mutate(minutes = sum(minutes_std)) %>% 
+  ungroup %>% 
+  select(-minutes_std_raw)
 
-         # duration_min = case_when(std_ending <= net_open_new ~ "0",
-         #                          std_ending <= net_close_new ~ duration_std,
-         #                          std_ending >  net_close_new ~ duration_raw))
+write.csv(metadata_SunMoon_sum, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv',
+          row.names = FALSE)
 
-         # net_open_new = if_else(hour_open <= 12, nextDay_open, net_open), %>% 
-  
+# test <- metadata_SunMoon_sum %>%
+#   select(nightID, net_open_old, std_ending_old, net_open, net_close, std_ending, minutes_old, minutes_raw, minutes_std, minutes)
 
-test <- metadata_SunMoon_CPUE %>% 
-  select(nightID, net_open, net_open_new, net_close, net_close_new, std_ending_old, std_ending, minutes_old, duration_min)
 
-# select(App_sunset, Moon_rise, Moon_Set, moonFrac, moonMin, moonIndex, Date, Island, Site, std_ending, Lat, Long)
 
+
+# moonIndexF <- function(date, lon, lat) {
+#   if(class(date) != 'Date') stop('date must be a Date object')
+#   
+#   d <- data.frame(t = ISOdate(year(date), month(date), day(date), tz = 'UTC') + seq(0, 24*3600, length = 24*3600),
+#                   moonalt = oce::moonAngle(t, lon, lat)$altitude,
+#                   sunalt = oce::sunAngle(t, lon, lat)$altitude) %>%
+#     mutate(absma = abs(moonalt),
+#            abssa = abs(sunalt),
+#            moonslope = sign(lead(moonalt) - moonalt),
+#            sunslope = sign(lead(sunalt) - sunalt))
+#   
+#   moonrise <- d %>%
+#     filter(moonslope > 0) %>%
+#     arrange(absma) %>%
+#     slice(1) %>%
+#     select(t) %>%
+#     first
+#   
+#   moonset <- d %>%
+#     filter(moonslope < 0) %>%
+#     arrange(absma) %>%
+#     slice(1) %>%
+#     select(t) %>%
+#     first
+#   
+#   sunrise <- d %>%
+#     filter(sunslope > 0) %>%
+#     arrange(abssa) %>%
+#     slice(1) %>%
+#     select(t) %>%
+#     first
+#   
+#   sunset <- d %>%
+#     filter(sunslope < 0) %>%
+#     arrange(abssa) %>%
+#     slice(1) %>%
+#     select(t) %>%
+#     first
+#   
+#   # browser()
+#   
+#   diameter <- moonAngle(d$t[1], lon, lat)$diameter
+#   illumination <- moonAngle(d$t[1], lon, lat)$illuminatedFraction
+#   moontime <- difftime(max(moonrise, sunset), min(moonset, sunrise), units = 'hours') %>% as.numeric
+#   
+#   diameter * illumination * moontime
+# }
+# moonIn <- moonIndexF(moon_vec$date, lon, lat)
