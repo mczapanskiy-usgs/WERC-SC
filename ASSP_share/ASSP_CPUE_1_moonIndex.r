@@ -30,9 +30,9 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_2018.csv', na.strings=c("","NA"
          hour_open = as.numeric(hour(net_open_old)), hour_close = as.numeric(hour(net_close_old)),
          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
-  select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close) -> metadata_raw 
+  select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw 
 
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_2014-2018.csv', na.strings=c("","NA")) %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_1994-2018.csv', na.strings=c("","NA"))  %>% 
   mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
          net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:
@@ -40,8 +40,8 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_2014-2018.csv', na.strin
          # pull out the hour of the open/close event, if before 12 then it was after midnight:
          hour_open = as.numeric(hour(net_open_old)), hour_close = as.numeric(hour(net_close_old)),
          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
-         net_close = if_else(hour_close <= 12, nextDay_close, net_close_old))%>% 
-  select(-nextDay_close, -nextDay_open, -hour_open, -hour_close) -> metadata_raw_AD 
+         net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
+  select(-nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw_AD 
   
 read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>% 
   select(-Notes) -> sites_tbl
@@ -188,7 +188,7 @@ metadata_SunMoon_sum <- metadata_SunMoon %>%
   ungroup %>% 
   select(-minutes_std_raw)
 
-write.csv(metadata_SunMoon_sum, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv',
+write.csv(metadata_SunMoon_sum, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_metadata_1994-2018all.csv',
           row.names = FALSE)
 
 # test <- metadata_SunMoon_sum %>%
