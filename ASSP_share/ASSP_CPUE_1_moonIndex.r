@@ -21,7 +21,7 @@ library(chron)
 # library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_2018.csv', na.strings=c("","NA")) %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_1994-2018_03012019.csv', na.strings=c("","NA")) %>% 
   mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
          net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:
@@ -32,27 +32,27 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_2018.csv', na.strings=c("","NA"
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
   select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw 
 
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_1994-2018.csv', na.strings=c("","NA"))  %>% 
-  mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
-         net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
-         # but some "net_open" and "net_close" times were actually after midnight:
-         nextDay_open = net_open_old + 24*60*60, nextDay_close = net_close_old + 24*60*60, 
-         # pull out the hour of the open/close event, if before 12 then it was after midnight:
-         hour_open = as.numeric(hour(net_open_old)), hour_close = as.numeric(hour(net_close_old)),
-         net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
-         net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
-  select(-nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw_AD 
+# read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_1994-2018.csv', na.strings=c("","NA"))  %>% 
+#   mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
+#          net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
+#          # but some "net_open" and "net_close" times were actually after midnight:
+#          nextDay_open = net_open_old + 24*60*60, nextDay_close = net_close_old + 24*60*60, 
+#          # pull out the hour of the open/close event, if before 12 then it was after midnight:
+#          hour_open = as.numeric(hour(net_open_old)), hour_close = as.numeric(hour(net_close_old)),
+#          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
+#          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
+#   select(-nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw_AD 
   
 read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>% 
   select(-Notes) -> sites_tbl
-
-### COMBINE ALL METADATA
-metadata_comb <- metadata_raw %>% 
-  bind_rows(metadata_raw_AD)
+# 
+# ### COMBINE ALL METADATA
+# metadata_comb <- metadata_raw %>% 
+#   bind_rows(metadata_raw_AD)
 
 ### STANDARDIZE LOCATIONS FOR ALL SITES AND REMOVE SUPERFLUOUS COLUMNS
 ## for CPUE metatdata
-metadata <- metadata_comb %>%
+metadata <- metadata_raw %>%
   mutate(Site= mosaic::derivedFactor(
             "SWcorner" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
             "SR2" = (island=="SR" & site=="2"),
@@ -86,8 +86,8 @@ metadata <- metadata_comb %>%
         raw_CPUE_old = raw_CPUE, 
         std_CPUE_old = std_CPUE,
         birds_min_area_old = birds.min.area) %>% 
-  select(-site, -std_ending, -duration, -std_min, -App_sunset, -Moon_fract, -moon_time, -moon_min, -moon_index, -WS_midnight, 
-         -duration, -minutes, -std_captured, -raw_CPUE, -std_CPUE, -Month, -day) %>%
+  select(-site, -std_ending, -std_min, -App_sunset, -Moon_fract, -moon_time, -moon_min, -moon_index, -WS_midnight, 
+         -minutes, -std_captured, -raw_CPUE, -std_CPUE, -Month, -day) %>%
   # add latitude and longitude to metadata
   left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island"))  
 
