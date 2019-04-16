@@ -73,6 +73,13 @@ CPUEgrid <- expand.grid(Trapline = unique(predEventPUE$Trapline), Week = unique(
   mutate(NEvents = ifelse(is.na(NEvents), 0, NEvents), 
          CPUE = NEvents/NTraps)
 
+trapsYr <- catch %>% 
+  group_by(Trapline, Year) %>% 
+  summarise(n())
+
+write.csv(trapsYr, file = '~/WERC-SC/HALE/catch_11_trapsYr.csv',
+          row.names = FALSE)
+
 ## save to GitHub folder
 # predEventPUE data file
 write.csv(predEventPUE, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
