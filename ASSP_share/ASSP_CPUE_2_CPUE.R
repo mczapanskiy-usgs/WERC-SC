@@ -21,12 +21,14 @@ library(lubridate)
 # library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_catches_2018.csv') %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_catches_1994-2018_03012019.csv') %>% 
   # remove unnecessary rows
   select(-P10, -P09, -P08, -P07, -P06, -P05, -P04, -P03, -P02, -P01, 
          -R6, -R5, -R4, -R3, -R2, -R1, -X, -X.1, -X.2, -X.3, -X.4, -X.5,
-         -tail, -sex, -Release) -> catches_raw
-vread.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_catches_1994-2018.csv') -> catches_raw_AD
+         -tail, -sex, -release.time)  -> catches_raw 
+
+# read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_catches_1994-2018.csv') -> catches_raw_AD
+
 read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv') -> metadata_sum
 
 # for catch data
@@ -46,8 +48,15 @@ catches <- catches_raw %>%
     "PI1" = (island=="PI" & site=="1"| island=="PI" & site==""), 
     "GC" = (island=="ANI" & site=="GC"),
     .default = ""),
-    Date = mdy(date, tz = "US/Pacific")) %>% 
-  select(-date, -site)
+    ## combine dat and time, adjust date to actual capture date
+    capture.time_old = as.POSIXct(paste(date, capture.time), format="%m/%d/%Y %H:%M"),
+    # if "capture.time" times were actually after midnight:
+    nextDay_capture.time = capture.time_old + 24*60*60, 
+    # pull out the hour of capture event, if before 12 then it was after midnight:
+    hour_capture = as.numeric(hour(capture.time_old)),
+    capture_time = if_else(hour_capture <= 12, nextDay_capture.time, capture.time_old),
+    eventDate = mdy(date, tz = "US/Pacific")) %>% 
+  select(-site, -capture.time, -capture.time_old, -nextDay_capture.time, -hour_capture)
 
 # sunsetTime <- getSunlightTimes(data = sun_vec,
 #                                keep = c("sunset"), tz = "PST8PDT") %>% 
@@ -60,8 +69,10 @@ catches <- catches_raw %>%
 ### CPUE
 ## number of catches for each species and night
 catches_t <- catches %>% 
-  mutate(capture.time2 = hm(capture.time),
-         capture_DateTime = as.POSIXct(paste(Date, capture.time2), format="%Y-%m-%d %H:%M:%S"))
+  mutate(capture_DT = paste(date, capture.time),
+         capture_DateTime = as.POSIXct(capture_DT, format="%m/%d/%Y %H:%M")) %>% 
+  select(-date, -site, -capture_DT)
+         
 
 # catches_sum <- catches %>% 
 #   group_by(Date, Site) %>% 
