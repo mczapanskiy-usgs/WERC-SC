@@ -38,10 +38,7 @@ catch_EventPUE$Season <- factor(catch_EventPUE$Season, levels = c("Pre-laying", 
 catch_EventPUE$predEvent <- factor(catch_EventPUE$predEvent, 
                                    levels = c("catCaught", "ratCaught", "mongooseCaught", 
                                               "birdOtherCaught", "baitLost", "trapTriggered", "none"))
-catch_EventPUE$Month <- as.character(catch_EventPUE$Month)
-catch_EventPUE$Month <- as.factor(catch_EventPUE$Month)
-catch_EventPUE$Month <- factor(catch_EventPUE$Month,
-                                  levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"))
+
                                
 # box plot of CPUE in different seasons
 season_box <- ggplot(catch_spatial, aes(Season, CPUE)) +
@@ -150,15 +147,20 @@ season_box <- ggplot(catch_EventPUE, aes(Season)) +
 season_box %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 ggsave(width = 10, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/seasonal_preds_facet_eck15.pdf")
 
+catch_EventPUE$Month <- as.character(catch_EventPUE$Month)
+catch_EventPUE$Month <- as.factor(catch_EventPUE$Month)
+catch_EventPUE$Month <- factor(catch_EventPUE$Month,
+                               levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"))
+                               # levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"))
 
 ### box chart of PREDATOR CPUE by month
-month_box <- ggplot(catch_EventPUE, aes(x=Month, y=CPUE)) + 
+month_box_mong <- ggplot(catch_EventPUE, aes(x=Month, y=CPUE)) + 
   geom_boxplot() +
   facet_wrap(~ predEvent) + # facet_wrap(~ predEvent, nrow = 3) +
   theme_bw() +
-  labs(x = 'Month', y = 'Catch per Weekly Trapline Effort') 
-month_box %+% subset(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
-ggsave(width = 10, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyCPUE_preds_facet_eck15.pdf")
+  labs(x = 'Month', y = 'Mongoose catches per Weekly Trapline Effort') 
+month_box_mong %+% subset(catch_EventPUE, predEvent %in% c("mongooseCaught")) #  "ratCaught", "catCaught", 
+ggsave(width = 10, height = 5, dpi=300, filename = "~/WERC-SC/HALE/outputs/monthlyCPUE_Mong_eck15.pdf")
 
 predCatph_eventPUE <- filter(catch_EventPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught"))
 predMonthCount <- count(predCatph_eventPUE, vars = Month, wt_var = predEvent)
