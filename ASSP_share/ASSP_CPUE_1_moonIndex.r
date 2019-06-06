@@ -140,7 +140,7 @@ moonIndex <- moon %>%
          seq = 1:n()) # seq to make sure that tables are joined in correct order 
 
 ## calculate sunset
-# create datafram to run sunset function on
+# create dataframe to run sunset function on
 sun_vec <- metadata %>%  
   #  remove multiple open/close events for one netting night
   group_by(date, Lat, Long, Site, nightID) %>%
