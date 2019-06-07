@@ -14,6 +14,7 @@ library(lubridate)
 ### READ IN BANDING CPUE DATA
 read.csv('~/WERC-SC/ASSP_share/ASSP_MistnetMetadata_1994-2018.csv') %>% 
   mutate(Date = as.Date(date, format="%Y-%m-%d")) -> metadata
+read.csv('~/WERC-SC/ASSP_share/MistnetMetadata_sumAllSpp.csv') -> catches_std_all
 read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locations_032219.csv') %>% 
   select(-Notes) -> sites_tbl
 read.csv('~/WERC-SC/ASSP_share/CMI_Deployment_Info_CINP_2011-2018.csv') %>%
@@ -22,7 +23,8 @@ read.csv('~/WERC-SC/ASSP_share/CMI_Deployment_Info_CINP_2011-2018.csv') %>%
          Island = as.character(Island)) %>% 
   select(Sensor_Name, Deployment_Date, Deployment_Year, Retrieval_Date, Island, Location, Latitude, Longitude) -> SM_sites
 
-metadata_rev <- metadata %>% 
+# standardize sites, create unique ID, add site locations
+metadata_2 <- metadata %>% 
   mutate(Site= mosaic::derivedFactor(
     "SR1" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| 
                     island=="SR" & site=="UNK" | island=="SR" & site=="Lower terrace of SE Side of SRK"),
@@ -46,6 +48,9 @@ metadata_rev <- metadata %>%
     nightID = paste(dateStr,island, Site, sep = "_")) %>% 
   # add latitude and longitude to metadata
   left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island")) 
+
+metadata_3 <- metadata_2 %>% 
+  left_join(catches_std_all, by = "nightID")
 
 metadata_SM <- metadata_rev %>% 
   select(nightID, Date, year, island, Site, Lat, Long, net_open, net_close_final, notes) %>% #, -day, -Month, -dateStr, -site 

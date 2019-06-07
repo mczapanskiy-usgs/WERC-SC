@@ -45,9 +45,31 @@ obs_mamu_all <- obs_all %>%
          Surv_No = as.numeric(as.factor(date)))
 
 ### CALUCLATE JUVENILE RATIO FROM ADJUSTED HY AND AHY DETECTION VALUES
-# un-adjusted data
+## un-adjusted data
 juvRatio_all <- obs_mamu_all %>% 
   group_by(Year) %>%
+  summarise(nSvy = n_distinct(Surv_No),
+            cov = cov(AHY, HY, use = "pairwise.complete.obs"),
+            AHYsum = sum(AHY, na.rm = TRUE), AHYvar = var(AHY, na.rm = TRUE), AHYave = mean(AHY, na.rm = TRUE),
+            HYsum = sum(HY, na.rm = TRUE), HYvar = var(HY, na.rm = TRUE), HYave = mean(HY, na.rm = TRUE)) %>% 
+  mutate(juvRat = HYsum/AHYsum, # juvenile ratio per survey, adjusted 
+         juvRatVar = (((HYvar/(AHYave^2))+((HYave^2)*AHYvar)/(AHYave^4))-(((2*HYave)*cov)/(AHYave^3)))/nSvy,
+         juvRatSE = juvRatVar^(0.5))
+# zig survey design
+juvRatio_all_zig <- obs_mamu_all %>% 
+  group_by(Year) %>%
+  filter(Survey == "zig") %>% 
+  summarise(nSvy = n_distinct(Surv_No),
+            cov = cov(AHY, HY, use = "pairwise.complete.obs"),
+            AHYsum = sum(AHY, na.rm = TRUE), AHYvar = var(AHY, na.rm = TRUE), AHYave = mean(AHY, na.rm = TRUE),
+            HYsum = sum(HY, na.rm = TRUE), HYvar = var(HY, na.rm = TRUE), HYave = mean(HY, na.rm = TRUE)) %>% 
+  mutate(juvRat = HYsum/AHYsum, # juvenile ratio per survey, adjusted 
+         juvRatVar = (((HYvar/(AHYave^2))+((HYave^2)*AHYvar)/(AHYave^4))-(((2*HYave)*cov)/(AHYave^3)))/nSvy,
+         juvRatSE = juvRatVar^(0.5))
+# 400 m survey design
+juvRatio_all_400 <- obs_mamu_all %>% 
+  group_by(Year) %>%
+  filter(Survey == "400") %>% 
   summarise(nSvy = n_distinct(Surv_No),
             cov = cov(AHY, HY, use = "pairwise.complete.obs"),
             AHYsum = sum(AHY, na.rm = TRUE), AHYvar = var(AHY, na.rm = TRUE), AHYave = mean(AHY, na.rm = TRUE),
@@ -66,12 +88,44 @@ juvRatio_all_cor <- obs_mamu_all %>%
   mutate(juvRatAdj = HYsumAdj/AHYsumAdj, # juvenile ratio per survey
          juvRatVarAdj = (((HYvarAdj/(AHYaveAdj^2))+((HYaveAdj^2)*AHYvarAdj)/(AHYaveAdj^4))-(((2*HYaveAdj)*covAdj)/(AHYaveAdj^3)))/nSvy,
          juvRatSEadj = juvRatVarAdj^(0.5))
+# zig survey design
+juvRatio_all_cor_zig <- obs_mamu_all %>% 
+  group_by(Year) %>%
+  filter(Survey == "zig") %>% 
+  summarise(nSvy = n_distinct(Surv_No),
+            covAdj = cov(HYadj, AHYadj, use = "pairwise.complete.obs"),
+            AHYsumAdj = sum(AHYadj, na.rm = TRUE), AHYvarAdj = var(AHYadj, na.rm = TRUE), AHYaveAdj = mean(AHYadj, na.rm = TRUE), 
+            HYsumAdj = sum(HYadj, na.rm = TRUE), HYvarAdj = var(HYadj, na.rm = TRUE), HYaveAdj = mean(HYadj, na.rm = TRUE)) %>% # annual covariance of adjusted HY and AHY
+  mutate(juvRatAdj = HYsumAdj/AHYsumAdj, # juvenile ratio per survey
+         juvRatVarAdj = (((HYvarAdj/(AHYaveAdj^2))+((HYaveAdj^2)*AHYvarAdj)/(AHYaveAdj^4))-(((2*HYaveAdj)*covAdj)/(AHYaveAdj^3)))/nSvy,
+         juvRatSEadj = juvRatVarAdj^(0.5))
+# 400 m survey design
+juvRatio_all_cor_400 <- obs_mamu_all %>% 
+  group_by(Year) %>%
+  filter(Survey == "400") %>% 
+  summarise(nSvy = n_distinct(Surv_No),
+            covAdj = cov(HYadj, AHYadj, use = "pairwise.complete.obs"),
+            AHYsumAdj = sum(AHYadj, na.rm = TRUE), AHYvarAdj = var(AHYadj, na.rm = TRUE), AHYaveAdj = mean(AHYadj, na.rm = TRUE), 
+            HYsumAdj = sum(HYadj, na.rm = TRUE), HYvarAdj = var(HYadj, na.rm = TRUE), HYaveAdj = mean(HYadj, na.rm = TRUE)) %>% # annual covariance of adjusted HY and AHY
+  mutate(juvRatAdj = HYsumAdj/AHYsumAdj, # juvenile ratio per survey
+         juvRatVarAdj = (((HYvarAdj/(AHYaveAdj^2))+((HYaveAdj^2)*AHYvarAdj)/(AHYaveAdj^4))-(((2*HYaveAdj)*covAdj)/(AHYaveAdj^3)))/nSvy,
+         juvRatSEadj = juvRatVarAdj^(0.5))
 
 ### SAVE juvenile ratio results and statistics
 write.csv(juvRatio_all, file = '~/WERC-SC/MAMU/juvRatio_2013-2018.csv',
           row.names = FALSE) 
 write.csv(juvRatio_all_cor, file = '~/WERC-SC/MAMU/juvRatio_2013-1018_adj.csv',
+          row.names = FALSE)
+# zig survey design
+write.csv(juvRatio_all_zig, file = '~/WERC-SC/MAMU/juvRatio_2013-2018_zig.csv',
           row.names = FALSE) 
+write.csv(juvRatio_all_cor_zig, file = '~/WERC-SC/MAMU/juvRatio_2013-1018_adj_zig.csv',
+          row.names = FALSE)
+# 400 m survey design
+write.csv(juvRatio_all_400, file = '~/WERC-SC/MAMU/juvRatio_2013-2018_400.csv',
+          row.names = FALSE) 
+write.csv(juvRatio_all_cor_400, file = '~/WERC-SC/MAMU/juvRatio_2013-1018_adj_400.csv',
+          row.names = FALSE)
 
 
   
