@@ -56,6 +56,29 @@ metadata_SM <- metadata_rev %>%
   select(nightID, Date, year, island, Site, Lat, Long, net_open, net_close_final, notes) %>% #, -day, -Month, -dateStr, -site 
   full_join(SM_sites, by = c("island" = "Island", "year" = "Deployment_Year"))
 
+# catches_std_ASSP <- catches_std %>% 
+#   filter(recapture == "N",
+#          spp == "ASSP",
+#          std == "1") %>% # std = 1 => caught before std_ending
+#   group_by(nightID) %>% 
+#   summarise(count = n()) %>% 
+#   mutate(no_captured_std = as.character(count))
+# 
+# metadata_count <- metadata %>%  
+#   #  remove multiple open/close events for one netting night
+#   group_by(date, Lat, Long, Site, nightID) %>%
+#   count(nightID) %>% 
+#   ungroup %>% 
+#   full_join(catches_std_ASSP, by = "nightID")
+# 
+# ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
+# catches_std_all <- catches_std %>% 
+#   filter(spp %in% c("ASSP", "LESP", "BLSP")) %>% 
+#   group_by(spp, nightID) %>% 
+#   summarise(count = n()) %>% 
+#   spread(spp, count)
+
+
 write.csv(metadata_SM, file = '~/WERC-SC/ASSP_share/ASSP_MistnetMetadata_SM_1994-2018.csv',
           row.names = FALSE)
 

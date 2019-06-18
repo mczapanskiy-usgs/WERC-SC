@@ -8,28 +8,23 @@ setwd("~/WERC-SC/ASSP_share")
 
 ## LOAD LIBRARIES
 library(data.table)
+library(tidyr)
 library(dplyr)
 library(lubridate)
-# library(mosaic)
-# library(oce)
 library(suncalc)
-# library(foreach)
-# library(doParallel)
-# library(stats)
-# library(circular)
-# library(StreamMetabolism)
-# library(rnoaa)
 
-### READ IN BANDING CPUE DATA
+
+### READ IN DATA
+# banding catches data 
 read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_catches_1994-2018_03012019.csv') %>% 
   # remove unnecessary rows
   select(-P10, -P09, -P08, -P07, -P06, -P05, -P04, -P03, -P02, -P01, 
          -R6, -R5, -R4, -R3, -R2, -R1, -X, -X.1, -X.2, -X.3, -X.4, -X.5,
          -tail, -sex, -release.time)  -> catches_raw 
-
+# netting site data
 read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190506.csv') %>% 
   select(-Notes) -> sites_tbl
-
+# CPUE metadata from "ASSP_CPUE_1"
 read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv') -> metadata
 
 # for catch data
@@ -73,7 +68,7 @@ catches <- catches_raw %>%
 
 ### CALCULATE SUNSET AND STD. ENDING
 # create catches dataframe to run sunset function on
-catches_unique <- catches %>% 
+catch_nights_unique <- catches %>% 
   na.omit() %>%  
   group_by(eventDate, Lat, Long, Site, nightID) %>%
   count(nightID) %>% 
@@ -81,7 +76,7 @@ catches_unique <- catches %>%
   transmute(date = as_date(eventDate), lat = Lat, lon = Long, Site = Site, nightID = nightID)
   
 # run sunset function
-sunTimes <- getSunlightTimes(data = catches_unique,
+sunTimes <- getSunlightTimes(data = catch_nights_unique,
                                keep = c("sunset"), tz = "PST8PDT") %>%
   mutate(std_ending = sunset + lubridate::hours(5) + lubridate::minutes(18), # standard ending = 5.3 hours after sunset
          Lat = lat,
@@ -96,7 +91,6 @@ catches_sun <- catches %>%
   select(-eventDate.x, -eventDate.y)
 
 ### SUM CATCHES BY SPECIES 
-# 
 catches_std <- catches_sun %>% 
   mutate(std = if_else(std_ending > capture_time, "1", "0"), # if bird was caught before std_ending = 1, after = 0
          recapture = mosaic::derivedFactor(
@@ -118,15 +112,10 @@ catches_std_ASSP <- catches_std %>%
          spp == "ASSP",
          std == "1") %>% # std = 1 => caught before std_ending
   group_by(nightID) %>% 
-  summarise(count = n()) %>% 
-  mutate(no_captured_std = as.character(count))
+  summarise(no_captured = n()) %>% 
+  mutate(no_captured_std = as.character(no_captured)) %>% 
+  right_join(catch_nights_unique, by= "nightID")
 
-metadata_count <- metadata %>%  
-  #  remove multiple open/close events for one netting night
-  group_by(date, Lat, Long, Site, nightID) %>%
-  count(nightID) %>% 
-  ungroup %>% 
-  full_join(catches_std_ASSP, by = "nightID")
 
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
 catches_std_all <- catches_std %>% 
@@ -145,6 +134,16 @@ write.csv(catches_std_all, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sumAllSp
 #   group_by(nightID) %>%
 #   count(species)
 
+
+# metadata_count <- metadata %>%  
+#   #  remove multiple open/close events for one netting night
+#   group_by(date, Lat, Long, Site, nightID) %>%
+#   count(nightID) %>% 
+#   # ungroup %>% 
+#   left_join(catches_std_ASSP, by = "nightID")
+
+# x <- catches_std$nightID
+# y <- as.character(metadata$nightID)
 
 ## only birds caught before cutoff point
 ## Sum spp counts

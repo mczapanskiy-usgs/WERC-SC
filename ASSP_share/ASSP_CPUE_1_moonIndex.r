@@ -188,7 +188,7 @@ metadata_SunMoon_sum <- metadata_SunMoon %>%
   ungroup %>% 
   select(-minutes_std_raw)
 
-write.csv(metadata_SunMoon_sum, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_metadata_1994-2018all.csv',
+write.csv(metadata_SunMoon_sum, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv',
           row.names = FALSE)
 
 # test <- metadata_SunMoon_sum %>%
