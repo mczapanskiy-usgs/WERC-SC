@@ -27,7 +27,7 @@ catch_duplicateID_all %>%
   filter(!is.na(TrapNum)) %>% # remove all rows that don't have a trap number (28 entires)
   mutate(date = as.Date(as.character(date), format = '%Y%m%d')) -> catch_duplicateID_all
 
-catch_duplicateID_all %>%
+catch_duplicateID_all <- catch_duplicateID_all %>%
   data.table %>%  # can use column names as variables directly (no $ needed)
 #   filter(!is.na(TrapNum)) %>% # remove all rows that don't have a trap number (28 entires)
 #   mutate(ObsDate = as.Date(as.character(dateStr), format = '%Y%m%d')) %>% # adds new column "ObsDate"
@@ -36,7 +36,10 @@ catch_duplicateID_all %>%
   group_by(Trapline, TrapNum) %>% # distinct trap groups, so that lag(BaitSet) isn't accidentally associated with any other traplines/numbers
   mutate(BaitPrevOld = BaitPrev, 
          BaitPrev = as.character(ifelse(BaitPrevOld != '', BaitPrevOld, lag(BaitSet)))) %>% ## recreated BaitPrev to include all values and renamed BaitPrevOld
-  ungroup %>%
-  write.csv('~/WERC-SC/HALE/catch_4_duplicateID_20161209.csv',  ##catch_addDuplicates2.csv',
+  ungroup 
+
+write.csv(catch_duplicateID_all, file = '~/WERC-SC/HALE/catch_4_duplicateID_20161209.csv',  ##catch_addDuplicates2.csv',
             row.names = FALSE)
+
+
 # incorporate BaitPrev2 into catch_duplicateID.csv

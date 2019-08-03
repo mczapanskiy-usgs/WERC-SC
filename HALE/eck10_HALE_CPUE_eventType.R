@@ -34,7 +34,7 @@ is.predEvent <- function(predCaught, birdCaught, otherCaught, trapStatus, baitSt
 
 # create predEvent column based on is.predEvent function (and remove mouse caught and NA events)
 catch <- mutate(catch, predEvent = is.predEvent(predCaught, birdCaught, otherCaught, TrapStatus, BaitStatus)) %>% 
-  filter(predEvent != 'mouseCaught',
+  filter(predEvent != 'mouseCaught', 
          predEvent != 'NA')
 
 # save new catch data file with predEvents to GitHub file

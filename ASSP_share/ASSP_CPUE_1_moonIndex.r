@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: Feb 27, 2019
+# last edited: June 19, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -31,19 +31,8 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_1994-2018_03012019.csv', na.str
          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
   select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw 
-
-# read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_SR_SBI_CPUE_1994-2018.csv', na.strings=c("","NA"))  %>% 
-#   mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
-#          net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
-#          # but some "net_open" and "net_close" times were actually after midnight:
-#          nextDay_open = net_open_old + 24*60*60, nextDay_close = net_close_old + 24*60*60, 
-#          # pull out the hour of the open/close event, if before 12 then it was after midnight:
-#          hour_open = as.numeric(hour(net_open_old)), hour_close = as.numeric(hour(net_close_old)),
-#          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
-#          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
-#   select(-nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw_AD 
   
-read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190506.csv') %>% 
   select(-Notes) -> sites_tbl
 # 
 # ### COMBINE ALL METADATA
@@ -54,37 +43,46 @@ read.csv('~/WERC-SC/ASSP_share/mistnet_sites_rev.csv') %>%
 ## for CPUE metatdata
 metadata <- metadata_raw %>%
   mutate(Site= mosaic::derivedFactor(
-            "SWcorner" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
-            "SR2" = (island=="SR" & site=="2"),
-            "SR3" = (island=="SR" & site=="3"),
-            "LittleScorpionHeadland" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
-            "HighTerrace" = (island=="SR" & site=="SR High Terrace-East"),
-            "AP" = (island=="SBI" & site=="Arch Point" |island=="SBI" & site=="AP"),
-            "ESP" = (island=="SBI" & site=="Eseal Point" |island=="SBI" & site=="ESP"),
-            "ShagOverlook" = (island=="SBI" & site=="Shag Overlook"),
-            "NatureTrailPlot" = (island=="SBI" & site=="Nature Trail Plot"), 
-            "WebstersPoint" = (island=="SBI" & site=="Webster's Point"), 
-            "PI1" = (island=="PI" & site=="1"| island=="PI" & site==""), 
-            "GC" = (island=="ANI" & site=="GC"),
-            .default = ""),
+        # ANI
+        "CC" = (island=="ANI" & site=="Cathedral Cove"),
+        "EAI_N" = (island=="ANI" & site=="EAI North side, dock area" | island=="ANI" & site=="Landing Cove Overlook"),
+        "EAI_S" = (island=="ANI" & site=="EAI South Ridge" | island=="ANI" & site=="EAI South side--near water catchment"),
+        "EAI_SW" = (island=="ANI" & site=="EAI SW end"),
+        "EAI_W" = (island=="ANI" & site=="EAI west of lighthouse"),
+        "FC" = (island=="ANI" & site =="North side Frenchy's Cove, East End, Upper Bench" | island=="ANI" & site =="Frenchy's Beach" | island=="ANI" & site =="Frenchy's Cove"),
+        "GC" = (island=="ANI" & site=="GC"),
+        "RR" = (island=="ANI" & site=="Rat Rock"),
+        "RC" = (island=="ANI" & site=="Rockfall Cove"), 
+        # PI
+        "PI1" = (island=="PI" & site=="1"| island=="PI" & site==""), 
+        # SBI
+        "AP" = (island=="SBI" & site=="Arch Point" |island=="SBI" & site=="AP"),
+        "ESP" = (island=="SBI" & site=="Eseal Point" |island=="SBI" & site=="ESP" |island=="SBI" & site==""),
+        "NTP" = (island=="SBI" & site=="Nature Trail Plot"), 
+        "NCliffs" = (island=="SBI" & site=="North Peak Cliffs" | island=="SBI" & site=="North Cliffs"), 
+        "SR" = (island=="SBI" & site=="Shag Overlook" | island=="SBI" & site=="Shag Rock Overlook"),
+        "SP" = (island=="SBI" & site=="SignalPeak" | island=="SBI" & site=="Signal Peak"), 
+        "Sutil" = (island=="SBI" & site=="Sutil Island"), 
+        "WP" = (island=="SBI" & site=="Webster's Point" | island=="SBI" & site=="Webster Point Draw"),
+        "WCliffs" = (island=="SBI" & site=="West Cliffs"), 
+        # SCI
+        "DR" = (island=="SBI" & site=="Diablo Rock"), 
+        # SR
+        "SR1" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
+        "SR2" = (island=="SR" & site=="2"),
+        "SR3" = (island=="SR" & site=="3"),
+        "LSH" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
+        "HT" = (island=="SR" & site=="SR High Terrace-East"),
+        .default = ""),
         # create unique netting night ID
-        day = substr(date, 9, 10),
-        Month = substr(date, 6, 7),
+        day = substr(date, 9, 10), Month = substr(date, 6, 7),
         dateStr = paste(year, Month, day, sep = ""),
         nightID = paste(dateStr,island, Site, sep = "_"),
         # rename all old fields
-        App_sunset_old = App_sunset,
-        Moon_fract_old = Moon_fract,
-        moon_time_old = moon_time,
-        moon_min_old = moon_min,
-        moon_index_old = moon_index,
-        WS_midnight_old = WS_midnight,
-        std_ending_old = std_ending,
-        # duration_old = duration,
-        minutes_old = minutes,
-        std_captured_old = std_captured,
-        raw_CPUE_old = raw_CPUE, 
-        std_CPUE_old = std_CPUE,
+        App_sunset_old = App_sunset, Moon_fract_old = Moon_fract, moon_time_old = moon_time, 
+        moon_min_old = moon_min, moon_index_old = moon_index, WS_midnight_old = WS_midnight,
+        std_ending_old = std_ending, minutes_old = minutes, # duration_old = duration,
+        std_captured_old = std_captured, raw_CPUE_old = raw_CPUE, std_CPUE_old = std_CPUE,
         birds_min_area_old = birds.min.area) %>% 
   select(-site, -std_ending, -std_min, -App_sunset, -Moon_fract, -moon_time, -moon_min, -moon_index, -WS_midnight, 
          -minutes, -std_captured, -raw_CPUE, -std_CPUE, -Month, -day) %>%
@@ -125,11 +123,14 @@ moon_vec = metadata %>%
   group_by(date, Lat, Long, Site, nightID) %>%
   count(nightID) %>% 
   ungroup %>% 
-  transmute(date = as.Date(date), startDates = lubridate::ymd(date), endDates = startDates + lubridate::days(1), 
-            Lat, Long, nightID = nightID) %>% #
-  mutate(startDates = as.POSIXct(startDates), endDates = as.POSIXct(endDates))
+  transmute(date = as.Date(date), 
+            startDay = as.POSIXct(date, format="%Y-%m-%d"), 
+            endDay = startDay + lubridate::days(1), 
+            Lat, Long, nightID = nightID) %>% 
+  mutate(startDay = as.POSIXct(startDay), endDay = as.POSIXct(endDay)) %>% # startDates = as.POSIXct(startDay, format="%Y-%m-%d"), 
+  drop_na()
 # run moonCalc function
-moon <- moonCalc(moon_vec$startDates, moon_vec$endDates, moon_vec$Lat, moon_vec$Long) 
+moon <- moonCalc(moon_vec$startDay, moon_vec$endDay, moon_vec$Lat, moon_vec$Long) 
 
 # add dates and location back into datatable
 moonIndex <- moon %>% 

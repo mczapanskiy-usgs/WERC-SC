@@ -28,7 +28,7 @@ read.csv('~/WERC-SC/HALE/catch_5_duplicateID_withtraploc_20161209.csv',
   filter(TrapStatus != "M") %>% # TrapStatus = M = missing = trap not present
   
   # flag trap checks with closed rat
-  mutate(RatInvalid = is.RatInvalid(predCaught, TrapStatus)) %>% 
+  mutate(RatInvalid = is.RatInvalid(predCaught, TrapStatus)) %>%
   filter(!RatInvalid) %>%
   
   # remove "not rebaited" data (traps where BaitStatus = N and Comments said not rebaited)
@@ -49,8 +49,9 @@ read.csv('~/WERC-SC/HALE/catch_5_duplicateID_withtraploc_20161209.csv',
            as.numeric %>% 
            floor) %>% # mutate(prevCheckInterval = difftime(lead(date), date, units = 'days') %>% as.numeric %>% floor) %>% 
   ungroup %>%
-  mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14)  -> catch_traploc_weekChecks_w14 # change the number to adjust the "effort" interval
-# %>% filter(TrapChecked = "TRUE")
+  # mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14) %>% # change the number to adjust the "effort" interval
+  # filter(TrapChecked = "TRUE") -> catch_traploc_weekChecks
+  mutate(TrapChecked = !is.na(prevCheckInterval) & prevCheckInterval < 14) -> catch_traploc_weekChecks_w14 
 
 ## remove entries with unknown BaitStatus (for Raina to review)
 catch_traploc_weekChecks %>%

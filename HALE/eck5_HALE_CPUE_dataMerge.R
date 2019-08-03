@@ -61,7 +61,10 @@ anti_join(trap_catches,
   list(select(catches_with_traploc_partial, date:catchID, Filename, StartDate, Trapline:TrapNum, Trap_Brand:point_Y, Year:Comments, duplicate:Dummy), .) %>%  ## StartDate:EndDate, Trapline:TrapNum, Year:Dummy, Trap_Brand:Northing), .) %>% 
   rbindlist(fill = TRUE) -> catches_with_traploc
 
-write.csv(catches_with_traploc,file = '~/WERC-SC/HALE/catch_5_duplicateID_withtraploc_20161209.csv',
+unique <- !catches_with_traploc$catchID %in% catches_with_traploc$catchID[duplicated(catches_with_traploc$catchID)]
+summary(unique)
+
+write.csv(catches_with_traploc, file = '~/WERC-SC/HALE/catch_5_duplicateID_withtraploc_20161209.csv',
             row.names = FALSE)  
 
 

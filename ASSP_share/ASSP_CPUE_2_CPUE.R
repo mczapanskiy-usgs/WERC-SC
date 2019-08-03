@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates net time and CPUE
 # created: Feb 11, 2019 by: E Kelsey
-# last edited: June 5, 2019
+# last edited: June 19, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -29,7 +29,7 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv') -> metadat
 
 # for catch data
 catches <- catches_raw %>% 
-  select(date, island, site, capture.time, species, recapture.) %>% 
+  select(date, island, year, site, capture.time, species, recapture.) %>% 
   mutate(Site= mosaic::derivedFactor(
     "SWcorner" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR" | island=="SR" & site=="UNK" | island=="SR" & site==""),
     "SR2" = (island=="SR" & site=="2"),
@@ -53,15 +53,18 @@ catches <- catches_raw %>%
     "RatR" = (island=="ANI" & site=="Rat Rock"),
     .default = ""),
     # create unique netting night ID
-    nightID = paste(date,island, Site, sep = "_"),
+    day = substr(date, 9, 10),
+    Month = substr(date, 6, 7),
+    dateStr = paste(year, Month, day, sep = ""),
+    nightID = paste(dateStr,island, Site, sep = "_"),
     ## combine dat and time, adjust date to actual capture date
-    capture.time_old = as.POSIXct(paste(date, capture.time), format="%m/%d/%Y %H:%M"),
+    capture.time_old = as.POSIXct(paste(date, capture.time), format="%Y-%m-%d %H:%M"),
     # if "capture.time" times were actually after midnight:
     nextDay_capture.time = capture.time_old + 24*60*60, 
     # pull out the hour of capture event, if before 12 then it was after midnight:
     hour_capture = as.numeric(hour(capture.time_old)),
     capture_time = if_else(hour_capture <= 12, nextDay_capture.time, capture.time_old),
-    eventDate = mdy(date, tz = "US/Pacific")) %>% 
+    eventDate = ymd(date, tz = "US/Pacific")) %>% 
   select(-site, -capture.time, -capture.time_old, -nextDay_capture.time, -hour_capture) %>% 
   left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island"))
 
@@ -116,6 +119,8 @@ catches_std_ASSP <- catches_std %>%
   mutate(no_captured_std = as.character(no_captured)) %>% 
   right_join(catch_nights_unique, by= "nightID")
 
+test <- anti_join(catches_std_ASSP, metadata, by = "nightID")
+
 
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
 catches_std_all <- catches_std %>% 
@@ -125,6 +130,9 @@ catches_std_all <- catches_std %>%
   spread(spp, count)
 
 write.csv(catches_std_all, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sumAllSpp.csv',
+          row.names = FALSE)
+
+write.csv(test, file = '~/WERC-SC/ASSP_share/missingBANDING.csv',
           row.names = FALSE)
 
 
