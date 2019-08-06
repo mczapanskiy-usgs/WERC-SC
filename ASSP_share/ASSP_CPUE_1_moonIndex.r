@@ -21,7 +21,7 @@ library(chron)
 # library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_1994-2018_03012019.csv', na.strings=c("","NA")) %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_20190618.csv', na.strings=c("","NA")) %>% 
   mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
          net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:
@@ -32,7 +32,7 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_1994-2018_03012019.csv', na.str
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
   select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw 
   
-read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190506.csv') %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190802.csv') %>% 
   select(-Notes) -> sites_tbl
 # 
 # ### COMBINE ALL METADATA
@@ -123,21 +123,23 @@ moon_vec = metadata %>%
   group_by(date, Lat, Long, Site, nightID) %>%
   count(nightID) %>% 
   ungroup %>% 
-  transmute(date = as.Date(date), 
-            startDay = as.POSIXct(date, format="%Y-%m-%d"), 
+  # mutate() %>% 
+  transmute(date = date,
+            startDay = as.POSIXct(date), # , format="%Y-%m-%d %h:%m:%s" 
             endDay = startDay + lubridate::days(1), 
             Lat, Long, nightID = nightID) %>% 
-  mutate(startDay = as.POSIXct(startDay), endDay = as.POSIXct(endDay)) %>% # startDates = as.POSIXct(startDay, format="%Y-%m-%d"), 
-  drop_na()
+  # mutate(startDay = as.POSIXct(startDay), endDay = as.POSIXct(endDay)) %>% # startDates = as.POSIXct(startDay, format="%Y-%m-%d"), 
+  drop_na() # remove the few rows with unknown locations
+
 # run moonCalc function
 moon <- moonCalc(moon_vec$startDay, moon_vec$endDay, moon_vec$Lat, moon_vec$Long) 
 
 # add dates and location back into datatable
 moonIndex <- moon %>% 
   bind_cols(moon_vec) %>% # STOP CODE AFTER THIS LINE AND CHECK THAT DATES LINE UP #
-  # after checking that dates line up, remove "startDate", also remove "endDates" because not needed
-  select(-startDate, -endDates) %>% 
-  mutate(startDates = as.Date(startDates), 
+  # after checking that dates line up, remove "startDate", also remove "endDay" because not needed
+  select(-startDate, -endDay) %>% 
+  mutate(startDay = as.Date(startDay), 
          seq = 1:n()) # seq to make sure that tables are joined in correct order 
 
 ## calculate sunset

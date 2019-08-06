@@ -16,7 +16,7 @@ library(suncalc)
 
 ### READ IN DATA
 # banding catches data 
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_catches_1994-2018_03012019.csv') %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_06182019.csv') %>% 
   # remove unnecessary rows
   select(-P10, -P09, -P08, -P07, -P06, -P05, -P04, -P03, -P02, -P01, 
          -R6, -R5, -R4, -R3, -R2, -R1, -X, -X.1, -X.2, -X.3, -X.4, -X.5,
