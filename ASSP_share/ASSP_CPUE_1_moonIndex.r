@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: June 19, 2019
+# last edited: August 7, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -54,10 +54,10 @@ metadata <- metadata_raw %>%
         "RR" = (island=="ANI" & site=="Rat Rock"),
         "RC" = (island=="ANI" & site=="Rockfall Cove"), 
         # PI
-        "PI1" = (island=="PI" & site=="1"| island=="PI" & site==""), 
+        "PI1" = (island=="PI" & site=="1" | island=="PI" & site=="" | island=="PI" & site=="UNK"), 
         # SBI
-        "AP" = (island=="SBI" & site=="Arch Point" |island=="SBI" & site=="AP"),
-        "ESP" = (island=="SBI" & site=="Eseal Point" |island=="SBI" & site=="ESP" |island=="SBI" & site==""),
+        "AP" = (island=="SBI" & site=="Arch Point" | island=="SBI" & site=="AP"),
+        "ESP" = (island=="SBI" & site=="Eseal Point" | island=="SBI" & site=="ESP" | island=="SBI" & site=="" | island=="SBI" & site=="UNK"),
         "NTP" = (island=="SBI" & site=="Nature Trail Plot"), 
         "NCliffs" = (island=="SBI" & site=="North Peak Cliffs" | island=="SBI" & site=="North Cliffs"), 
         "SR" = (island=="SBI" & site=="Shag Overlook" | island=="SBI" & site=="Shag Rock Overlook"),
@@ -71,7 +71,7 @@ metadata <- metadata_raw %>%
         "SR1" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
         "SR2" = (island=="SR" & site=="2"),
         "SR3" = (island=="SR" & site=="3"),
-        "LSH" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
+        "LSH" = (island=="SR" & site=="Little Scorstartpion Headland" | island=="SR" & site=="Scorpion Bluff"),
         "HT" = (island=="SR" & site=="SR High Terrace-East"),
         .default = ""),
         # create unique netting night ID
@@ -149,7 +149,8 @@ sun_vec <- metadata %>%
   group_by(date, Lat, Long, Site, nightID) %>%
   count(nightID) %>% 
   ungroup %>% 
-  transmute(date = as_date(date), lat = Lat, lon = Long, Site = Site, nightID = nightID) 
+  transmute(date = as_date(date), lat = Lat, lon = Long, Site = Site, nightID = nightID) %>% 
+  drop_na() 
 # run sunset function
 sunsetTime <- getSunlightTimes(data = sun_vec,
                            keep = c("sunset"), tz = "PST8PDT") %>% 
@@ -166,7 +167,7 @@ sunsetTime <- getSunlightTimes(data = sun_vec,
 ## combine moonIndex and sunset
 moonIndex_sunset <- moonIndex %>%  
   left_join(sunsetTime, by = c("nightID", "Lat", "Long")) %>% # c("startDates", "Lat", "Long", "Site")
-  mutate(Date = date(startDates)) %>% 
+  mutate(Date = date(startDay)) %>% 
   select(nightID, App_sunset, moonFrac, moonMin, moonIndex, Date, Site, std_ending, Lat, Long)
 ## add combined sun moon dataset to metadata  
 metadata_SunMoon <- metadata %>% 
@@ -193,6 +194,8 @@ metadata_SunMoon_sum <- metadata_SunMoon %>%
 
 write.csv(metadata_SunMoon_sum, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv',
           row.names = FALSE)
+
+
 
 # test <- metadata_SunMoon_sum %>%
 #   select(nightID, net_open_old, std_ending_old, net_open, net_close, std_ending, minutes_old, minutes_raw, minutes_std, minutes)

@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates net time and CPUE
 # created: Feb 11, 2019 by: E Kelsey
-# last edited: June 19, 2019
+# last edited: August 7, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -20,37 +20,51 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_06182019.csv') %>%
   # remove unnecessary rows
   select(-P10, -P09, -P08, -P07, -P06, -P05, -P04, -P03, -P02, -P01, 
          -R6, -R5, -R4, -R3, -R2, -R1, -X, -X.1, -X.2, -X.3, -X.4, -X.5,
-         -tail, -sex, -release.time)  -> catches_raw 
+         -tail, -sex, -release.time) %>% 
+  distinct() -> catches_raw 
+
 # netting site data
-read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190506.csv') %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190802.csv') %>% 
   select(-Notes) -> sites_tbl
+
 # CPUE metadata from "ASSP_CPUE_1"
 read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv') -> metadata
 
 # for catch data
 catches <- catches_raw %>% 
   select(date, island, year, site, capture.time, species, recapture.) %>% 
+  filter(island != "ND") %>% 
   mutate(Site= mosaic::derivedFactor(
-    "SWcorner" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR" | island=="SR" & site=="UNK" | island=="SR" & site==""),
+    # ANI
+    "CC" = (island=="ANI" & site=="Cathedral Cove"),
+    "EAI_N" = (island=="ANI" & site=="EAI North side, dock area" | island=="ANI" & site=="Landing Cove Overlook"),
+    "EAI_S" = (island=="ANI" & site=="EAI South Ridge" | island=="ANI" & site=="EAI South side--near water catchment"),
+    "EAI_SW" = (island=="ANI" & site=="EAI SW end"),
+    "EAI_W" = (island=="ANI" & site=="EAI west of lighthouse"),
+    "FC" = (island=="ANI" & site =="North side Frenchy's Cove, East End, Upper Bench" | island=="ANI" & site =="Frenchy's Beach" | island=="ANI" & site =="Frenchy's Cove"),
+    "GC" = (island=="ANI" & site=="GC"),
+    "RR" = (island=="ANI" & site=="Rat Rock"),
+    "RC" = (island=="ANI" & site=="Rockfall Cove"), 
+    # PI
+    "PI1" = (island=="PI" & site=="1"| island=="PI" & site=="" | island=="PI" & site=="UNK"), 
+    # SBI
+    "AP" = (island=="SBI" & site=="Arch Point" | island=="SBI" & site=="AP"),
+    "ESP" = (island=="SBI" & site=="Eseal Point" | island=="SBI" & site=="ESP" | island=="SBI" & site=="" | island=="SBI" & site=="UNK"),
+    "NTP" = (island=="SBI" & site=="Nature Trail Plot"), 
+    "NCliffs" = (island=="SBI" & site=="North Peak Cliffs" | island=="SBI" & site=="North Cliffs"), 
+    "SR" = (island=="SBI" & site=="Shag Overlook" | island=="SBI" & site=="Shag Rock Overlook"),
+    "SP" = (island=="SBI" & site=="SignalPeak" | island=="SBI" & site=="Signal Peak"), 
+    "Sutil" = (island=="SBI" & site=="Sutil Island"), 
+    "WP" = (island=="SBI" & site=="Webster's Point" | island=="SBI" & site=="Webster Point Draw"),
+    "WCliffs" = (island=="SBI" & site=="West Cliffs"), 
+    # SCI
+    "DR" = (island=="SCI" & site=="Diablo Rock"), 
+    # SR
+    "SR1" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR" | island=="SR" & site=="UNK" | island=="SR" & site=="AB10"),
     "SR2" = (island=="SR" & site=="2"),
     "SR3" = (island=="SR" & site=="3"),
-    "LittleScorpionHeadland" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
-    "HighTerrace" = (island=="SR" & site=="SR High Terrace-East"),
-    "AP" = (island=="SBI" & site=="Arch Point" |island=="SBI" & site=="AP"),
-    "ESP" = (island=="SBI" & site=="Eseal Point" |island=="SBI" & site=="ESP"),
-    "ShagOverlook" = (island=="SBI" & site=="Shag Overlook" | island=="SBI" & site=="Shag Rock Overlook"),
-    "NatureTrailPlot" = (island=="SBI" & site=="Nature Trail Plot"), 
-    "WebstersPoint" = (island=="SBI" & site=="Webster's Point" | island=="SBI" & site=="Webster Point Draw" | island=="SBI" & site=="WebsterPointDraw"| island=="SBI" & site=="WPDR"), 
-    "NCliffs" = (island == "SBI" & site == "North Cliffs" | island == "SBI" & site == "North Peak Cliffs"),
-    "WCliffs" = (island == "SBI" & site == "West Cliffs"),
-    "SutilI" = (island == "SBI" & site == "Sutil Island"),
-    "SignalPeak" = (island == "SBI" & site == "Signal Peak"),
-    "PI1" = (island=="PI" & site=="1"| island=="PI" & site==""), 
-    "GarbageC" = (island=="ANI" & site=="GC"),
-    "Frenchys" = (island=="ANI" & site=="Frenchy's Cove"),
-    "NFrenchys" = (island=="ANI" & site=="North side Frenchy's Cove, East End, Upper Bench"),
-    "CathedralC" = (island=="ANI" & site=="Cathedral Cove"),
-    "RatR" = (island=="ANI" & site=="Rat Rock"),
+    "LSH" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
+    "HT" = (island=="SR" & site=="SR High Terrace-East"),
     .default = ""),
     # create unique netting night ID
     day = substr(date, 9, 10),
@@ -66,18 +80,22 @@ catches <- catches_raw %>%
     capture_time = if_else(hour_capture <= 12, nextDay_capture.time, capture.time_old),
     eventDate = ymd(date, tz = "US/Pacific")) %>% 
   select(-site, -capture.time, -capture.time_old, -nextDay_capture.time, -hour_capture) %>% 
-  left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island"))
+  left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island")) 
 
+catches_nightID <- catches %>% 
+  group_by(nightID) %>% 
+  mutate(seq = 1:n(),
+         catchID = paste(nightID, seq, sep = "_")) %>% 
+  ungroup()
 
 ### CALCULATE SUNSET AND STD. ENDING
 # create catches dataframe to run sunset function on
-catch_nights_unique <- catches %>% 
+catch_nights_unique <- catches_nightID %>% 
   na.omit() %>%  
   group_by(eventDate, Lat, Long, Site, nightID) %>%
   count(nightID) %>% 
   ungroup %>% 
   transmute(date = as_date(eventDate), lat = Lat, lon = Long, Site = Site, nightID = nightID)
-  
 # run sunset function
 sunTimes <- getSunlightTimes(data = catch_nights_unique,
                                keep = c("sunset"), tz = "PST8PDT") %>%
@@ -88,12 +106,18 @@ sunTimes <- getSunlightTimes(data = catch_nights_unique,
          eventDate = as.POSIXct(date)) %>%
   select(-date, -lat, -lon, -sunset)
 
-catches_sun <- catches %>% 
-  left_join(sunTimes, by = c("Site", "nightID", "Lat", "Long")) %>% # c("Site", "nightID", "eventDate", "Lat", "Long")) 
+## bind sunset and std_ending times with catches dataset
+catches_sun <- catches_nightID %>% 
+  inner_join(sunTimes, by = c("Site", "nightID", "Lat", "Long")) %>% # c("Site", "nightID", "eventDate", "Lat", "Long")) 
   mutate(eventDate = eventDate.x) %>% 
-  select(-eventDate.x, -eventDate.y)
+  select(-eventDate.x, -eventDate.y) %>% 
+  # 56 entries from SR 2005-06-02 were duplicated for some reason
+  mutate(duplicate = duplicated(catchID)) %>% 
+  filter(duplicate == !TRUE)
+# summary(dup)
 
-### SUM CATCHES BY SPECIES 
+
+# standardize recapture and species
 catches_std <- catches_sun %>% 
   mutate(std = if_else(std_ending > capture_time, "1", "0"), # if bird was caught before std_ending = 1, after = 0
          recapture = mosaic::derivedFactor(
@@ -110,6 +134,7 @@ catches_std <- catches_sun %>%
            "UNK" = (species == "UNK" & species=="ASSP/LESP"),
            .default = "UNK"))
 
+### SUM CATCHES BY SPECIES 
 catches_std_ASSP <- catches_std %>% 
   filter(recapture == "N",
          spp == "ASSP",
@@ -119,20 +144,20 @@ catches_std_ASSP <- catches_std %>%
   mutate(no_captured_std = as.character(no_captured)) %>% 
   right_join(catch_nights_unique, by= "nightID")
 
-test <- anti_join(catches_std_ASSP, metadata, by = "nightID")
+missingBANDING <- anti_join(catches_std_ASSP, metadata, by = "nightID")
 
 
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
-catches_std_all <- catches_std %>% 
+catches_std_allSP <- catches_std %>% 
   filter(spp %in% c("ASSP", "LESP", "BLSP")) %>% 
   group_by(spp, nightID) %>% 
   summarise(count = n()) %>% 
   spread(spp, count)
 
-write.csv(catches_std_all, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sumAllSpp.csv',
+write.csv(catches_std_allSP, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sumAllSpp.csv',
           row.names = FALSE)
 
-write.csv(test, file = '~/WERC-SC/ASSP_share/missingBANDING.csv',
+write.csv(missingBANDING, file = '~/WERC-SC/ASSP_share/missingBANDING.csv',
           row.names = FALSE)
 
 
