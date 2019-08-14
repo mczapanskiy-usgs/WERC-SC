@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: August 7, 2019
+# last edited: August 14, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -21,7 +21,7 @@ library(chron)
 # library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_20190618.csv', na.strings=c("","NA")) %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', na.strings=c("","NA")) %>% 
   mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
          net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:

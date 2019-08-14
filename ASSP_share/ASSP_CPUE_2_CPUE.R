@@ -16,12 +16,11 @@ library(suncalc)
 
 ### READ IN DATA
 # banding catches data 
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_06182019.csv') %>% 
+read.csv('~/WERC-SC/ASSP_BANDING_08142019.csv') %>% 
   # remove unnecessary rows
   select(-P10, -P09, -P08, -P07, -P06, -P05, -P04, -P03, -P02, -P01, 
          -R6, -R5, -R4, -R3, -R2, -R1, -X, -X.1, -X.2, -X.3, -X.4, -X.5,
-         -tail, -sex, -release.time) %>% 
-  distinct() -> catches_raw 
+         -tail, -sex, -release.time) -> catches_raw 
 
 # netting site data
 read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190802.csv') %>% 
@@ -114,8 +113,6 @@ catches_sun <- catches_nightID %>%
   # 56 entries from SR 2005-06-02 were duplicated for some reason
   mutate(duplicate = duplicated(catchID)) %>% 
   filter(duplicate == !TRUE)
-# summary(dup)
-
 
 # standardize recapture and species
 catches_std <- catches_sun %>% 
@@ -127,12 +124,15 @@ catches_std <- catches_sun %>%
            .default = "UNK"),
         spp = mosaic::derivedFactor(
            "ASSP" = (species =="ASSP"),
-           "LESP" = (species =="LESP" & species =="LHSP"),
-           "LSTP" = (species =="LSTP" & species =="LTSP"),
+           "LESP" = (species =="LESP" | species =="LHSP"),
+           "LSTP" = (species =="LSTP" | species =="LTSP"),
            "BLSP" = (species == "BLSP"),
            "OTHER" = (species == "CAAU" & species =="Jouanin's Petrel" & species=="OTHER" & species =="WEGU" & species=="XAMU"),
            "UNK" = (species == "UNK" & species=="ASSP/LESP"),
            .default = "UNK"))
+
+test <- catches_std %>% 
+  filter(spp == "LESP")
 
 ### SUM CATCHES BY SPECIES 
 catches_std_ASSP <- catches_std %>% 
@@ -140,11 +140,10 @@ catches_std_ASSP <- catches_std %>%
          spp == "ASSP",
          std == "1") %>% # std = 1 => caught before std_ending
   group_by(nightID) %>% 
-  summarise(no_captured = n()) %>% 
-  mutate(no_captured_std = as.character(no_captured)) %>% 
-  right_join(catch_nights_unique, by= "nightID")
-
-missingBANDING <- anti_join(catches_std_ASSP, metadata, by = "nightID")
+  summarise(ASSP = n()) %>% 
+  mutate(ASSP_std = as.character(ASSP)) %>% 
+  right_join(catch_nights_unique, by= "nightID") %>% 
+  select(-ASSP)
 
 
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
@@ -154,10 +153,15 @@ catches_std_allSP <- catches_std %>%
   summarise(count = n()) %>% 
   spread(spp, count)
 
-write.csv(catches_std_allSP, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sumAllSpp.csv',
+write.csv(catches_std_allSP, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv',
           row.names = FALSE)
 
+
+missingMETADATA <- anti_join(metadata, catches_std_ASSP, by = "nightID")
+missingBANDING <- anti_join(catches_std_ASSP, metadata, by = "nightID")
 write.csv(missingBANDING, file = '~/WERC-SC/ASSP_share/missingBANDING.csv',
+          row.names = FALSE)
+write.csv(missingMETADATA, file = '~/WERC-SC/ASSP_share/missingMETADATA.csv',
           row.names = FALSE)
 
 
