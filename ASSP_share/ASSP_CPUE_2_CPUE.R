@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates net time and CPUE
 # created: Feb 11, 2019 by: E Kelsey
-# last edited: August 7, 2019
+# last edited: August 26, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -16,7 +16,7 @@ library(suncalc)
 
 ### READ IN DATA
 # banding catches data 
-read.csv('~/WERC-SC/ASSP_BANDING_08142019.csv') %>% 
+read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_08142019.csv') %>% 
   # remove unnecessary rows
   select(-P10, -P09, -P08, -P07, -P06, -P05, -P04, -P03, -P02, -P01, 
          -R6, -R5, -R4, -R3, -R2, -R1, -X, -X.1, -X.2, -X.3, -X.4, -X.5,
@@ -33,7 +33,8 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv') -> metadat
 catches <- catches_raw %>% 
   select(date, island, year, site, capture.time, species, recapture.) %>% 
   filter(island != "ND") %>% 
-  mutate(Site= mosaic::derivedFactor(
+  mutate(date = mdy(date),
+    Site= mosaic::derivedFactor(
     # ANI
     "CC" = (island=="ANI" & site=="Cathedral Cove"),
     "EAI_N" = (island=="ANI" & site=="EAI North side, dock area" | island=="ANI" & site=="Landing Cove Overlook"),

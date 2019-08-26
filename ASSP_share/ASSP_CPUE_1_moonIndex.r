@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: August 14, 2019
+# last edited: August 26, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")

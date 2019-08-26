@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates processes the metadata that Amelia created
 # created: March 6, 2019 by: E Kelsey
-# last edited: August 8, 2019 by E Kelsey
+# last edited: August 26, 2019 by E Kelsey
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -28,12 +28,22 @@ metadata_3 <- metadata_SunMoon_sum %>%
   inner_join(catches_std_SP, by = "nightID")
 
 metadata_SM <- metadata_3 %>% 
-  full_join(SM_sites, by = c("island" = "Island", "year" = "Deployment_Year")) %>% 
+  left_join(SM_sites, by = c("island" = "Island", "year" = "Deployment_Year")) %>% 
   mutate(net_notes = notes,
-         Site = Site.x) %>% 
-  select(nightID, Date, year, island, Site, net_open, net_close, ASSP, LESP, BLSP, net_notes, SPID)
+         Site = Site.x) %>%
+  select(nightID, Date, year, island, Site, net_open, net_close, ASSP, LESP, BLSP, net_notes, SPID) %>%
+  # 22 entries from PI_AB47 and SB_LC duplicated during the bind, remove duplicates
+  distinct()
+  
+# ## test to see if any duplicates were created
+# duplicates <- duplicated(metadata_SM) %>% 
+#   data.table()
+# summary(duplicates)
+# metadata_duplicates <- metadata_SM %>% 
+#   bind_cols(duplicates) %>% 
+#   filter(. == "TRUE")
 
-write.csv(metadata_SM, file = '~/WERC-SC/ASSP_share/ASSP_MistnetMetadata_SM_1994-2018_20190823.csv',
+write.csv(metadata_SM, file = '~/WERC-SC/ASSP_share/ASSP_MistnetMetadata_SM_1994-2018_20190826.csv',
           row.names = FALSE)
 
 ### ADD ASSP CATCHES TO METADATA
