@@ -15,21 +15,22 @@ library(mosaic)
 library(oce)
 library(foreach)
 library(doParallel)
-library(stats)
+# library(stats)
 library(suncalc)
-library(chron)
+# library(chron)
 # library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
 read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', na.strings=c("","NA")) %>% 
-  mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%Y-%m-%d %H:%M"),
-         net_close_old = as.POSIXct(paste(date, net_close), format="%Y-%m-%d %H:%M"),
+  mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%m/%d/%Y %H:%M"),
+         net_close_old = as.POSIXct(paste(date, net_close), format="%m/%d/%Y %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:
          nextDay_open = net_open_old + 24*60*60, nextDay_close = net_close_old + 24*60*60, 
          # pull out the hour of the open/close event, if before 12 then it was after midnight:
          hour_open = as.numeric(hour(net_open_old)), hour_close = as.numeric(hour(net_close_old)),
          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
-         net_close = if_else(hour_close <= 12, nextDay_close, net_close_old)) %>% 
+         net_close = if_else(hour_close <= 12, nextDay_close, net_close_old),
+         date = mdy(date)) %>% 
   select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw 
   
 read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190802.csv') %>% 

@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates processes the metadata that Amelia created
 # created: March 6, 2019 by: E Kelsey
-# last edited: April 5, 2019 by E Kelsey
+# last edited: August 8, 2019 by E Kelsey
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -16,22 +16,24 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv') -> metadat
 read.csv('~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv') -> catches_std_SP
 # read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locations_032219.csv') %>% 
 #   select(-Notes) -> sites_tbl
-read.csv('~/WERC-SC/ASSP_share/CMI_Deployment_Info_CINP_2011-2018.csv') %>%
+read.csv('~/WERC-SC/ASSP_share/USGS_ASSP_Mistnetting_2019_Deployment_Info.csv') %>%
   mutate(Deployment_Date = as.Date(Deployment_Date, format="%m/%d/%Y"),
          Retrieval_Date = as.Date(Retrieval_Date, format="%m/%d/%Y"),
-         Island = as.character(Island),
-         Sensor_Location = Location) %>% 
-  select(Sensor_Name, Deployment_Date, Deployment_Year, Retrieval_Date, Island, Sensor_Location, Latitude, Longitude) -> SM_sites
+         Island = as.character(Island)) %>% 
+  select(Sensor_Name, SPID, Deployment_Date, Deployment_Year, Retrieval_Date, Island, Site) -> SM_sites
 
 ### CREATE MISTNETTING METADATA SHEET TO SHARE WITH CMI
 metadata_3 <- metadata_SunMoon_sum %>% 
-  left_join(catches_std_SP, by = "nightID")
+  mutate(island = as.character(island)) %>%
+  inner_join(catches_std_SP, by = "nightID")
 
 metadata_SM <- metadata_3 %>% 
-  select(nightID, Date, year, island, Site, Lat, Long, net_open, net_close, ASSP, LESP, BLSP, notes) %>% #, -day, -Month, -dateStr, -site 
-  full_join(SM_sites, by = c("island" = "Island", "year" = "Deployment_Year"))
+  full_join(SM_sites, by = c("island" = "Island", "year" = "Deployment_Year")) %>% 
+  mutate(net_notes = notes,
+         Site = Site.x) %>% 
+  select(nightID, Date, year, island, Site, net_open, net_close, ASSP, LESP, BLSP, net_notes, SPID)
 
-write.csv(metadata_SM, file = '~/WERC-SC/ASSP_share/ASSP_MistnetMetadata_SM_1994-2018_20190808.csv',
+write.csv(metadata_SM, file = '~/WERC-SC/ASSP_share/ASSP_MistnetMetadata_SM_1994-2018_20190823.csv',
           row.names = FALSE)
 
 ### ADD ASSP CATCHES TO METADATA
