@@ -31,7 +31,8 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', na.strings=c("",
          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old),
          date = mdy(date)) %>% 
-  select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) -> metadata_raw 
+  select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) %>% 
+  filter(TRUE) -> metadata_raw 
   
 read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190802.csv') %>% 
   select(-Notes) -> sites_tbl
@@ -130,7 +131,8 @@ moon_vec = metadata %>%
             endDay = startDay + lubridate::days(1), 
             Lat, Long, nightID = nightID) %>% 
   # mutate(startDay = as.POSIXct(startDay), endDay = as.POSIXct(endDay)) %>% # startDates = as.POSIXct(startDay, format="%Y-%m-%d"), 
-  drop_na() # remove the few rows with unknown locations
+  drop_na() %>%  # remove the few rows with unknown locations
+  filter(TRUE) 
 
 # run moonCalc function
 moon <- moonCalc(moon_vec$startDay, moon_vec$endDay, moon_vec$Lat, moon_vec$Long) 
@@ -141,7 +143,8 @@ moonIndex <- moon %>%
   # after checking that dates line up, remove "startDate", also remove "endDay" because not needed
   select(-startDate, -endDay) %>% 
   mutate(startDay = as.Date(startDay), 
-         seq = 1:n()) # seq to make sure that tables are joined in correct order 
+         seq = 1:n()) %>% # seq to make sure that tables are joined in correct order 
+  filter(TRUE) 
 
 ## calculate sunset
 # create dataframe to run sunset function on
@@ -150,16 +153,19 @@ sun_vec <- metadata %>%
   group_by(date, Lat, Long, Site, nightID) %>%
   count(nightID) %>% 
   ungroup %>% 
-  transmute(date = as_date(date), lat = Lat, lon = Long, Site = Site, nightID = nightID) %>% 
-  drop_na() 
+  transmute(date = date, lat = Lat, lon = Long, Site = Site, nightID = nightID) %>% #as_date()
+  drop_na() %>% 
+  filter(TRUE) 
 # run sunset function
 sunsetTime <- getSunlightTimes(data = sun_vec,
                            keep = c("sunset"), tz = "PST8PDT") %>% 
   mutate(std_ending = sunset + lubridate::hours(5) + lubridate::minutes(18), # standard ending = 5.3 hours after sunset
          Lat = lat,
          Long = lon,
-         App_sunset = sunset) %>% 
-  select(-date, -lat, -lon, -sunset)  
+         App_sunset = sunset) %>%
+  left_join(sun_vec, by = c("date", "lat", "lon")) %>%
+  select(-date, -lat, -lon, -sunset) %>%
+  filter(TRUE) 
   # # make App_sunset by breaking up sunset time and date
   # mutate_at(vars(sunset), funs("startDates" = date(.), "App_sunset" = hms::as.hms(.))) %>% 
 
@@ -169,7 +175,8 @@ sunsetTime <- getSunlightTimes(data = sun_vec,
 moonIndex_sunset <- moonIndex %>%  
   left_join(sunsetTime, by = c("nightID", "Lat", "Long")) %>% # c("startDates", "Lat", "Long", "Site")
   mutate(Date = date(startDay)) %>% 
-  select(nightID, App_sunset, moonFrac, moonMin, moonIndex, Date, Site, std_ending, Lat, Long)
+  select(nightID, App_sunset, moonFrac, moonMin, moonIndex, Date, Site, std_ending, Lat, Long) %>% 
+  filter(TRUE) 
 ## add combined sun moon dataset to metadata  
 metadata_SunMoon <- metadata %>% 
   left_join(moonIndex_sunset, by = c("nightID", "Site", "Lat", "Long")) 

@@ -82,7 +82,7 @@ catches <- catches_raw %>%
   select(-site, -capture.time, -capture.time_old, -nextDay_capture.time, -hour_capture) %>% 
   left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island")) 
 
-catches_nightID <- catches %>% 
+catches_ID <- catches %>% 
   group_by(nightID) %>% 
   mutate(seq = 1:n(),
          catchID = paste(nightID, seq, sep = "_")) %>% 
@@ -90,7 +90,7 @@ catches_nightID <- catches %>%
 
 ### CALCULATE SUNSET AND STD. ENDING
 # create catches dataframe to run sunset function on
-catch_nights_unique <- catches_nightID %>% 
+catch_nights_unique <- catches_ID %>% 
   na.omit() %>%  
   group_by(eventDate, Lat, Long, Site, nightID) %>%
   count(nightID) %>% 
@@ -104,16 +104,25 @@ sunTimes <- getSunlightTimes(data = catch_nights_unique,
          Long = lon,
          App_sunset = sunset,
          eventDate = as.POSIXct(date)) %>%
+  left_join(catch_nights_unique, by = c("date", "lat", "lon")) %>%
   select(-date, -lat, -lon, -sunset)
 
 ## bind sunset and std_ending times with catches dataset
-catches_sun <- catches_nightID %>% 
-  inner_join(sunTimes, by = c("Site", "nightID", "Lat", "Long")) %>% # c("Site", "nightID", "eventDate", "Lat", "Long")) 
+catches_sun <- catches_ID %>% 
+  left_join(sunTimes, by = c("Site", "nightID", "Lat", "Long")) %>% # c("Site", "nightID", "eventDate", "Lat", "Long")) 
   mutate(eventDate = eventDate.x) %>% 
   select(-eventDate.x, -eventDate.y) %>% 
-  # 56 entries from SR 2005-06-02 were duplicated for some reason
-  mutate(duplicate = duplicated(catchID)) %>% 
-  filter(duplicate == !TRUE)
+  
+# ## test to see if any duplicates were created
+# duplicates <- duplicated(catches_sun) %>%
+#   data.table()
+# summary(duplicates)
+# catches_duplicates <- catches_sun %>%
+#   bind_cols(duplicates) %>%
+#   filter(. == "TRUE")
+  
+  # 44 entries from SR 2005-06-02 were duplicated during the bind, remove duplicates
+  distinct()
 
 # standardize recapture and species
 catches_std <- catches_sun %>% 
@@ -165,6 +174,9 @@ write.csv(missingBANDING, file = '~/WERC-SC/ASSP_share/missingBANDING.csv',
 write.csv(missingMETADATA, file = '~/WERC-SC/ASSP_share/missingMETADATA.csv',
           row.names = FALSE)
 
+
+# mutate(duplicate = duplicated(catchID)) %>% 
+# filter(duplicate == !TRUE)
 
 ### CPUE
 ## number of catches for each species and night

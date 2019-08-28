@@ -32,8 +32,6 @@ metadata_SM <- metadata_3 %>%
   mutate(net_notes = notes,
          Site = Site.x) %>%
   select(nightID, Date, year, island, Site, net_open, net_close, ASSP, LESP, BLSP, net_notes, SPID) %>%
-  # 22 entries from PI_AB47 and SB_LC duplicated during the bind, remove duplicates
-  distinct()
   
 # ## test to see if any duplicates were created
 # duplicates <- duplicated(metadata_SM) %>% 
@@ -42,6 +40,11 @@ metadata_SM <- metadata_3 %>%
 # metadata_duplicates <- metadata_SM %>% 
 #   bind_cols(duplicates) %>% 
 #   filter(. == "TRUE")
+  
+  # 22 entries from PI_AB47 and SB_LC duplicated during the bind, remove duplicates
+  distinct()
+  
+
 
 write.csv(metadata_SM, file = '~/WERC-SC/ASSP_share/ASSP_MistnetMetadata_SM_1994-2018_20190826.csv',
           row.names = FALSE)
