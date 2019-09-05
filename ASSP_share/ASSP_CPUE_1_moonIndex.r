@@ -21,7 +21,7 @@ library(suncalc)
 # library(rnoaa)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', na.strings=c("","NA")) %>% 
+metadata_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', na.strings=c("","NA")) %>% 
   mutate(net_open_old = as.POSIXct(paste(date, net_open), format="%m/%d/%Y %H:%M"),
          net_close_old = as.POSIXct(paste(date, net_close), format="%m/%d/%Y %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:
@@ -32,10 +32,10 @@ read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', na.strings=c("",
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old),
          date = mdy(date)) %>% 
   select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) %>% 
-  filter(TRUE) -> metadata_raw 
+  filter(TRUE) 
   
-read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190802.csv') %>% 
-  select(-Notes) -> sites_tbl
+sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190905.csv') %>% 
+  select(-Notes)
 # 
 # ### COMBINE ALL METADATA
 # metadata_comb <- metadata_raw %>% 
@@ -56,7 +56,7 @@ metadata <- metadata_raw %>%
         "RR" = (island=="ANI" & site=="Rat Rock"),
         "RC" = (island=="ANI" & site=="Rockfall Cove"), 
         # PI
-        "PI1" = (island=="PI" & site=="1" | island=="PI" & site=="" | island=="PI" & site=="UNK"), 
+        "PI1" = (island=="PI" & site=="PI1"), # & site=="1" | island=="PI" & site=="" | island=="PI" & site=="UNK" | island=="PI" & site=="PI1"), 
         # SBI
         "AP" = (island=="SBI" & site=="Arch Point" | island=="SBI" & site=="AP"),
         "ESP" = (island=="SBI" & site=="Eseal Point" | island=="SBI" & site=="ESP" | island=="SBI" & site=="" | island=="SBI" & site=="UNK"),
@@ -68,14 +68,14 @@ metadata <- metadata_raw %>%
         "WP" = (island=="SBI" & site=="Webster's Point" | island=="SBI" & site=="Webster Point Draw"),
         "WCliffs" = (island=="SBI" & site=="West Cliffs"), 
         # SCI
-        "DR" = (island=="SBI" & site=="Diablo Rock"), 
+        "DR" = (island=="SCI" & site=="Diablo Rock"), 
         # SR
         "SR1" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
         "SR2" = (island=="SR" & site=="2"),
         "SR3" = (island=="SR" & site=="3"),
         "LSH" = (island=="SR" & site=="Little Scorstartpion Headland" | island=="SR" & site=="Scorpion Bluff"),
         "HT" = (island=="SR" & site=="SR High Terrace-East"),
-        .default = ""),
+        .default = "UNK"),
         # create unique netting night ID
         day = substr(date, 9, 10), Month = substr(date, 6, 7),
         dateStr = paste(year, Month, day, sep = ""),
@@ -186,7 +186,8 @@ metadata_SunMoon <- metadata %>%
 # create table with just one row per net night
 metadata_unique <- metadata_SunMoon %>% 
   distinct(nightID) %>% 
-  mutate(seq = 1:n())
+  mutate(seq = 1:n()) %>% 
+  filter(TRUE)
 # sum up net time for all net open/close intervals
 metadata_SunMoon_sum <- metadata_SunMoon %>% 
   mutate(minutes_std_raw = as.character(difftime(std_ending, net_open, units="mins")), 

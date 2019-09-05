@@ -43,16 +43,19 @@ buoys_all <- tabledap(
   'cwwcNDBCMet', 
   fields=c('station', 'latitude',  'longitude', 'time', 'wd', 'wspd', 'gst', 'atmp', 'dewp'), 
   'time>=1994-01-01',   'time<=2018-12-31', 
-  'latitude>=30.86','latitude<=41.75', 'longitude>=-128','longitude<=-116'
-)
+  'latitude>=30.86','latitude<=41.75', 'longitude>=-128','longitude<=-116')
 
 # Read metadata with mistnetting dates from CPUE data. Filter out "ND" for sessions with no date recorded.
 metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', na.strings=c("","NA"),
                   header = TRUE, stringsAsFactors = FALSE) %>% 
   filter(date !="ND") %>%
-  transform(date = as.Date(date, format = "%m/%d/%Y"))
-# make dates into 
-dates <- metadata$date
+  transform(date = as.Date(date, format = "%m/%d/%Y")) %>% 
+  mutate(close_date = date + days(1))
+
+dates_all <- c(metadata$date, metadata$close_date)
+
+dates <- metadata %>% 
+  select(date, close_date)
 
 # str(dates)
 # str(buoys_all)
@@ -72,16 +75,16 @@ buoy.df <-data.frame(station = buoy$station,
                  dewp = as.numeric(buoy$dewp)) %>%
   transform(date = date(time)) %>%
   transform(year = year(date))%>%
-  filter(date %in% dates)
+  filter(date %in% dates_all)
 
 # # Check that all stations were retrieved
 # unique.sta <- unique(buoy$sta)
 # n.sta <- length(unique.sta)
 
-# Check the number of rows (dates)
-date_num <- buoy.df %>% 
-  distinct(date) %>% 
-  nrow()
+# # Check the number of rows (dates)
+# date_num <- buoy.df %>% 
+#   distinct(date) %>% 
+#   nrow()
 
 # Check the date range
 date_range <- buoy.df %>% 
@@ -148,7 +151,7 @@ ggplot(buoy_daily) +
 
 # write data to a csv so it can be imported and used for analyses later
 # will be sent to working directory set at beginning of script. Can set another wd. 
-write.csv(buoy_daily, 'ASSP_mistnetting_avg_daily_buoy.csv',
+write.csv(buoy_daily, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_daily_buoy.csv',
           row.names = FALSE)
 
 

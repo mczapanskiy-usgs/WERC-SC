@@ -12,15 +12,15 @@ library(dplyr)
 library(lubridate)
 
 ### READ IN BANDING CPUE DATA
-read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv') -> metadata_SunMoon_sum
-read.csv('~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv') -> catches_std_SP
-# read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locations_032219.csv') %>% 
+metadata_SunMoon_sum <- read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv')
+catches_std_SP <- read.csv('~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv')
+# read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190905.csv') %>% 
 #   select(-Notes) -> sites_tbl
-read.csv('~/WERC-SC/ASSP_share/USGS_ASSP_Mistnetting_2019_Deployment_Info.csv') %>%
+SM_sites <- read.csv('~/WERC-SC/ASSP_share/USGS_ASSP_Mistnetting_2019_Deployment_Info.csv') %>%
   mutate(Deployment_Date = as.Date(Deployment_Date, format="%m/%d/%Y"),
          Retrieval_Date = as.Date(Retrieval_Date, format="%m/%d/%Y"),
          Island = as.character(Island)) %>% 
-  select(Sensor_Name, SPID, Deployment_Date, Deployment_Year, Retrieval_Date, Island, Site) -> SM_sites
+  select(Sensor_Name, SPID, Deployment_Date, Deployment_Year, Retrieval_Date, Island, Site)
 
 ### CREATE MISTNETTING METADATA SHEET TO SHARE WITH CMI
 metadata_3 <- metadata_SunMoon_sum %>% 
