@@ -107,7 +107,7 @@ metadata_effort <- metadata %>%
 
 catches_metadata <- catches_ID %>%
   left_join(metadata_effort, by = c("Site", "nightID", "Lat", "Long")) 
-
+# compare Sites listed in catches vs. metadata datasets
 summary(metadata_effort$Site)
 summary(catches_ID$Site)
   
@@ -142,14 +142,15 @@ catches_std <- catches_metadata %>%
 write.csv(catches_std, file = '~/WERC-SC/ASSP_share/CATCHES_allSpp_unfiltered.csv',
           row.names = FALSE)
 
+missingMETADATA <- anti_join(metadata, catches_std, by = "nightID")
+missingBANDING <- anti_join(catches_std, metadata, by = "nightID")
+
+## filter catches, sum by species, than sum by catch effort with metadata
 # view what will be filtered
 summary(as.factor(catches_std$std)) # catches before vs. after standard ending
 summary(as.factor(catches_std$pre_close)) # catches before net opened, also ones duplicated for ea. open/close during one night when merged w/ metadata
 summary(as.factor(catches_std$post_open)) # catches after net closed, also ones duplicated for ea. open/close during one night when merged w/ metadata
 summary(catches_std$recapture == "N") # recaptures
-
-
-## filter catches, sum by species, than combine with metadata
 # filter out other spp, and catches that don't count as part of effort
 catches_filtered <- catches_std %>% 
   filter(recapture == "N", 
@@ -158,14 +159,30 @@ catches_filtered <- catches_std %>%
          spp == "ASSP") # std == "1",
 # sum catches for each species and night
 metadata_catches <- catches_filtered %>%
-  group_by(island, Site, nightID) %>%
+  group_by(island, Site, nightID, net_open) %>%
   # count(species) %>% 
   summarise(ASSP = n(),
-            ASSPstd = count(std == "1")) %>% 
+            ASSPstd = sum(std == "1")) %>% 
   # mutate(ASSPraw = as.character(ASSP)) %>% 
-  right_join(metadata, by= c("nightID", "island", "Site")) %>% 
+  right_join(metadata, by= c("nightID", "island", "Site", "net_open")) %>% 
   mutate(CPUEraw = ASSP/minutes_raw,
-         CPUE = ASSPstd/minutes)
+         CPUEstd = ASSPstd/minutes) %>% 
+  distinct()
+write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE.csv',
+          row.names = FALSE)
+
+summary(metadata_catches$ASSP)
+summary(metadata_catches$ASSPstd)
+
+### compare calclated CPUE with JA's numbers from 2016
+metadata_catches_comp <- metadata_catches %>% 
+  filter(std_CPUE_old != 'NA')
+ggplot(metadata_catches_comp) +
+  geom_point(aes(date, std_CPUE_old), color = "green") + 
+  geom_point(aes(date, CPUEstd), color = "black") +
+  facet_wrap(~Site) +
+  # labs(x = "Date", y = "Wind Direction") +
+  theme_bw()
 
 
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
@@ -178,52 +195,7 @@ catches_std_allSP <- catches_std %>%
 write.csv(catches_std_allSP, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv',
           row.names = FALSE)
 
-# catches_std_ASSP <- catches_std %>% 
-#   filter(recapture == "N",
-#          spp == "ASSP",
-#          std == "1") %>% # std = 1 => caught before std_ending
-#   group_by(nightID) %>% 
-#   summarise(ASSP = n()) %>% 
-#   mutate(ASSP_std = as.character(ASSP)) %>% 
-#   right_join(catch_nights_unique, by= "nightID") %>% 
-#   select(-ASSP)
-
-missingMETADATA <- anti_join(metadata, catches_std_ASSP, by = "nightID")
-missingBANDING <- anti_join(catches_std_ASSP, metadata, by = "nightID")
-
-
-# mutate(duplicate = duplicated(catchID)) %>% 
-# filter(duplicate == !TRUE)
-
-# metadata_count <- metadata %>%  
-#   #  remove multiple open/close events for one netting night
-#   group_by(date, Lat, Long, Site, nightID) %>%
-#   count(nightID) %>% 
-#   # ungroup %>% 
-#   left_join(catches_std_ASSP, by = "nightID")
 
 
 
-
-# ### CALCULATE SUNSET AND STD. ENDING
-# # create catches dataframe to run sunset function on
-# sun_vec <- metadata %>%
-#   select(date, Lat, Long, Site, nightID) %>% 
-#   na.omit() %>% 
-#   #  remove multiple open/close events for one netting night
-#   group_by(date, Lat, Long, Site, nightID) %>%
-#   count(nightID) %>% 
-#   ungroup %>% 
-#   transmute(date = as_date(date), lat = Lat, lon = Long, Site = Site, nightID = nightID) %>% 
-#   filter(TRUE) 
-# 
-# sunTimes <- getSunlightTimes(data = sun_vec, # data = catch_nights_unique,
-#                                keep = c("sunset"), tz = "PST8PDT") %>%
-#   mutate(std_ending = sunset + lubridate::hours(5) + lubridate::minutes(18), # standard ending = 5.3 hours after sunset
-#          Lat = lat,
-#          Long = lon,
-#          App_sunset = sunset,
-#          eventDate = as.POSIXct(date)) %>%
-#   left_join(sun_vec, by = c("date", "lat", "lon")) %>%
-#   select(-date, -lat, -lon, -sunset)
 # 
