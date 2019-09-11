@@ -106,7 +106,7 @@ metadata_effort <- metadata %>%
   select(Site, Date, nightID, net_open, net_close, App_sunset, std_ending, Lat, Long)
 
 catches_metadata <- catches_ID %>%
-  left_join(metadata_effort, by = c("Site", "nightID", "Lat", "Long")) 
+  full_join(metadata_effort, by = c("Site", "nightID", "Lat", "Long")) 
 # compare Sites listed in catches vs. metadata datasets
 summary(metadata_effort$Site)
 summary(catches_ID$Site)
@@ -151,6 +151,7 @@ summary(as.factor(catches_std$std)) # catches before vs. after standard ending
 summary(as.factor(catches_std$pre_close)) # catches before net opened, also ones duplicated for ea. open/close during one night when merged w/ metadata
 summary(as.factor(catches_std$post_open)) # catches after net closed, also ones duplicated for ea. open/close during one night when merged w/ metadata
 summary(catches_std$recapture == "N") # recaptures
+summary(catches_std$spp == "ASSP")
 # filter out other spp, and catches that don't count as part of effort
 catches_filtered <- catches_std %>% 
   filter(recapture == "N", 
@@ -164,7 +165,7 @@ metadata_catches <- catches_filtered %>%
   summarise(ASSP = n(),
             ASSPstd = sum(std == "1")) %>% 
   # mutate(ASSPraw = as.character(ASSP)) %>% 
-  right_join(metadata, by= c("nightID", "island", "Site", "net_open")) %>% 
+  right_join(metadata, by= c("nightID", "island", "Site")) %>% # , "net_open"
   mutate(CPUEraw = ASSP/minutes_raw,
          CPUEstd = ASSPstd/minutes) %>% 
   distinct()
@@ -181,9 +182,26 @@ ggplot(metadata_catches_comp) +
   geom_point(aes(date, std_CPUE_old), color = "green") + 
   geom_point(aes(date, CPUEstd), color = "black") +
   facet_wrap(~Site) +
-  # labs(x = "Date", y = "Wind Direction") +
   theme_bw()
 
+ggplot(metadata_catches_comp) +
+  geom_point(aes(date, std_captured_old), color = "green") + 
+  geom_point(aes(date, ASSPstd), color = "black") +
+  facet_wrap(~Site) +
+  theme_bw()
+
+ggplot(metadata_catches_comp) +
+  geom_point(aes(date, moon_index_old), color = "green") + 
+  geom_point(aes(date, moonIndex), color = "black") +
+  facet_wrap(~Site) +
+  theme_bw()
+# 
+# ggplot(metadata_catches_comp) +
+#   geom_point(aes(date, minutes_old), color = "green") +
+#   geom_point(aes(date, minutes_raw), color = "red") +
+#   geom_point(aes(date, minutes_std), color = "black") +
+#   facet_wrap(~Site) +
+#   theme_bw()
 
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
 catches_std_allSP <- catches_std %>% 
