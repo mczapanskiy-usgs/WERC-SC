@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates net time and CPUE
 # created: Feb 11, 2019 by: E Kelsey
-# last edited: September 4, 2019
+# last edited: September 10, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -27,11 +27,13 @@ sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190905.csv')
                 select(-Notes) 
 
 # CPUE metadata from "ASSP_CPUE_1"
-metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_sum.csv') %>% 
+metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_new.csv') %>% 
               mutate(Date = as.Date(Date),
                      std_ending = as.POSIXct(std_ending),
                      net_open = as.POSIXct(net_open),
-                     net_close = as.POSIXct(net_close)) %>% 
+                     net_close = as.POSIXct(net_close),
+                     minutes_raw = as.integer(minutes_raw),
+                     minutes_std = as.integer(minutes_std)) %>% 
               filter(TRUE)
 
 
@@ -165,9 +167,10 @@ metadata_catches <- catches_filtered %>%
   summarise(ASSP = n(),
             ASSPstd = sum(std == "1")) %>% 
   # mutate(ASSPraw = as.character(ASSP)) %>% 
-  right_join(metadata, by= c("nightID", "island", "Site")) %>% # , "net_open"
+  right_join(metadata, by= c("nightID", "island", "Site", "net_open")) %>% 
+  filter(minutes_std > 0) %>%
   mutate(CPUEraw = ASSP/minutes_raw,
-         CPUEstd = ASSPstd/minutes) %>% 
+         CPUEstd = ASSPstd/minutes_std) %>% 
   distinct()
 write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE.csv',
           row.names = FALSE)
@@ -175,33 +178,6 @@ write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE.c
 summary(metadata_catches$ASSP)
 summary(metadata_catches$ASSPstd)
 
-### compare calclated CPUE with JA's numbers from 2016
-metadata_catches_comp <- metadata_catches %>% 
-  filter(std_CPUE_old != 'NA')
-ggplot(metadata_catches_comp) +
-  geom_point(aes(date, std_CPUE_old), color = "green") + 
-  geom_point(aes(date, CPUEstd), color = "black") +
-  facet_wrap(~Site) +
-  theme_bw()
-
-ggplot(metadata_catches_comp) +
-  geom_point(aes(date, std_captured_old), color = "green") + 
-  geom_point(aes(date, ASSPstd), color = "black") +
-  facet_wrap(~Site) +
-  theme_bw()
-
-ggplot(metadata_catches_comp) +
-  geom_point(aes(date, moon_index_old), color = "green") + 
-  geom_point(aes(date, moonIndex), color = "black") +
-  facet_wrap(~Site) +
-  theme_bw()
-# 
-# ggplot(metadata_catches_comp) +
-#   geom_point(aes(date, minutes_old), color = "green") +
-#   geom_point(aes(date, minutes_raw), color = "red") +
-#   geom_point(aes(date, minutes_std), color = "black") +
-#   facet_wrap(~Site) +
-#   theme_bw()
 
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
 catches_std_allSP <- catches_std %>% 
@@ -212,8 +188,3 @@ catches_std_allSP <- catches_std %>%
 
 write.csv(catches_std_allSP, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv',
           row.names = FALSE)
-
-
-
-
-# 

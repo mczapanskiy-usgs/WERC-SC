@@ -113,8 +113,8 @@ moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) {
                                     moonAlt <- moon$altitude
                                     moonOnly <- moonAlt > 0 & sunAlt < 0
                                     moonFrac <- mean(moon$illuminatedFraction[moonOnly])
-                                    moonMin = (sum(moonOnly) * interval / period)/60
-                                    moonIndex = moonMin * moonFrac
+                                    moonMin <- sum(moonOnly) * (interval / period)/60
+                                    moonIndex <- moonMin * moonFrac
                                     data.frame(startDate = s, moonFrac = moonFrac, moonMin = moonMin, moonIndex = moonIndex)
                                   }
                 stopCluster(cl)
@@ -194,10 +194,11 @@ metadata_SunMoon <- metadata_SunMoon_all %>%
   group_by(nightID) %>% 
   summarise(Site = first(Site), island = first(island), Date = first(Date), Lat = first(Lat), Long = first(Long), 
             App_sunset = first(App_sunset), moonFrac = first(moonFrac), moonMin = first(moonMin), moonIndex = first(moonIndex),
-            net_open = first(net_open), net_close = first(net_close), std_ending = first(std_ending), 
+            net_open = first(net_open), net_close = last(net_close), std_ending = first(std_ending), 
             minutes_raw = sum(min_raw), minutes_std = sum(min_std),
             Net_mesh = first(Net_mesh), Net_dim = first(Net_dim), Audio_file = first(Audio_file), dB_level = first(dB_level), 
-            Speaker_system = first(Speaker_system), Data_repository = first(Data_repository), notes = first(notes)) 
+            Speaker_system = first(Speaker_system), Data_repository = first(Data_repository), notes = first(notes))
+
 # confirm that metadata_SunMoon is the same length as unique nightID 
 metadata_unique <- metadata_SunMoon %>% 
   distinct(nightID) %>% 
