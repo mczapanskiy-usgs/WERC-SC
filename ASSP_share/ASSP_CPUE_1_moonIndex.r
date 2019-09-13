@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: August 26, 2019
+# last edited: Sept 13, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -70,7 +70,7 @@ metadata <- metadata_raw %>%
         # SCI
         "DR" = (island=="SCI" & site=="Diablo Rock"), 
         # SR
-        "SR1" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
+        "SR1" = (island=="SR" & site=="1" | island=="SR" & site=="SR1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
         "SR2" = (island=="SR" & site=="2"),
         "SR3" = (island=="SR" & site=="3"),
         "LSH" = (island=="SR" & site=="Little Scorstartpion Headland" | island=="SR" & site=="Scorpion Bluff"),
@@ -156,9 +156,11 @@ sun_vec <- metadata %>%
   transmute(date = date, lat = Lat, lon = Long, Site = Site, nightID = nightID) %>% #as_date()
   drop_na() %>% 
   filter(TRUE) 
+
+
 # run sunset function
 sunsetTime <- getSunlightTimes(data = sun_vec,
-                           keep = c("sunset"), tz = "PST8PDT") %>% 
+                               keep = c("sunset"), tz = "PST8PDT") %>% 
   mutate(std_ending = sunset + lubridate::hours(5) + lubridate::minutes(18), # standard ending = 5.3 hours after sunset
          Lat = lat,
          Long = lon,
@@ -166,8 +168,50 @@ sunsetTime <- getSunlightTimes(data = sun_vec,
   left_join(sun_vec, by = c("date", "lat", "lon")) %>%
   select(-date, -lat, -lon, -sunset) %>%
   filter(TRUE) 
-  # # make App_sunset by breaking up sunset time and date
-  # mutate_at(vars(sunset), funs("startDates" = date(.), "App_sunset" = hms::as.hms(.))) %>% 
+# # make App_sunset by breaking up sunset time and date
+# mutate_at(vars(sunset), funs("startDates" = date(.), "App_sunset" = hms::as.hms(.))) %>% 
+
+
+moon_vec <- metadata %>%  
+  #  remove multiple open/close events for one netting night
+  group_by(date, Lat, Long, Site, nightID) %>%
+  count(nightID) %>% 
+  ungroup %>% 
+  transmute(date = date + lubridate::days(1), lat = Lat, lon = Long, Site = Site, nightID = nightID) %>% #as_date()
+  drop_na() %>% 
+  filter(TRUE) 
+
+moon_vec_next <- metadata %>%  
+  #  remove multiple open/close events for one netting night
+  group_by(date, Lat, Long, Site, nightID) %>%
+  count(nightID) %>% 
+  ungroup %>% 
+  transmute(date = date + lubridate::days(2), lat = Lat, lon = Long, Site = Site, nightID = nightID) %>% #as_date()
+  drop_na() %>% 
+  filter(TRUE) 
+
+moon_test <- getMoonTimes(data = moon_vec,
+                          keep = c("rise", "set"), tz = "PST8PDT") %>% 
+  mutate(Lat = lat,
+         Long = lon,
+         date = date - lubridate::days(1)) %>%
+  left_join(sun_vec, by = c("date", "lat", "lon")) %>%
+  select(-lat, -lon,) %>%
+  filter(TRUE) 
+
+moon_next <- getMoonTimes(data = moon_vec_next,
+                          keep = c("rise", "set"), tz = "PST8PDT") %>% 
+  mutate(Lat = lat, # nextDay = date,
+         Long = lon,
+         moonRise_next = rise,
+         moonSet_next = set,
+         date = date - lubridate::days(2)) %>%
+  select(-rise, -set) %>% 
+  left_join(moon_test, by = c("date", "Lat", "Long")) %>%
+  select(-date, -lat, -lon) %>%
+  mutate(moonRise = if_else(rise == "NA", moonRise_next, rise),
+         moonSet = if_else(set == "NA", moonSet_next, set)) %>% 
+  filter(TRUE) 
 
 
 ### MERGE METADATA WITH SUNSET AND MOONINDEX

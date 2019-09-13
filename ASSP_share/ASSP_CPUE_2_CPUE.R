@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates net time and CPUE
 # created: Feb 11, 2019 by: E Kelsey
-# last edited: September 10, 2019
+# last edited: September 13, 2019
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -16,7 +16,7 @@ library(suncalc)
 
 ### READ IN DATA
 # banding catches data 
-catches_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_08142019.csv') %>% 
+catches_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_20190913.csv') %>% 
                 # remove unnecessary rows
                 select(-P10, -P09, -P08, -P07, -P06, -P05, -P04, -P03, -P02, -P01, 
                        -R6, -R5, -R4, -R3, -R2, -R1, -X, -X.1, -X.2, -X.3, -X.4, -X.5,
@@ -24,7 +24,7 @@ catches_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_08142019.csv') %>%
 
 # netting site data
 sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190905.csv') %>% 
-                select(-Notes) 
+                select(-Alias, -Notes) 
 
 # CPUE metadata from "ASSP_CPUE_1"
 metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadata_SunMoon_new.csv') %>% 
@@ -68,7 +68,7 @@ catches <- catches_raw %>%
     # SCI
     "DR" = (island=="SCI" & site=="Diablo Rock"), 
     # SR
-    "SR1" = (island=="SR" & site=="1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR" | island=="SR" & site=="UNK" | island=="SR" & site=="AB10"),
+    "SR1" = (island=="SR" & site=="1" | island=="SR" & site=="SR1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR" | island=="SR" & site=="UNK" | island=="SR" & site=="AB10"),
     "SR2" = (island=="SR" & site=="2"),
     "SR3" = (island=="SR" & site=="3"),
     "LSH" = (island=="SR" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
@@ -127,8 +127,8 @@ catches_std <- catches_metadata %>%
          pre_close = if_else(net_close > capture_time, "1", "0"), # if bird was caught before net_close = 1, after = 0
          post_open = if_else(net_open < capture_time, "1", "0"), # if bird was caught after net_open = 1, before = 0
          recapture = mosaic::derivedFactor(
-           "Y" = (recapture.=="Y" & recapture.=="y" & recapture.=="SNR" ), #& recapture.=="YSN"
-           "N" = (recapture.=="N"),
+           "Y" = (recapture.=="SNR" | recapture.=="YSN"), # remove same night recaptures 
+           "N" = (recapture.=="N" | recapture.=="Y" | recapture.=="y"), # recaps from other nights still count # 
            # "UNK" = (recapture.=="UNK" & recapture.=="X"),
            .default = "UNK"),
         spp = mosaic::derivedFactor(
@@ -140,6 +140,10 @@ catches_std <- catches_metadata %>%
            # "UNK" = (species == "UNK"), #  & species=="ASSP/LESP"
            .default = "UNK")) %>%
   filter(TRUE)
+
+summary(catches_metadata$recapture.)
+summary(catches_std$recapture)
+
 ### SAVE CATCHES FILE BEFORE IT IS FILTERED
 write.csv(catches_std, file = '~/WERC-SC/ASSP_share/CATCHES_allSpp_unfiltered.csv',
           row.names = FALSE)
@@ -162,21 +166,35 @@ catches_filtered <- catches_std %>%
          spp == "ASSP") # std == "1",
 # sum catches for each species and night
 metadata_catches <- catches_filtered %>%
-  group_by(island, Site, nightID, net_open) %>%
+  group_by(island, Site, nightID) %>% # , "net_open"
   # count(species) %>% 
   summarise(ASSP = n(),
             ASSPstd = sum(std == "1")) %>% 
   # mutate(ASSPraw = as.character(ASSP)) %>% 
-  right_join(metadata, by= c("nightID", "island", "Site", "net_open")) %>% 
+  left_join(metadata, by= c("nightID", "island", "Site")) %>% # , "net_open"
   filter(minutes_std > 0) %>%
   mutate(CPUEraw = ASSP/minutes_raw,
          CPUEstd = ASSPstd/minutes_std) %>% 
+  # drop_na()
   distinct()
 write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE.csv',
           row.names = FALSE)
 
 summary(metadata_catches$ASSP)
 summary(metadata_catches$ASSPstd)
+
+
+#### SAVE CPUE DATA FOR ALL NETTING EFFORTS THAT CPUE CAN BE CALCULATED FOR
+write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE.csv',
+          row.names = FALSE)
+
+#### SAVE CPUE DATA 2017-2018 TO SEND TO T TINKER
+metadata_catches_2017_2018 <- metadata_catches %>% 
+  mutate(year = year(Date)) %>% 
+  filter(year > 2016) %>% 
+  select(-year)
+write.csv(metadata_catches_2017_2018, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE_2017-2018.csv',
+          row.names = FALSE)
 
 
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
