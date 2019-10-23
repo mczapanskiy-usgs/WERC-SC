@@ -197,6 +197,11 @@ write.csv(metadata_catches_2017_2018, file = '~/WERC-SC/ASSP_share/metadata_catc
           row.names = FALSE)
 
 
+
+
+
+
+
 ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
 catches_std_allSP <- catches_std %>% 
   filter(spp %in% c("ASSP", "LESP", "BLSP")) %>% 

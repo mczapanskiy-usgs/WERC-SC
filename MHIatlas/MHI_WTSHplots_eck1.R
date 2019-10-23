@@ -30,5 +30,5 @@ occ_Summary <- plots %>%
          burrowOcc_SA = occ_prop*totalBurrows_SA,
          burrowOcc_SA_CI = occ_prop*CI95_Burrows_SA) 
 
-write.csv(occ_Summary, file = '~/WERC-SC/MHIatlas/Summary_occ.csv',
+write.csv(occ_Summary, file = '~/WERC-SC/MHIatlas/WTSH_KPNWR_summary_occ.csv',
           row.names = FALSE)

@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates processes the metadata that Amelia created
 # created: March 6, 2019 by: E Kelsey
-# last edited: August 26, 2019 by E Kelsey
+# last edited: October 21, 2019 by E Kelsey
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
