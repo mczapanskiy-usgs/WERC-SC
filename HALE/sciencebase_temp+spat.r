@@ -27,11 +27,23 @@ spat <- spatial$spatial_catchID
 temp <- temporal$temporal_catchID
 
 sciencebase3 <- sciencebase2 %>% 
-  full_join(spatial, by = c("catchID" = "spatial_catchID")) %>% 
-  full_join(temporal, by = c("catchID" = "temporal_catchID")) %>% 
-  mutate(dupl = duplicated(catchID))
+  mutate(spat = catchID %in% spat,
+         temp = catchID %in% temp,
+         duplic = duplicated(catchID),
+         spatial = if_else(spat == TRUE, "1", "0"),
+         temporal = if_else(temp == TRUE, "1", "0"),
+         spatial = as.numeric(spatial),
+         temporal = as.numeric(temporal)) %>% 
+  select(-spat, -temp, -duplic)
 
-write.csv(sciencebase3, file = '~/WERC-SC/HALE/sciencebase_test.csv',
+# view data
+summary(sciencebase3$duplic)
+summary(sciencebase3$temp)
+summary(sciencebase3$spat)
+sum(sciencebase3$temporal)
+sum(sciencebase3$spatial)
+summary(duplicated(spat))
+summary(duplicated(temp))
+
+write.csv(sciencebase3, file = '~/WERC-SC/HALE/Kelsey2019_ScienceBase_v3.csv',
           row.names = FALSE)
-
-# net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
