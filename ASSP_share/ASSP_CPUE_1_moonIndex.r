@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: Sept 13, 2019
+# last edited: Jan 22, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -31,11 +31,12 @@ metadata_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', 
          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old),
          date = mdy(date)) %>% 
-  select(-X, -X.1, -nextDay_close, -nextDay_open, -hour_open, -hour_close, -duration) %>% 
+  select(-App_sunset:-WS_midnight, -month, -mo_period, -duration:-birds.min.area, -X, -X.1,
+         -nextDay_open, -nextDay_close, -hour_open, -hour_close) %>% # -net_open_old, -net_close_old, 
   filter(TRUE) 
   
-sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190905.csv') %>% 
-  select(-Notes)
+sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20200122.csv') %>% 
+  select(-Site_Name, -Notes)
 # 
 # ### COMBINE ALL METADATA
 # metadata_comb <- metadata_raw %>% 
@@ -77,23 +78,22 @@ metadata <- metadata_raw %>%
         "HT" = (island=="SR" & site=="SR High Terrace-East"),
         .default = "UNK"),
         # create unique netting night ID
-        day = substr(date, 9, 10), Month = substr(date, 6, 7),
-        dateStr = paste(year, Month, day, sep = ""),
-        nightID = paste(dateStr,island, Site, sep = "_"),
-        # rename all old fields
-        App_sunset_old = App_sunset, Moon_fract_old = Moon_fract, moon_time_old = moon_time, 
-        moon_min_old = moon_min, moon_index_old = moon_index, WS_midnight_old = WS_midnight,
-        std_ending_old = std_ending, minutes_old = minutes, # duration_old = duration,
-        std_captured_old = std_captured, raw_CPUE_old = raw_CPUE, std_CPUE_old = std_CPUE,
-        birds_min_area_old = birds.min.area) %>% 
-  select(-site, -std_ending, -std_min, -App_sunset, -Moon_fract, -moon_time, -moon_min, -moon_index, -WS_midnight, 
-         -minutes, -std_captured, -raw_CPUE, -std_CPUE, -Month, -day) %>%
+        day = substr(date, 9, 10), month = substr(date, 6, 7),
+        dateStr = paste(year, month, day, sep = ""),
+        sessionID = paste(dateStr,island, Site, sep = "_")) %>%
+        # # rename all old fields
+        # App_sunset_old = App_sunset, Moon_fract_old = Moon_fract, moon_time_old = moon_time, moon_min_old = moon_min, moon_index_old = moon_index, WS_midnight_old = WS_midnight,
+        # std_ending_old = std_ending, minutes_old = minutes, # duration_old = duration, std_captured_old = std_captured, raw_CPUE_old = raw_CPUE, std_CPUE_old = std_CPUE, birds_min_area_old = birds.min.area
+  select(-site, -dateStr) %>%
   # add latitude and longitude to metadata
   left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island"))  
 
+# updated CPUE metadata for publication
+write.csv(metadata, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_metadata.csv',
+          row.names = FALSE)
+
 
 ### MAKE SUN AND MOON DATAFRAME
-
 ## Calculate moon time
 # MOON TIME CALCULATION FUNCTION (from MFC "moonIndex_v2.R")
 moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) { 
