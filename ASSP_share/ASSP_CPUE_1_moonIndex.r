@@ -31,8 +31,8 @@ metadata_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_08142019.csv', 
          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old),
          date = mdy(date)) %>% 
-  select(-App_sunset:-WS_midnight, -month, -mo_period, -duration:-birds.min.area, -X, -X.1,
-         -nextDay_open, -nextDay_close, -hour_open, -hour_close) %>% # -net_open_old, -net_close_old, 
+  select(-mo_period, -duration:-birds.min.area, -X, -X.1, -net_open_old, -net_close_old,  
+        -nextDay_open, -nextDay_close, -hour_open, -hour_close) %>% # -App_sunset:-WS_midnight, -month, 
   filter(TRUE) 
   
 sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20200122.csv') %>% 
@@ -70,11 +70,10 @@ metadata <- metadata_raw %>%
         "WCliffs" = (island=="SBI" & site=="West Cliffs"), 
         # SCI
         "DR" = (island=="SCI" & site=="Diablo Rock"), 
-        # SR
         "SR1" = (island=="SR" & site=="1" | island=="SR" & site=="SR1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
         "SR2" = (island=="SR" & site=="2"),
         "SR3" = (island=="SR" & site=="3"),
-        "LSH" = (island=="SR" & site=="Little Scorstartpion Headland" | island=="SR" & site=="Scorpion Bluff"),
+        "LSH" = (island=="SCI" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
         "HT" = (island=="SR" & site=="SR High Terrace-East"),
         .default = "UNK"),
         # create unique netting night ID
