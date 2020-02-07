@@ -48,5 +48,7 @@ metadata <- metadata_raw %>%
   select(-net_open_1_old:-net_close_5_old_hr) %>% 
   filter(TRUE) 
 
-write.csv(metadata, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_test.csv',
+table(metadata$seriesID)
+
+write.csv(metadata, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_20200206.csv',
           row.names = FALSE)
