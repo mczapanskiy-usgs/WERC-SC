@@ -87,6 +87,7 @@ metadata_1stnight <- getSunlightTimes(data = sun_vec,
        min_5 = as.double(if_else(as.character(net_close_5_std - net_open_5) < 0, "0", as.character(net_close_5 - net_open_5)))) %>%  
   mutate_at(c("min_1", "min_2", "min_3", "min_4", "min_5"), .funs = ~replace_na(., 0)) %>% 
   mutate(min_std = min_1 + min_2 + min_3 + min_4 + min_5) %>%
+  select(-min_1:-min_5) %>% 
   filter(seriesID == "1")
 
 test <- metadata_1stnight %>% 
@@ -126,24 +127,21 @@ catches_filtered <- catches_metadata %>%
 # summary(catches_metadata$recapture.)
 # summary(catches_std$SNrecapture)
 
-
 # sum catches for each species and night
 metadata_catches <- catches_filtered %>%
   group_by(island, Site, sessionID) %>% 
   # count(species) %>% 
   summarise(ASSP = n(),
-            ASSPstd = sum(std == "1"))
-  
-  
-  # mutate(ASSPraw = as.character(ASSP)) %>% 
-  left_join(metadata, by= c("nightID", "island", "Site")) %>% # , "net_open"
-  filter(minutes_std > 0) %>%
-  mutate(CPUEraw = ASSP/minutes_raw,
-         CPUEstd = ASSPstd/minutes_std) %>% 
+            ASSPstd = sum(std == "1")) %>% 
+  mutate(ASSPraw = as.character(ASSP)) %>% 
+  left_join(metadata_1stnight, by= c("sessionID", "island", "Site")) %>%
+  select()
+  # filter(min_std > 0) %>%
+  mutate(CPUEstd = ASSPstd/min_std) # %>% 
   # drop_na()
-  distinct()
+  # distinct()
 
-write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE.csv',
+write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE_PSG.csv',
           row.names = FALSE)
   
   

@@ -1,6 +1,8 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
+# input data: raw database
 # created: Jan 23, 2020
+# last edited: Feb 21, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -19,10 +21,15 @@ library(suncalc)
 # library(chron)
 # library(rnoaa)
 
-### READ IN BANDING CPUE DATA
-metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_01232020.csv', na.strings=c("","NA")) 
+### READ IN DATA
+## CPUE DATA (AKA METADATA)
+metadata_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_01232020.csv', na.strings=c("","NA")) 
+## BANDING DATA (AKA CATCHES DATA)
+catches_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_01232020.csv', na.strings=c("","NA")) %>% 
+  select(-X:-X.5)
 
-metadata_JA <- metadata%>% 
+
+metadata <- metadata_raw %>% 
   mutate(net_open_old = as.POSIXct(paste(date, net.open), format="%m/%d/%Y %H:%M"),
          net_close_old = as.POSIXct(paste(date, net.close), format="%m/%d/%Y %H:%M"),
          # but some "net_open" and "net_close" times were actually after midnight:
@@ -32,6 +39,7 @@ metadata_JA <- metadata%>%
          net_open = if_else(hour_open <= 12, nextDay_open, net_open_old),
          net_close = if_else(hour_close <= 12, nextDay_close, net_close_old),
          date = mdy(date),
+         # standardize site names
          Site= mosaic::derivedFactor(
            # ANI
            "CC" = (island=="ANI" & site=="Cathedral Cove"),
@@ -67,6 +75,7 @@ metadata_JA <- metadata%>%
          day = substr(date, 9, 10), month = substr(date, 6, 7),
          dateStr = paste(year, month, day, sep = ""),
          sessionID = paste(dateStr,island, Site, sep = "_"),
+         # generate distintion between "island" and "location"
          islandID= mosaic::derivedFactor(
            "ANI" = (island =="ANI"),
            "SMI" = (island == "PI"),
@@ -76,16 +85,10 @@ metadata_JA <- metadata%>%
   filter(TRUE)
 
 
-write.csv(metadata_JA, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_01242020_JA.csv',
-          row.names = FALSE)
-
-
-catches <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_01232020.csv', na.strings=c("","NA")) %>% 
-  select(-X:-X.5)
-
-catches_JA <- catches%>% 
+catches <- catches_raw %>% 
   filter(island != "ND") %>% 
   mutate(date = mdy(date),
+         # standardize site names
          Site= mosaic::derivedFactor(
            # ANI
            "CC" = (island=="ANI" & site=="Cathedral Cove"),
@@ -143,6 +146,10 @@ catches_JA <- catches%>%
   select(catchID, sessionID, day, Month, year, island, Site, measurer.s., capture_time, release_time, sunset:Notes) %>% #-capture.time, -capture.time_old, -nextDay_capture.time, -hour_capture, -release.time, -release.time_old, -nextDay_release.time, -hour_release) %>% 
   filter(TRUE)
 
-write.csv(catches_JA, file = '~/WERC-SC/ASSP_share/ASSP_BANDING_01242020_JA.csv',
+### save data to manually review
+write.csv(metadata, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_METADATA2review.csv', # '~/WERC-SC/ASSP_share/ASSP_CPUE_01242020_JA.csv',
+          row.names = FALSE)
+
+write.csv(catches, file = '~/WERC-SC/ASSP_share/ASSP_BANDING_CATCHES2review.csv', # '~/WERC-SC/ASSP_share/ASSP_BANDING_01242020_JA.csv',
             row.names = FALSE)
   
