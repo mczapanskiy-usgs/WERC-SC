@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: Jan 22, 2020
+# last edited: Feb 24, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -20,98 +20,139 @@ library(suncalc)
 # library(chron)
 # library(rnoaa)
 
-### READ IN BANDING CPUE DATA
-metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_metadata_session.csv', na.strings=c("","NA")) %>% 
-  filter(Site != "RC", Site != "EAI_S") %>% 
+### READ IN DATA
+# netting site locations
+sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20200122.csv') %>% 
+  select(-Notes)
+# metadata from ASSP_2 script
+metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_2_metadata_session.csv', na.strings=c("","NA")) %>% 
+  # filter(Site != "RC", Site != "EAI_S") %>% 
   mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
               "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
             .funs = ~as.POSIXct(.)) %>% 
-  left_join(sites_tbl, by = c("Site" = "Site", "island" = "Island")) %>% 
+  left_join(sites_tbl, by = c("Site", "Location", "island" = "Island")) %>% 
   mutate(Site = as.factor(Site),
          Island = as.factor(island)) %>% 
-  select(-App_sunset) %>% 
+  select(-App_sunset, -island) %>% 
   filter(TRUE)
-
-sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20200122.csv') %>% 
-  select(-Notes, -Alias)
-
-# MOON TIME CALCULATION FUNCTION (from MFC "moonIndex_v2.R")
-moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) { 
-                startDay <- with_tz(startDay, 'UTC')
-                endDay <- with_tz(endDay, 'UTC')
-                interval <- first(interval)
-                cl <- makeCluster(detectCores())
-                registerDoParallel(cl)
-                result <- foreach(s = startDay, e = endDay, 
-                                  x = longitude, y = latitude,
-                                  .combine = bind_rows, 
-                                  .packages = c('oce')) %dopar% {
-                                    t <- seq(from = s, to = e, by = interval)
-                                    period = as.numeric(difftime(e, s, units = 'days'))
-                                    sunAlt <- sunAngle(t, x, y, useRefraction = TRUE)$altitude
-                                    moon <- moonAngle(t, x, y, useRefraction = TRUE)
-                                    moonAlt <- moon$altitude
-                                    moonOnly <- moonAlt > 0 & sunAlt < 0
-                                    moonFrac <- mean(moon$illuminatedFraction[moonOnly])
-                                    moonMin <- sum(moonOnly) * (interval / period)/60
-                                    moonIndex <- moonMin * moonFrac
-                                    data.frame(startDate = s, moonFrac = moonFrac, moonMin = moonMin, moonIndex = moonIndex)
-                                  }
-                stopCluster(cl)
-                result
-}
+# 
+# # MOON TIME CALCULATION FUNCTION (from MFC "moonIndex_v2.R")
+# moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) { 
+#                 startDay <- with_tz(startDay, 'UTC')
+#                 endDay <- with_tz(endDay, 'UTC')
+#                 interval <- first(interval)
+#                 cl <- makeCluster(detectCores())
+#                 registerDoParallel(cl)
+#                 result <- foreach(s = startDay, e = endDay, 
+#                                   x = longitude, y = latitude,
+#                                   .combine = bind_rows, 
+#                                   .packages = c('oce')) %dopar% {
+#                                     t <- seq(from = s, to = e, by = interval)
+#                                     period = as.numeric(difftime(e, s, units = 'days'))
+#                                     sunAlt <- sunAngle(t, x, y, useRefraction = TRUE)$altitude
+#                                     moon <- moonAngle(t, x, y, useRefraction = TRUE)
+#                                     moonAlt <- moon$altitude
+#                                     moonOnly <- moonAlt > 0 & sunAlt < 0
+#                                     moonFrac <- mean(moon$illuminatedFraction[moonOnly])
+#                                     moonMin <- sum(moonOnly) * (interval / period)/60
+#                                     moonIndex <- moonMin * moonFrac
+#                                     data.frame(startDate = s, moonFrac = moonFrac, moonMin = moonMin, moonIndex = moonIndex)
+#                                   }
+#                 stopCluster(cl)
+#                 result
+# }
 
 
 ### MAKE SUN AND MOON DATAFRAME
+
+## SUNSET
+# create dataframe to run sunset function on
+sun_vec <- metadata %>%  
+  transmute(date = as.Date(date, format = "%m/%d/%Y"), lat = Lat, lon = Long, Site = Site, sessionID = sessionID) %>% #as_date()
+  # remove the few rows with unknown locations
+  drop_na() %>%  
+  filter(TRUE) 
+
+metadata_sunsetTime <- getSunlightTimes(data = sun_vec,
+                                    keep = c("sunset"), tz = "PST8PDT") %>% 
+  mutate(std_ending = sunset + lubridate::hours(5) + lubridate::minutes(18), # standard ending = 5.3 hours after sunset
+         Lat = lat,
+         Long = lon,
+         App_sunset = sunset) %>%
+  left_join(sun_vec, by = c("date", "lat", "lon")) %>%
+  select(-date, -lat, -lon, -sunset) %>%
+  left_join(metadata, by = c("sessionID", "Site", "Lat", "Long")) %>% 
+  mutate(Site = as.factor(Site),
+         Island = as.factor(Island),
+         net_close_1_std = if_else(net_close_1 > std_ending, std_ending, net_close_1),
+         net_close_2_std = if_else(net_close_2 > std_ending, std_ending, net_close_2),
+         net_close_3_std = if_else(net_close_3 > std_ending, std_ending, net_close_3),
+         net_close_4_std = if_else(net_close_4 > std_ending, std_ending, net_close_4),
+         net_close_5_std = if_else(net_close_5 > std_ending, std_ending, net_close_5),
+         min_1 = as.double(if_else(as.character(net_close_1_std - net_open_1) < 0, "0", 
+                                    as.character(net_close_1 - net_open_1))),
+         min_2 = as.double(if_else(as.character(net_close_2_std - net_open_2) < 0, "0", 
+                                    as.character(net_close_2 - net_open_2))),
+         min_3 = as.double(if_else(as.character(net_close_3_std - net_open_3) < 0, "0", 
+                                    as.character(net_close_3 - net_open_3))),
+         min_4 = as.double(if_else(as.character(net_close_4_std - net_open_4) < 0, "0", 
+                                    as.character(net_close_4 - net_open_4))),
+         min_5 = as.double(if_else(as.character(net_close_5_std - net_open_5) < 0, "0", 
+                                    as.character(net_close_5 - net_open_5)))) %>%
+  mutate_at(c("min_1", "min_2", "min_3", "min_4", "min_5"), .funs = ~replace_na(., 0)) %>%
+  mutate(min_std = min_1 + min_2 + min_3 + min_4 + min_5) %>%
+  select(-min_1:-min_5) %>%
+  filter(TRUE)
+                              
+                              
 ## CALCULATE MOON TIME
 # create dataframe to run moonCalc function on 
-moon_vec = metadata %>% 
-  group_by(date, Lat, Long, Site, sessionID) %>%
-  count(sessionID) %>% 
-  ungroup %>% 
-  # mutate() %>% 
-  transmute(date = as.Date(date),
-            lat = Lat, 
-            lon = Long, 
-            sessionID = sessionID,
-            startDay = as.POSIXct(date), # , format="%Y-%m-%d %h:%m:%s" 
-            endDay = date + lubridate::days(1)) %>% 
-  # mutate(startDay = as.POSIXct(startDay), endDay = as.POSIXct(endDay)) %>% # startDates = as.POSIXct(startDay, format="%Y-%m-%d"), 
-  drop_na() %>%  # remove the few rows with unknown locations
-  filter(TRUE) 
-# create second dataframe for times when moon rises early the next morning 
+moon_vec <- metadata %>%  
+  transmute(date = as.Date(date, format = "%m/%d/%Y") + lubridate::days(1),
+            lat = Lat, lon = Long, 
+            Site, sessionID) %>% #as_date()
+  # remove the few rows with unknown locations
+  drop_na() %>%  
+  filter(TRUE)
+# moon_vec = metadata %>% 
+#   transmute(startDay = net_open_1, #date = as.Date(date, format = "%m/%d/%Y"), # + lubridate::days(1), # mdy(date), # dummy_date = 
+#             endDay = startDay + lubridate::days(1),
+#             Lat, Long, 
+#             # Site = Site, lat = Lat, lon = Long, 
+#             sessionID = sessionID) %>% 
+#             # startDay = as.POSIXct(date, format="%m/%d/%Y"), #  %h:%m:%s
+#             # endDay = startDay + lubridate::days(1)) %>% 
+#   # remove the few rows with unknown locations
+#   drop_na() %>%  
+#   filter(TRUE) 
+# create second dataframe for times when moon rises the following calendary day
 moon_vec_next <- metadata %>%
-  #  remove multiple open/close events for one netting night
-  group_by(date, Lat, Long, Site, sessionID) %>%
-  count(sessionID) %>%
-  ungroup %>%
-  transmute(date = as.Date(date) + lubridate::days(2),
+  transmute(dummy_date_nxt = as.Date(date, format = "%m/%d/%Y") + lubridate::days(2),
             lat = Lat, lon = Long,
             Site = Site,
-            sessionID = sessionID) %>% #as_date()
+            sessionID = sessionID) %>%
+  # remove the few rows with unknown locations
   drop_na() %>%
   filter(TRUE)
-
-# run moonCalc function
-moonIndex <- moonCalc(moon_vec$startDay, moon_vec$endDay, moon_vec$Lat, moon_vec$Long) %>% 
-  # add dates and location back into datatable
-  bind_cols(moon_vec) %>% # STOP CODE AFTER THIS LINE AND CHECK THAT DATES LINE UP #
-  # after checking that dates line up, remove "startDate", also remove "endDay" because not needed
-  select(-startDate, -endDay) %>% 
-  mutate(startDay = as.Date(startDay), 
-         seq = 1:n()) %>% # seq to make sure that tables are joined in correct order 
-  filter(TRUE) 
+# 
+# # run moonCalc function
+# moonIndex <- moonCalc(moon_vec$startDay, moon_vec$endDay, moon_vec$Long, moon_vec$Lat) %>% 
+#   # add dates and location back into datatable
+#   bind_cols(moon_vec) %>% # STOP CODE AFTER THIS LINE AND CHECK THAT DATES LINE UP #
+#   # after checking that dates line up, remove "startDate", also remove "endDay" because not needed
+#   # select(-startDay, -endDay) %>% 
+#   mutate(startDay = as.Date(startDay), 
+#          seq = 1:n()) %>% # seq to make sure that tables are joined in correct order 
+#   filter(TRUE) 
 #account for 
-moon_test <- getMoonTimes(data = moon_vec,
+moonT <- getMoonTimes(data = moon_vec,
                           keep = c("rise", "set"), tz = "PST8PDT") %>% 
-  mutate(Lat = lat,
-         Long = lon,
-         date = date - lubridate::days(1)) %>%
-  left_join(sun_vec, by = c("date", "lat", "lon")) %>%
-  select(-lat, -lon,) %>%
+  mutate(date = date - lubridate::days(1)) %>%
+  left_join(moon_vec, by = c("date", "lat", "lon")) %>%
+  # select(-lat, -lon,) %>%
   filter(TRUE) 
 
-moon_next <- getMoonTimes(data = moon_vec_next,
+moonT_next <- getMoonTimes(data = moon_vec_next,
                           keep = c("rise", "set"), tz = "PST8PDT") %>% 
   mutate(Lat = lat, # nextDay = date,
          Long = lon,
@@ -124,45 +165,6 @@ moon_next <- getMoonTimes(data = moon_vec_next,
   mutate(moonRise = if_else(rise == "NA", moonRise_next, rise),
          moonSet = if_else(set == "NA", moonSet_next, set)) %>% 
   filter(TRUE) 
-
-  
-## SUNSET
-# create dataframe to run sunset function on
-sun_vec <- metadata %>%  
-  #  remove multiple open/close events for one netting night
-  group_by(date, Lat, Long, Site, nightID) %>%
-  count(nightID) %>% 
-  ungroup %>% 
-  transmute(date = date, lat = Lat, lon = Long, Site = Site, nightID = nightID) %>% #as_date()
-  # drop_na() %>% 
-  filter(TRUE) 
-
-metadata_sunsetTime <- getSunlightTimes(data = sun_vec,
-                                      keep = c("sunset"), tz = "PST8PDT") %>% 
-  mutate(std_ending = sunset + lubridate::hours(5) + lubridate::minutes(18), # standard ending = 5.3 hours after sunset
-         Lat = lat,
-         Long = lon,
-         App_sunset = sunset) %>%
-  left_join(sun_vec, by = c("date", "lat", "lon")) %>%
-  select(-date, -lat, -lon, -sunset) %>%
-  left_join(metadata, by = c("sessionID", "Site", "Lat", "Long")) %>%
-  mutate(Site = as.factor(Site),
-         island = as.factor(island),
-         net_close_1_std = if_else(net_close_1 > std_ending, std_ending, net_close_1),
-         net_close_2_std = if_else(net_close_2 > std_ending, std_ending, net_close_2),
-         net_close_3_std = if_else(net_close_3 > std_ending, std_ending, net_close_3),
-         net_close_4_std = if_else(net_close_4 > std_ending, std_ending, net_close_4),
-         net_close_5_std = if_else(net_close_5 > std_ending, std_ending, net_close_5), 
-         min_1 = as.double(if_else(as.character(net_close_1_std - net_open_1) < 0, "0", as.character(net_close_1 - net_open_1))),
-         min_2 = as.double(if_else(as.character(net_close_2_std - net_open_2) < 0, "0", as.character(net_close_2 - net_open_2))),
-         min_3 = as.double(if_else(as.character(net_close_3_std - net_open_3) < 0, "0", as.character(net_close_3 - net_open_3))),
-         min_4 = as.double(if_else(as.character(net_close_4_std - net_open_4) < 0, "0", as.character(net_close_4 - net_open_4))),
-         min_5 = as.double(if_else(as.character(net_close_5_std - net_open_5) < 0, "0", as.character(net_close_5 - net_open_5)))) %>%  
-  mutate_at(c("min_1", "min_2", "min_3", "min_4", "min_5"), .funs = ~replace_na(., 0)) %>% 
-  mutate(min_std = min_1 + min_2 + min_3 + min_4 + min_5) %>%
-  select(-min_1:-min_5) %>% 
-  filter(TRUE) 
-
 
 ### MERGE METADATA WITH SUNSET AND MOONINDEX
 ## combine moonIndex and sunset

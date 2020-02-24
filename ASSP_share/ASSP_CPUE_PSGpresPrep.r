@@ -1,7 +1,7 @@
 #### STORM-PETREL CATCH ANALYSIS - REDO
 # this script calculates net time and CPUE
 # created: Feb 6, 2020 by: E Kelsey
-# last edited: 
+# last edited: Feb 21, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -12,6 +12,7 @@ library(tidyr)
 library(dplyr)
 library(lubridate)
 library(suncalc)
+library(ggplot2)
 
 
 ### READ IN DATA
@@ -25,7 +26,7 @@ catches_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_01282020.csv') %>%
 sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20190905.csv') %>% 
   select(-Notes, -Alias) #-Site_Name, 
 ## "clean" metdata
-metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_20200206.csv', na.strings=c("","NA")) %>% 
+metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_metadata_session.csv', na.strings=c("","NA")) %>% 
   filter(Site != "RC", Site != "EAI_S") %>% 
   mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
               "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
@@ -87,11 +88,8 @@ metadata_1stnight <- getSunlightTimes(data = sun_vec,
        min_5 = as.double(if_else(as.character(net_close_5_std - net_open_5) < 0, "0", as.character(net_close_5 - net_open_5)))) %>%  
   mutate_at(c("min_1", "min_2", "min_3", "min_4", "min_5"), .funs = ~replace_na(., 0)) %>% 
   mutate(min_std = min_1 + min_2 + min_3 + min_4 + min_5) %>%
-  select(-min_1:-min_5) %>% 
-  filter(seriesID == "1")
+  select(-min_1:-min_5) 
 
-test <- metadata_1stnight %>% 
-  select(net_close_1, net_close_1_std, std_ending)
 
 # compare Sites listed in catches vs. metadata datasets
 summary(metadata_1stnight$Site)
@@ -135,13 +133,31 @@ metadata_catches <- catches_filtered %>%
             ASSPstd = sum(std == "1")) %>% 
   mutate(ASSPraw = as.character(ASSP)) %>% 
   left_join(metadata_1stnight, by= c("sessionID", "island", "Site")) %>%
-  select()
+  # select() %>% 
   # filter(min_std > 0) %>%
   mutate(CPUEstd = ASSPstd/min_std) # %>% 
   # drop_na()
   # distinct()
+  
+CPUE <-  ggplot(metadata_catches, aes(as.character(year), CPUEstd)) +
+  geom_boxplot() +
+  facet_wrap(~Site) +
+  # ylim(0, 0.5) +
+  scale_x_discrete(name ="Year", 
+                   limits=c("1994","1995","1996","1997","1998","1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006",
+                            "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018")) +
+  labs(y = 'Catch-Per-Unit-Effort') +
+  theme_bw()
+# CPUE %+% subset(metadata_catches, island %in% c("PI", "SR", "SBI"))
+CPUE %+% subset(metadata_catches, Site %in% c("PI1", "SR1", "AP", "ESP"))
+ggsave(width = 20, height = 20, dpi=300, filename = "~/WERC-SC/ASSP_share/CPUE_yr_island_PSG.pdf")
+
+  
 
 write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE_PSG.csv',
           row.names = FALSE)
   
+test <- catches_raw %>% 
+  filter(island == "PI")
+
   
