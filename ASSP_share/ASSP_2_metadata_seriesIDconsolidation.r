@@ -29,11 +29,13 @@ metadata <- gather(metadata_raw, net_stat, net_time, net_open_1:net_close_5) %>%
   select(-net_time_old, -net_time_nxt, -net_time_hr) %>% 
   group_by(sessionID) %>% 
   spread(net_stat, net_time) %>% 
-  filter(TRUE) 
+  filter() %>% 
+  mutate(last_open = if_else(net_close_5 == "NA",
+                    net_close_4))
 
 table(metadata$seriesID)
 
-write.csv(metadata, file = '~/WERC-SC/ASSP_share/ASSP_2_metadata_session.csv', # '~/WERC-SC/ASSP_share/ASSP_CPUE_20200206.csv',
+write.csv(metadata, file = '~/WERC-SC/ASSP_share/ASSP_2_CPUE_metadata_session.csv', # '~/WERC-SC/ASSP_share/ASSP_CPUE_20200206.csv',
           row.names = FALSE)
 
 

@@ -1,5 +1,5 @@
 #### STORM-PETREL CPUE METADATA
-# this script calculates processes the metadata that Amelia created
+# this script combines mistnetting and acoustics metadata
 # created: March 6, 2019 by: E Kelsey
 # last edited: Jan 22, 2020
 

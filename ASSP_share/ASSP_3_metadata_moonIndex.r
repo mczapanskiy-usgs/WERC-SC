@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: Feb 24, 2020
+# last edited: March 5, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -25,7 +25,7 @@ library(suncalc)
 sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20200122.csv') %>% 
   select(-Notes)
 # metadata from ASSP_2 script
-metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_2_metadata_session.csv', na.strings=c("","NA")) %>% 
+metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_2_CPUE_metadata_session.csv', na.strings=c("","NA")) %>% 
   # filter(Site != "RC", Site != "EAI_S") %>% 
   mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
               "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
@@ -35,32 +35,7 @@ metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_2_metadata_session.csv', na.stri
          Island = as.factor(island)) %>% 
   select(-App_sunset, -island) %>% 
   filter(TRUE)
-# 
-# # MOON TIME CALCULATION FUNCTION (from MFC "moonIndex_v2.R")
-# moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) { 
-#                 startDay <- with_tz(startDay, 'UTC')
-#                 endDay <- with_tz(endDay, 'UTC')
-#                 interval <- first(interval)
-#                 cl <- makeCluster(detectCores())
-#                 registerDoParallel(cl)
-#                 result <- foreach(s = startDay, e = endDay, 
-#                                   x = longitude, y = latitude,
-#                                   .combine = bind_rows, 
-#                                   .packages = c('oce')) %dopar% {
-#                                     t <- seq(from = s, to = e, by = interval)
-#                                     period = as.numeric(difftime(e, s, units = 'days'))
-#                                     sunAlt <- sunAngle(t, x, y, useRefraction = TRUE)$altitude
-#                                     moon <- moonAngle(t, x, y, useRefraction = TRUE)
-#                                     moonAlt <- moon$altitude
-#                                     moonOnly <- moonAlt > 0 & sunAlt < 0
-#                                     moonFrac <- mean(moon$illuminatedFraction[moonOnly])
-#                                     moonMin <- sum(moonOnly) * (interval / period)/60
-#                                     moonIndex <- moonMin * moonFrac
-#                                     data.frame(startDate = s, moonFrac = moonFrac, moonMin = moonMin, moonIndex = moonIndex)
-#                                   }
-#                 stopCluster(cl)
-#                 result
-# }
+
 
 
 ### MAKE SUN AND MOON DATAFRAME
@@ -84,26 +59,34 @@ metadata_sunsetTime <- getSunlightTimes(data = sun_vec,
   left_join(metadata, by = c("sessionID", "Site", "Lat", "Long")) %>% 
   mutate(Site = as.factor(Site),
          Island = as.factor(Island),
+         min_1 = net_close_1 - net_open_1,
+         min_2 = net_close_2 - net_open_2,
+         min_3 = net_close_3 - net_open_3,
+         min_4 = net_close_4 - net_open_4,
+         min_5 = net_close_5 - net_open_5,
          net_close_1_std = if_else(net_close_1 > std_ending, std_ending, net_close_1),
          net_close_2_std = if_else(net_close_2 > std_ending, std_ending, net_close_2),
          net_close_3_std = if_else(net_close_3 > std_ending, std_ending, net_close_3),
          net_close_4_std = if_else(net_close_4 > std_ending, std_ending, net_close_4),
          net_close_5_std = if_else(net_close_5 > std_ending, std_ending, net_close_5),
-         min_1 = as.double(if_else(as.character(net_close_1_std - net_open_1) < 0, "0", 
+         min_1_std = as.double(if_else(as.character(net_close_1_std - net_open_1) < 0, "0", 
                                     as.character(net_close_1 - net_open_1))),
-         min_2 = as.double(if_else(as.character(net_close_2_std - net_open_2) < 0, "0", 
+         min_2_std = as.double(if_else(as.character(net_close_2_std - net_open_2) < 0, "0", 
                                     as.character(net_close_2 - net_open_2))),
-         min_3 = as.double(if_else(as.character(net_close_3_std - net_open_3) < 0, "0", 
+         min_3_std = as.double(if_else(as.character(net_close_3_std - net_open_3) < 0, "0", 
                                     as.character(net_close_3 - net_open_3))),
-         min_4 = as.double(if_else(as.character(net_close_4_std - net_open_4) < 0, "0", 
+         min_4_std = as.double(if_else(as.character(net_close_4_std - net_open_4) < 0, "0", 
                                     as.character(net_close_4 - net_open_4))),
-         min_5 = as.double(if_else(as.character(net_close_5_std - net_open_5) < 0, "0", 
+         min_5_std = as.double(if_else(as.character(net_close_5_std - net_open_5) < 0, "0", 
                                     as.character(net_close_5 - net_open_5)))) %>%
   mutate_at(c("min_1", "min_2", "min_3", "min_4", "min_5"), .funs = ~replace_na(., 0)) %>%
-  mutate(min_std = min_1 + min_2 + min_3 + min_4 + min_5) %>%
-  select(-min_1:-min_5) %>%
-  filter(TRUE)
-                              
+  mutate(min = as.numeric(min_1 + min_2 + min_3 + min_4 + min_5),
+         min_std = as.numeric(min_1_std + min_2_std + min_3_std + min_4_std + min_5_std)) %>%
+  select(-min_1:-min_5_std,) %>%
+  filter(TRUE) 
+
+write.csv(metadata_sunsetTime, file = '~/WERC-SC/ASSP_share/ASSP_1_CPUE_metadata_Sun_noMoon.csv',
+          row.names = FALSE)
                               
 ## CALCULATE MOON TIME
 # create dataframe to run moonCalc function on 
@@ -145,6 +128,7 @@ moon_vec_next <- metadata %>%
 #          seq = 1:n()) %>% # seq to make sure that tables are joined in correct order 
 #   filter(TRUE) 
 #account for 
+
 moonT <- getMoonTimes(data = moon_vec,
                           keep = c("rise", "set"), tz = "PST8PDT") %>% 
   mutate(date = date - lubridate::days(1)) %>%
@@ -279,3 +263,30 @@ write.csv(metadata_SunMoon_all, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadat
 # # updated CPUE metadata for publication
 # write.csv(metadata, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_metadata.csv',
 #           row.names = FALSE)
+
+# 
+# # MOON TIME CALCULATION FUNCTION (from MFC "moonIndex_v2.R")
+# moonCalc <- function(startDay, endDay, longitude, latitude, interval = 60) { 
+#                 startDay <- with_tz(startDay, 'UTC')
+#                 endDay <- with_tz(endDay, 'UTC')
+#                 interval <- first(interval)
+#                 cl <- makeCluster(detectCores())
+#                 registerDoParallel(cl)
+#                 result <- foreach(s = startDay, e = endDay, 
+#                                   x = longitude, y = latitude,
+#                                   .combine = bind_rows, 
+#                                   .packages = c('oce')) %dopar% {
+#                                     t <- seq(from = s, to = e, by = interval)
+#                                     period = as.numeric(difftime(e, s, units = 'days'))
+#                                     sunAlt <- sunAngle(t, x, y, useRefraction = TRUE)$altitude
+#                                     moon <- moonAngle(t, x, y, useRefraction = TRUE)
+#                                     moonAlt <- moon$altitude
+#                                     moonOnly <- moonAlt > 0 & sunAlt < 0
+#                                     moonFrac <- mean(moon$illuminatedFraction[moonOnly])
+#                                     moonMin <- sum(moonOnly) * (interval / period)/60
+#                                     moonIndex <- moonMin * moonFrac
+#                                     data.frame(startDate = s, moonFrac = moonFrac, moonMin = moonMin, moonIndex = moonIndex)
+#                                   }
+#                 stopCluster(cl)
+#                 result
+# }
