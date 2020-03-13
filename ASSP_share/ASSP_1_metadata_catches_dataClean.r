@@ -23,9 +23,9 @@ library(suncalc)
 
 ### READ IN DATA
 ## CPUE DATA (AKA METADATA)
-metadata_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_CPUE_01232020.csv', na.strings=c("","NA")) 
+metadata_raw <- read.csv('~/WERC-SC/ASSP_share/oldData/ASSP_BANDING_CPUE_01232020.csv', na.strings=c("","NA")) 
 ## BANDING DATA (AKA CATCHES DATA)
-catches_raw <- read.csv('~/WERC-SC/ASSP_share/ASSP_BANDING_01232020.csv', na.strings=c("","NA")) %>% 
+catches_raw <- read.csv('~/WERC-SC/ASSP_share/oldData/ASSP_BANDING_01232020.csv', na.strings=c("","NA")) %>% 
   select(-X:-X.5)
 
 
