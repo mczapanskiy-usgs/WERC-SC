@@ -102,6 +102,8 @@ moonT <- getMoonTimes(data = moonDF,
           
           filter(TRUE)
 
+as.data.table(moonT)
+setkey(moonT, rise)
 test = moonT[moonDF, roll = "nearest"]
 
 # create dataframe to run moonCalc function on 

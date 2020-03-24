@@ -47,7 +47,7 @@ catches <- catches_raw %>%
          mass_corr = uncorr_mass - mass_tare) %>%
   left_join(sites_tbl, by = c("Site", "Location", "Island")) %>% 
   # reorder
-  select(catchID:Site, Lat, Long, capture_time:bandno, recapture, diet, BP, uncorr_mass, mass_tare, mass_corr, culmen:Notes)
+  select(catchID:Site, Lat, Long, capture_time:bandno, recapture, diet, BP, uncorr_mass, mass_tare, mass_corr, culmen:R1, measurers, Notes)
 
 # compare "Site" factors in both tables -> inconsistencies?
 summary(as.factor(catches_raw$Site))
@@ -86,7 +86,7 @@ catches_save <- catches_std %>%
   select(catchID, sessionID, Month, day, year:Notes)
 
 ### SAVE CATCHES FILE BEFORE IT IS FILTERED
-write.csv(catches_save, file = '~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200313.csv',
+write.csv(catches_save, file = '~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200320.csv',
           row.names = FALSE)
 
 # missingMETADATA <- anti_join(metadata, catches_std, by = "sessionID")
@@ -110,15 +110,15 @@ summary(catches_std$species == "ASSP")
 # sum catches for each species and night
 metadata_catches <- catches_std %>%
   filter(post_open == "1",
-         species == "ASSP") %>% 
-  group_by(sessionID, Site) %>% 
+         species == "ASSP") %>%
+  group_by(sessionID, Site) %>%
   summarise(ASSP = n(),
-            ASSPstd = sum(std == "1")) %>% 
-  right_join(metadata, by= c("sessionID", "Site")) %>% 
+            ASSPstd = sum(std == "1")) %>%
+  right_join(metadata, by= c("sessionID", "Site")) %>%
   # filter(min_std > 0) %>%
   mutate(CPUEraw = ASSP/min,
-         CPUEstd = ASSPstd/min_std) %>% 
-  select(sessionID, Island, Location, Site, Site_Name, Lat, Long, month, day, year, seriesID, App_sunset, std_ending, 
+         CPUEstd = ASSPstd/min_std) %>%
+  select(sessionID, Island, Location, Site, Site_Name, Lat, Long, month, day, year, seriesID, App_sunset, std_ending,
          net_open_1, net_close_1, net_open_2, net_close_2, net_open_3, net_close_3, net_open_4, net_close_4, net_open_5, net_close_5,
          min, min_std, ASSP, ASSPstd, CPUEraw, CPUEstd, Net_mesh:Flagged_notes)
 
@@ -128,25 +128,25 @@ summary(metadata_catches$ASSPstd)
 #### SAVE CPUE DATA FOR ALL NETTING EFFORTS THAT CPUE CAN BE CALCULATED FOR
 write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200313.csv',
           row.names = FALSE)
-
-#### SAVE CPUE DATA 2017-2018 TO SEND TO T TINKER
-metadata_catches_2017_2018 <- metadata_catches %>% 
-  mutate(year = year(Date)) %>% 
-  filter(year > 2016) %>% 
-  select(-year)
-write.csv(metadata_catches_2017_2018, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE_2017-2018.csv',
-          row.names = FALSE)
-
-
-### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
-catches_std_allSP <- catches_std %>% 
-  filter(spp %in% c("ASSP", "LESP", "BLSP")) %>% 
-  group_by(spp, nightID) %>% 
-  summarise(count = n()) %>% 
-  spread(spp, count)
-
-write.csv(catches_std_allSP, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv',
-          row.names = FALSE)
+# 
+# #### SAVE CPUE DATA 2017-2018 TO SEND TO T TINKER
+# metadata_catches_2017_2018 <- metadata_catches %>% 
+#   mutate(year = year(Date)) %>% 
+#   filter(year > 2016) %>% 
+#   select(-year)
+# write.csv(metadata_catches_2017_2018, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE_2017-2018.csv',
+#           row.names = FALSE)
+# 
+# 
+# ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
+# catches_std_allSP <- catches_std %>% 
+#   filter(spp %in% c("ASSP", "LESP", "BLSP")) %>% 
+#   group_by(spp, nightID) %>% 
+#   summarise(count = n()) %>% 
+#   spread(spp, count)
+# 
+# write.csv(catches_std_allSP, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv',
+#           row.names = FALSE)
 
 # Site= mosaic::derivedFactor(
 #   # ANI
