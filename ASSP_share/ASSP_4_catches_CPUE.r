@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates net time and CPUE
 # created: Feb 11, 2019 by: E Kelsey
-# last edited: March 13, 2020
+# last edited: March 25, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -28,10 +28,10 @@ sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20200122.csv')
                 select(-Notes, -Site_Name)
 
 # CPUE metadata from "ASSP_CPUE_1"
-metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon.csv') %>% 
+metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon_minEdit.csv') %>% 
   mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
               "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
-            .funs = ~as.POSIXct(.)) %>% 
+            .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% 
   mutate(date = as.POSIXct(date, format="%m/%d/%Y")) %>% 
   filter(TRUE)
   # mutate(min = as.integer(min), min_std = as.integer(min_std)) %>% 
@@ -49,10 +49,10 @@ catches <- catches_raw %>%
   # reorder
   select(catchID:Site, Lat, Long, capture_time:bandno, recapture, diet, BP, uncorr_mass, mass_tare, mass_corr, culmen:R1, measurers, Notes)
 
-# compare "Site" factors in both tables -> inconsistencies?
-summary(as.factor(catches_raw$Site))
-summary(as.factor(catches$Site))
-summary(sites_tbl$Site)
+# # compare "Site" factors in both tables -> inconsistencies?
+# summary(as.factor(catches_raw$Site))
+# summary(as.factor(catches$Site))
+# summary(sites_tbl$Site)
 
 ## bind sunset, net open, net closed, std_ending times with catches dataset
 metadata_effort <- metadata %>% 
@@ -60,8 +60,8 @@ metadata_effort <- metadata %>%
 
 catches_metadata <- catches %>%
   left_join(metadata_effort, by = c("Site", "sessionID", "Lat", "Long")) %>% 
-  mutate(App_sunset = as.POSIXct(App_sunset, format = "%Y-%m-%d %H:%M:%S"),
-         std_ending = as.POSIXct(std_ending, format = "%Y-%m-%d %H:%M:%S")) %>% 
+  mutate(App_sunset = as.POSIXct(App_sunset, format = "%m/%d/%Y %H:%M"),
+         std_ending = as.POSIXct(std_ending, format = "%m/%d/%Y %H:%M")) %>% 
   filter(TRUE)
 
 # standardize recapture and species
@@ -86,7 +86,7 @@ catches_save <- catches_std %>%
   select(catchID, sessionID, Month, day, year:Notes)
 
 ### SAVE CATCHES FILE BEFORE IT IS FILTERED
-write.csv(catches_save, file = '~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200320.csv',
+write.csv(catches_save, file = '~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200325.csv',
           row.names = FALSE)
 
 # missingMETADATA <- anti_join(metadata, catches_std, by = "sessionID")
@@ -116,8 +116,10 @@ metadata_catches <- catches_std %>%
             ASSPstd = sum(std == "1")) %>%
   right_join(metadata, by= c("sessionID", "Site")) %>%
   # filter(min_std > 0) %>%
-  mutate(CPUEraw = ASSP/min,
+  mutate(CPUEraw =  ASSP/min,
          CPUEstd = ASSPstd/min_std) %>%
+         # CPUEraw = if_else(min == "NA", "NA", CPUEraw),
+         # CPUEstd = if_else(min == "NA", "NA", CPUEstd)) %>%
   select(sessionID, Island, Location, Site, Site_Name, Lat, Long, month, day, year, seriesID, App_sunset, std_ending,
          net_open_1, net_close_1, net_open_2, net_close_2, net_open_3, net_close_3, net_open_4, net_close_4, net_open_5, net_close_5,
          min, min_std, ASSP, ASSPstd, CPUEraw, CPUEstd, Net_mesh:Flagged_notes)
@@ -126,7 +128,7 @@ summary(metadata_catches$ASSP)
 summary(metadata_catches$ASSPstd)
 
 #### SAVE CPUE DATA FOR ALL NETTING EFFORTS THAT CPUE CAN BE CALCULATED FOR
-write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200313.csv',
+write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200325.csv',
           row.names = FALSE)
 # 
 # #### SAVE CPUE DATA 2017-2018 TO SEND TO T TINKER

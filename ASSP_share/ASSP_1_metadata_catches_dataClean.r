@@ -1,5 +1,5 @@
 #### STORM-PETREL CPUE METADATA
-# this script calculates sunset, moon rise and set, moon time
+# this script standardizes site names and generates sessionID and catchID
 # input data: raw database
 # created: Jan 23, 2020
 # last edited: Feb 21, 2020
@@ -13,13 +13,9 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 library(mosaic)
-library(oce)
 library(foreach)
 library(doParallel)
-# library(stats)
-library(suncalc)
-# library(chron)
-# library(rnoaa)
+
 
 ### READ IN DATA
 ## CPUE DATA (AKA METADATA)

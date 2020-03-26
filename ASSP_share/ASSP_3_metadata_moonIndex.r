@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: March 5, 2020
+# last edited: March 25, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -15,10 +15,7 @@ library(mosaic)
 library(oce)
 library(foreach)
 library(doParallel)
-# library(stats)
 library(suncalc)
-# library(chron)
-# library(rnoaa)
 
 ### READ IN DATA
 # netting site locations
@@ -26,7 +23,7 @@ sites_tbl <- read.csv('~/WERC-SC/ASSP_share/ASSP_mistnetting_locs_20200122.csv')
   select(-Notes)
 # metadata from ASSP_2 script
 metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_2_CPUE_metadata_session.csv', na.strings=c("","NA")) %>% 
-  # filter(Site != "RC", Site != "EAI_S") %>% 
+  # filter(net_open_1 != "NA") %>%
   mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
               "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
             .funs = ~as.POSIXct(., format = "%m/%d/%Y %H:%M")) %>% 
@@ -69,25 +66,30 @@ metadata_sunsetTime <- getSunlightTimes(data = sun_vec,
          net_close_3_std = if_else(net_close_3 > std_ending, std_ending, net_close_3),
          net_close_4_std = if_else(net_close_4 > std_ending, std_ending, net_close_4),
          net_close_5_std = if_else(net_close_5 > std_ending, std_ending, net_close_5),
-         min_1_std = as.double(if_else(as.character(net_close_1_std - net_open_1) < 0, "0", 
-                                    as.character(net_close_1 - net_open_1))),
-         min_2_std = as.double(if_else(as.character(net_close_2_std - net_open_2) < 0, "0", 
-                                    as.character(net_close_2 - net_open_2))),
-         min_3_std = as.double(if_else(as.character(net_close_3_std - net_open_3) < 0, "0", 
-                                    as.character(net_close_3 - net_open_3))),
-         min_4_std = as.double(if_else(as.character(net_close_4_std - net_open_4) < 0, "0", 
-                                    as.character(net_close_4 - net_open_4))),
-         min_5_std = as.double(if_else(as.character(net_close_5_std - net_open_5) < 0, "0", 
-                                    as.character(net_close_5 - net_open_5)))) %>% 
+         min_1_std = net_close_1_std - net_open_1,
+         min_2_std = net_close_2_std - net_open_2,
+         min_3_std = net_close_3_std - net_open_3,
+         min_4_std = net_close_4_std - net_open_4,
+         min_5_std = net_close_5_std - net_open_5) %>% 
   mutate_at(c("min_1_std", "min_2_std", "min_3_std", "min_4_std", "min_5_std"), .funs = ~replace_na(., 0)) %>%
   mutate(min = as.numeric(min_1 + min_2 + min_3 + min_4 + min_5),
-         min_std = min_1_std + min_2_std + min_3_std + min_4_std + min_5_std) %>%
-  select(-min_1:-min_5_std) %>%
+         min_std = min_1_std + min_2_std + min_3_std + min_4_std + min_5_std,
+         min = as.double(if_else(min < 0, "0", as.character(min))),
+         min = as.double(if_else(as.character(net_open_1) == "NA", "0", as.character(min))),
+         min_std = as.double(if_else(min_std <0, "0", as.character(min_std))),
+         min_std = as.double(if_else(as.character(net_open_1) == "NA", "0", as.character(min_std)))) %>%
+  # select(-min_1:-min_5_std) %>%
   filter(TRUE) 
 
-write.csv(metadata_sunsetTime, file = '~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon.csv',
+# test <- metadata_sunsetTime %>% filter(as.Date(as.factor(net_open_1 == "NA")))
+
+write.csv(metadata_sunsetTime, file = '~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon_test.csv',
           row.names = FALSE)
-                              
+
+min_test <- metadata_sunsetTime %>%
+  select(App_sunset, min_std, min, net_open_1, net_close_1, std_ending, net_open_2:net_open_5, net_close_2:net_close_5) %>%
+  filter(min_std > 300)
+
 ## CALCULATE MOON TIME
 
 moonDF <- data.frame(date = seq(ymd("1994-1-1"), ymd("2019-1-1"), by = "days"), 
@@ -296,3 +298,20 @@ write.csv(metadata_SunMoon_all, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_1_metadat
 #          seq = 1:n()) %>% # seq to make sure that tables are joined in correct order 
 #   filter(TRUE) 
 #account for 
+
+# min_1 = time_length(interval(net_open_1, net_close_1), "minute"),
+# min_2 = lubridate::interval(net_close_2, net_open_2),
+# min_3 = lubridate::interval(net_close_3, net_open_3),
+# min_4 = lubridate::interval(net_close_4, net_open_4),
+# min_5 = lubridate::interval(net_close_5, net_open_5),
+
+# min_1_std = as.double(if_else(as.character(net_close_1_std - net_open_1) < 0, "0", 
+#                            as.character(net_close_1 - net_open_1))),
+# min_2_std = as.double(if_else(as.character(net_close_2_std - net_open_2) < 0, "0", 
+#                            as.character(net_close_2 - net_open_2))),
+# min_3_std = as.double(if_else(as.character(net_close_3_std - net_open_3) < 0, "0", 
+#                            as.character(net_close_3 - net_open_3))),
+# min_4_std = as.double(if_else(as.character(net_close_4_std - net_open_4) < 0, "0", 
+#                            as.character(net_close_4 - net_open_4))),
+# min_5_std = as.double(if_else(as.character(net_close_5_std - net_open_5) < 0, "0", 
+#                            as.character(net_close_5 - net_open_5)))) %>% 
