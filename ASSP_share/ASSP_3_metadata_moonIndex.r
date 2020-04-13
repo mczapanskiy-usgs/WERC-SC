@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates sunset, moon rise and set, moon time
 # created: Dec 10, 2018 by: E Kelsey
-# last edited: March 25, 2020
+# last edited: March 26, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -39,7 +39,7 @@ metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_2_CPUE_metadata_session.csv', na
 ## SUNSET
 # create dataframe to run sunset function on
 sun_vec <- metadata %>%  
-  transmute(date = as.Date(date, format = "%m/%d/%Y"), lat = Lat, lon = Long, Site = Site, sessionID = sessionID) %>% #as_date()
+  transmute(date = as.Date(date, format = "%m/%d/%Y"), lat = Lat, lon = Long, Site = Site, sessionID = sessionID) %>% 
   # remove the few rows with unknown locations
   drop_na() %>%  
   filter(TRUE) 
@@ -71,6 +71,7 @@ metadata_sunsetTime <- getSunlightTimes(data = sun_vec,
          min_3_std = net_close_3_std - net_open_3,
          min_4_std = net_close_4_std - net_open_4,
          min_5_std = net_close_5_std - net_open_5) %>% 
+  mutate_at(c("min_1_std", "min_2_std", "min_3_std", "min_4_std", "min_5_std"), .funs = ~replace(., .<0, 0)) %>%
   mutate_at(c("min_1_std", "min_2_std", "min_3_std", "min_4_std", "min_5_std"), .funs = ~replace_na(., 0)) %>%
   mutate(min = as.numeric(min_1 + min_2 + min_3 + min_4 + min_5),
          min_std = min_1_std + min_2_std + min_3_std + min_4_std + min_5_std,
@@ -78,12 +79,16 @@ metadata_sunsetTime <- getSunlightTimes(data = sun_vec,
          min = as.double(if_else(as.character(net_open_1) == "NA", "0", as.character(min))),
          min_std = as.double(if_else(min_std <0, "0", as.character(min_std))),
          min_std = as.double(if_else(as.character(net_open_1) == "NA", "0", as.character(min_std)))) %>%
-  # select(-min_1:-min_5_std) %>%
+  select(-min_1:-min_5_std) %>%
   filter(TRUE) 
 
-# test <- metadata_sunsetTime %>% filter(as.Date(as.factor(net_open_1 == "NA")))
+# metadata_times_edit <- metadata_sunsetTime %>% 
+#   mutate(min_std = if_else(min == 900, 173.0833, min_std),
+#          min_std = if_else(min == 955, 114.25, min_std),
+#          min_std = if_else(min == 1022, 269.25, min_std))
+# test <- metadata_sunsetTime %>% filter(min > 550)
 
-write.csv(metadata_sunsetTime, file = '~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon_test.csv',
+write.csv(metadata_sunsetTime, file = '~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon.csv',
           row.names = FALSE)
 
 min_test <- metadata_sunsetTime %>%

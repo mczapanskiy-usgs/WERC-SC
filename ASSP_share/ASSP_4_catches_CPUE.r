@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates net time and CPUE
 # created: Feb 11, 2019 by: E Kelsey
-# last edited: March 25, 2020
+# last edited: March 26, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -32,7 +32,7 @@ metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon_minEd
   mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
               "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
             .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% 
-  mutate(date = as.POSIXct(date, format="%m/%d/%Y")) %>% 
+  # mutate(date = as.POSIXct(date, format="%m/%d/%Y")) %>% 
   filter(TRUE)
   # mutate(min = as.integer(min), min_std = as.integer(min_std)) %>% 
   
@@ -58,21 +58,18 @@ catches <- catches_raw %>%
 metadata_effort <- metadata %>% 
   select(Site, date, sessionID, net_close_1:net_open_5, App_sunset, std_ending, Lat, Long)
 
-catches_metadata <- catches %>%
+catches_std <- catches %>%
   left_join(metadata_effort, by = c("Site", "sessionID", "Lat", "Long")) %>% 
   mutate(App_sunset = as.POSIXct(App_sunset, format = "%m/%d/%Y %H:%M"),
-         std_ending = as.POSIXct(std_ending, format = "%m/%d/%Y %H:%M")) %>% 
-  filter(TRUE)
-
-# standardize recapture and species
-catches_std <- catches_metadata %>% 
-  mutate(std = if_else(std_ending > capture_time, "1", "0"), # if bird was caught before std_ending = 1, after = 0
+         std_ending = as.POSIXct(std_ending, format = "%m/%d/%Y %H:%M"),
+         std = if_else(std_ending > capture_time, "1", "0"), # if bird was caught before std_ending = 1, after = 0
          # pre_close = if_else(net_close > capture_time, "1", "0"), # if bird was caught before net_close = 1, after = 0
-         post_open = if_else(net_open_1 < capture_time, "1", "0"),  # if bird was caught after net_open = 1, before = 0
+         # post_open = if_else(net_open_1 < capture_time, "1", "0"),  # if bird was caught after net_open = 1, before = 0
          SNR = mosaic::derivedFactor(
            "Y" = (recapture =="SNR" | recapture =="YSN"), # remove same night recaptures
            "N" = (recapture =="N" | recapture =="Y"| recapture =="y"), # recaps from other nights still count 
            .default = "UNK")) %>%
+  select(catchID, sessionID, Month, day, year:Notes) %>% 
   filter(TRUE)
 
 # # compare Sites listed in catches vs. metadata datasets
@@ -82,11 +79,8 @@ catches_std <- catches_metadata %>%
 # summary(catches_metadata$recapture.)
 # summary(catches_std$SNR)
 
-catches_save <- catches_std %>% 
-  select(catchID, sessionID, Month, day, year:Notes)
-
 ### SAVE CATCHES FILE BEFORE IT IS FILTERED
-write.csv(catches_save, file = '~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200325.csv',
+write.csv(catches_std, file = '~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200325.csv',
           row.names = FALSE)
 
 # missingMETADATA <- anti_join(metadata, catches_std, by = "sessionID")
@@ -109,20 +103,26 @@ summary(catches_std$species == "ASSP")
 
 # sum catches for each species and night
 metadata_catches <- catches_std %>%
-  filter(post_open == "1",
-         species == "ASSP") %>%
+  filter(species == "ASSP") %>%
+  mutate(assumeBreed = mosaic::derivedFactor(
+    "Y" = (BP == "B" | BP == "b" | BP == "2" | BP == "3" | BP == "4"),
+    "N" = (BP == "D" | BP == "d" | BP == "0" | BP == "5" | BP == "PD" | BP == "pd" | BP == "1" | BP == "1.5" | BP == "4.5"),
+    .default = "ND")) %>% 
   group_by(sessionID, Site) %>%
   summarise(ASSP = n(),
-            ASSPstd = sum(std == "1")) %>%
+            ASSPstd = sum(std == "1"),
+            BPct = n(),
+            BP_Y = sum(assumeBreed == "Y"),
+            BP_N = sum(assumeBreed == "N")) %>%
   right_join(metadata, by= c("sessionID", "Site")) %>%
   # filter(min_std > 0) %>%
   mutate(CPUEraw =  ASSP/min,
-         CPUEstd = ASSPstd/min_std) %>%
-         # CPUEraw = if_else(min == "NA", "NA", CPUEraw),
-         # CPUEstd = if_else(min == "NA", "NA", CPUEstd)) %>%
+         CPUEstd = ASSPstd/min_std,
+         BPfreq_Y = BP_Y/BPct,
+         BPfreq_N = BP_N/BPct) %>%
   select(sessionID, Island, Location, Site, Site_Name, Lat, Long, month, day, year, seriesID, App_sunset, std_ending,
          net_open_1, net_close_1, net_open_2, net_close_2, net_open_3, net_close_3, net_open_4, net_close_4, net_open_5, net_close_5,
-         min, min_std, ASSP, ASSPstd, CPUEraw, CPUEstd, Net_mesh:Flagged_notes)
+         min, min_std, ASSP, ASSPstd, CPUEraw, CPUEstd, BPfreq_Y, BPfreq_N, Net_mesh:Flagged_notes)
 
 summary(metadata_catches$ASSP)
 summary(metadata_catches$ASSPstd)
@@ -131,68 +131,6 @@ summary(metadata_catches$ASSPstd)
 write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200325.csv',
           row.names = FALSE)
 # 
-# #### SAVE CPUE DATA 2017-2018 TO SEND TO T TINKER
-# metadata_catches_2017_2018 <- metadata_catches %>% 
-#   mutate(year = year(Date)) %>% 
-#   filter(year > 2016) %>% 
-#   select(-year)
-# write.csv(metadata_catches_2017_2018, file = '~/WERC-SC/ASSP_share/metadata_catches_CPUE_2017-2018.csv',
-#           row.names = FALSE)
-# 
-# 
-# ### SUMMARY OF ALL CATCHES FOR SONGMETER METADATA
-# catches_std_allSP <- catches_std %>% 
-#   filter(spp %in% c("ASSP", "LESP", "BLSP")) %>% 
-#   group_by(spp, nightID) %>% 
-#   summarise(count = n()) %>% 
-#   spread(spp, count)
-# 
-# write.csv(catches_std_allSP, file = '~/WERC-SC/ASSP_share/MistnetMetadata_sum_SP.csv',
-#           row.names = FALSE)
-
-# Site= mosaic::derivedFactor(
-#   # ANI
-#   "CC" = (island=="ANI" & site=="Cathedral Cove"),
-#   "EAI_N" = (island=="ANI" & site=="EAI North side, dock area" | island=="ANI" & site=="Landing Cove Overlook"),
-#   # "EAI_S" = (island=="ANI" & site=="EAI South Ridge" | island=="ANI" & site=="EAI South side--near water catchment"),
-#   "EAI_SW" = (island=="ANI" & site=="EAI SW end"),
-#   "EAI_W" = (island=="ANI" & site=="EAI west of lighthouse"),
-#   "FC" = (island=="ANI" & site =="North side Frenchy's Cove, East End, Upper Bench" | island=="ANI" & site =="Frenchy's Beach" | island=="ANI" & site =="Frenchy's Cove"),
-#   "GC" = (island=="ANI" & site=="GC"),
-#   "RR" = (island=="ANI" & site=="Rat Rock"),
-#   "RC" = (island=="ANI" & site=="Rockfall Cove"), 
-#   # PI
-#   "PI1" = (island=="PI" & site=="1"| island=="PI" & site=="" | island=="PI" & site=="UNK" | island=="PI" & site=="PI1"), 
-#   # SBI
-#   "AP" = (island=="SBI" & site=="Arch Point" | island=="SBI" & site=="AP"),
-#   "ESP" = (island=="SBI" & site=="Eseal Point" | island=="SBI" & site=="ESP" | island=="SBI" & site=="" | island=="SBI" & site=="UNK"),
-#   "NTP" = (island=="SBI" & site=="Nature Trail Plot"), 
-#   "NCliffs" = (island=="SBI" & site=="North Peak Cliffs" | island=="SBI" & site=="North Cliffs"), 
-#   "SR" = (island=="SBI" & site=="Shag Overlook" | island=="SBI" & site=="Shag Rock Overlook"),
-#   "SP" = (island=="SBI" & site=="SignalPeak" | island=="SBI" & site=="Signal Peak"), 
-#   "Sutil" = (island=="SBI" & site=="Sutil Island"), 
-#   "WP" = (island=="SBI" & site=="Webster's Point" | island=="SBI" & site=="Webster Point Draw"),
-#   "WCliffs" = (island=="SBI" & site=="West Cliffs"), 
-#   # SCI
-#   "DR" = (island=="SCI" & site=="Diablo Rock"), 
-#   "SR1" = (island=="SR" & site=="1" | island=="SR" & site=="SR1" | island=="SR" & site==""| island=="SR" & site=="Lower terrace of SE side of SR"| island=="SR" & site=="UNK"),
-#   "SR2" = (island=="SR" & site=="2"),
-#   "SR3" = (island=="SR" & site=="3"),
-#   "LSH" = (island=="SCI" & site=="Little Scorpion Headland" | island=="SR" & site=="Scorpion Bluff"),
-#   "HT" = (island=="SR" & site=="SR High Terrace-East"),
-#   .method = "FIRST",
-  # .default = "UNK"),
-
-# catches_ID <- catches %>% 
-#   group_by(sessionID) %>% 
-#   mutate(seq = 1:n(),
-#          catchID = paste(sessionID, seq, sep = "_")) %>% 
-#   ungroup() %>% 
-#   mutate(sessionID = as.factor(sessionID),
-#          Site = as.factor(Site)) %>% 
-#   filter(TRUE)
-
-
 # ## test to see if any duplicates were created
 # duplicates <- duplicated(catches_metadata) %>%
 #   data.table()

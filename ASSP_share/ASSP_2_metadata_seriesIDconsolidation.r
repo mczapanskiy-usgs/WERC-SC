@@ -29,9 +29,7 @@ metadata <- gather(metadata_raw, net_stat, net_time, net_open_1:net_close_5) %>%
   select(-net_time_old, -net_time_nxt, -net_time_hr) %>% 
   group_by(sessionID) %>% 
   spread(net_stat, net_time) %>% 
-  filter() %>% 
-  mutate(last_open = if_else(net_close_5 == "NA",
-                    net_close_4))
+  filter(TRUE) 
 
 table(metadata$seriesID)
 

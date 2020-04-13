@@ -1,0 +1,211 @@
+---
+title: "QAQC of the CINP ASSP 1994 - 2018 CPUE data"
+author: "EKelsey"
+date: "4/10/2020"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+
+Load libraries
+```{r}
+
+library(dplyr)
+library(ggplot2)
+```
+
+Load data and add columns neccessary for QAQC:
+```{r}
+
+metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200325.csv') %>% 
+  mutate_at(c("App_sunset", "std_ending"), .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% 
+  mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
+              "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
+            .funs = ~as.POSIXct(., format="%Y-%m-%d %H:%M:%S")) %>%
+  mutate_at(c("App_sunset", "std_ending", "net_open_1", "net_close_1"), 
+            .funs = list(time = ~ hms::as_hms(.))) %>% 
+  mutate(CPUE_ratio = CPUEstd/CPUEraw) %>% 
+  filter(TRUE)
+```
+
+# Time and Mistnetting Effort
+## Graphical check of App_sunset 
+```{r}
+
+ggplot(metadata, aes(month, App_sunset_time)) +
+  geom_point(aes(color = year)) +
+  scale_color_gradient(low="purple", high="orange") +
+  theme_bw()
+```
+.
+
+> This graph shows the time of apparent sunset for netting sessions each month.  The range and timing for that time of year is as we would expect.  Thus we conclude that the suncalc function was used effectively to get the sunset times associated with each mistnetting session.
+
+## Graphical check of Std_ending 
+### Plotted by month
+```{r}
+
+ggplot(metadata, aes(month, std_ending_time)) +
+  geom_point(aes(color = year)) +
+  scale_color_gradient(low="black", high="light blue") +
+  theme_bw()
+```
+.
+
+> This graph shows the time of standard ending (5.3 hours after sunset) for netting sessions each month.  The range and timing for these ending track with sunset time as we would expect.
+
+
+# Summarize net_open and net_close 
+```{r}
+
+# first (and usually only) net open time
+summary(as.POSIXct(metadata$net_open_1_time))
+# first (and usually only) net close time
+summary(as.POSIXct(metadata$net_close_1_time))
+```
+> This is not a perfect way to summarize net open and close times because the "summarize" function doesn't recognize times across midnight here.  But, by looking at the median and mean, we can tell that net open and close times are usually what we would expect, with a few late/early nights thrown in.
+
+## Total mistnetting minutes per session
+```{r}
+
+library(ggplot2)
+ggplot(metadata, aes(min)) +
+  geom_histogram(binwidth = 10) +
+  theme_bw()
+# summary of total mistnetting minutes
+summary(metadata$min)
+```
+> Here we visualize the total number of minutes calcuated for each netting session.  We want to check that minutes were added correctly across multiple open/close sessions and also that minutes were added accurately across midnight.  It looks like minutes were not added accurately across midnight on four occasions (the outliers)
+
+
+## Total mistnetting standard minutes per session 
+### from start until end or standard ending, whichever came first
+```{r}
+
+ggplot(metadata, aes(min_std)) +
+  geom_histogram(binwidth = 10) +
+  theme_bw()
+# summary of mistnetting minutes cut to standard ending time
+summary(metadata$min_std)
+```
+> Here we visualise the total number of mintues for the standardized session (from net open to net close or standard ending [5.3 hours after sunset] whichever came first).  The standardized minutes cut out the erroneous minute calculations, as hoped. Also the max number of standardized minutes is 317, which makes sense as the maximum amount of time between sunset and 5.3 hours after. 
+
+## Compare min vs. min_std for each session
+```{r}
+
+library(ggplot2)
+ggplot(metadata, aes(min, min_std)) +
+  geom_point(aes(color = Flagged_Y.N)) +
+  geom_abline(intercept = 0, slope = 1, color = "blue") +
+  xlim(0,1050) + ylim(0, 550) +
+  theme_bw()
+```
+.
+
+> This plot of minutes vs. standardized mintues (before the 5.3 hour standardized ending).  Blue line = slope of 1.  Here we can make sure that minutes standardized is always equal or less than total minutes and total number of standardized minutes isn't >317, indicating that the 5.3 hour cutoff was applied.  Red points = data that has been flagged due to inconsistencies in data entry.
+
+# ASSP
+## Histogram of total ASSP caught per session
+```{r}
+
+ggplot(metadata, aes(ASSP)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw()
+# summary of ASSP catches
+summary(metadata$ASSP)
+```
+> This graph and summary stats show the distribution of total numbers of ASSP caught per session.
+
+
+## Histogram of total ASSP caught per standardized session
+```{r}
+
+ggplot(metadata, aes(ASSPstd)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw()
+# summary of standardized ASSP catches
+summary(metadata$ASSPstd)
+```
+> This graph and summary stats show the distribution of total numbers of ASSP caught before standard ending or net close, whichever came first.  This distribution is more constrained than the one above, which is what we would expect with the standard ending cutoff.
+> Next we will look into what else could effect the number of birds caught
+
+```{r}
+ggplot(metadata, aes(Net_dim, ASSPstd)) +
+  geom_boxplot() +
+  theme_bw()
+```
+.
+> The size of the net doesn't seem to effect the number of birds caught in a specific night
+
+## comparison of ASSP vs ASSPstd 
+```{r}
+
+ggplot(metadata, aes(ASSP, ASSPstd)) +
+  geom_point(aes(color = Flagged_Y.N)) +
+  geom_abline(intercept = 0, slope = 1, color = "blue") +
+  xlim(0,60) + ylim(0, 60) +
+  theme_bw()
+```
+.
+
+> This plot of total number of ASSP vs. total number of ASSP before the standard ending.  Blue line = slope of 1.  Here we double check that the standardized number of ASSP is always equal to or less than the total number.  Red points = data that has been flagged due to inconsistencies in data entry.
+
+
+
+# CPUE
+## visualization of CPUE per session
+```{r}
+
+ggplot(metadata, aes(CPUEraw)) +
+  geom_histogram(binwidth = 0.01) +
+  theme_bw()
+# summary of CPUE per session
+summary(metadata$CPUEraw)
+```
+> This graph and summary stats show the distribution of catch-per-unit-effort (ASSP/min).
+
+
+## visualization of CPUE per standardized session
+```{r}
+
+ggplot(metadata, aes(CPUEstd)) +
+  geom_histogram(binwidth = 0.01) +
+  theme_bw()
+# summary of CPUE per standardized session
+summary(metadata$CPUEstd)
+```
+> This graph and summary stats show the distribution of standardized catch-per-unit-effort (ASSPstd/min_std).  This distribution is more constrained than the one above, which is what we would expect with the standard ending cutoff.
+
+## what other variables could influence CPUE?
+```{r}
+ggplot(metadata, aes(Net_dim, CPUEstd)) +
+  geom_boxplot() +
+  theme_bw()
+```
+.
+
+> Here is the frequency of standardized CPUE values broken up by the dimensions of the net.  Unknown net sizes make it hard to determine if the size of the net influenced catch rates
+
+## comparision of CPUE vs CPUEstd
+```{r}
+
+ggplot(metadata, aes(CPUEraw, CPUEstd)) +
+  geom_point(aes(color = Flagged_Y.N)) +
+  geom_abline(intercept = 0, slope = 1, color = "blue") +
+  theme_bw()
+```
+.
+
+> This graph explores the correlation between CPUE and CPUE std.  Blue line = slope of 1.  As expected, the correlation is often 1:1, but with variation as the number of ASSP caught and number of mistnetting minutes were both effected by the standard ending cutoff but not always in a proportional way.  Red points = data that has been flagged due to inconsistencies in data entry. 
+> The three outliers on the upper righthand side of the graph were checked to make sure the data was accurate.  Sure enough, these were nights with high numbers of ASSP caught, but no errors in the data
+
+
+<!-- ## check out data with high CPUE, to see if data expalains why they could be high -->
+<!-- ```{R} -->
+<!-- CPUEstd_outliers <- metadata %>% -->
+<!--   select(sessionID, App_sunset:net_close_1, min:CPUEstd) %>% -->
+<!--   filter(CPUEstd > 0.2) -->
+<!-- print(CPUEstd_outliers) -->
+<!-- ``` -->

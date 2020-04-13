@@ -1,0 +1,76 @@
+---
+title: "ASSP_CPUE_broodpatch"
+author: "EKelsey"
+date: "4/10/2020"
+output: html_document
+---
+
+load libraries
+```{r}
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+```
+
+read in data
+```{r}
+# CPUE metadata 
+metadata_BPno <- read.csv('~/WERC-SC/ASSP_share//metadata_BPno.csv') %>% 
+  mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
+              "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
+            .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% 
+  filter(TRUE)
+
+# banding catches data 
+metadata_BPcode <- read.csv('~/WERC-SC/ASSP_share/metadata_BPcode.csv') %>%
+  mutate(capture_time = as.POSIXct(capture_time, format="%Y-%m-%d %H:%M:%S"),
+         release_time = as.POSIXct(release_time, format="%Y-%m-%d %H:%M:%S")) %>% 
+  filter(TRUE)
+```
+
+summarize brood patch data
+```{r}
+summary(catches$BP)
+```
+
+### ADD BROOD PATCH FREQUENCY TO METADATA
+```{r}
+# analyze just the numerically ranked broodpatches
+metadata_BPno <- catches %>%
+  group_by(sessionID, Site) %>%
+  summarise(BPct = n(),
+            BP0 = sum(BP == "0"),
+            BP1 = sum(BP == "1"),
+            BP1.5 = sum(BP == "1.5"),
+            BP2 = sum(BP == "2"),
+            BP3 = sum(BP == "3"),
+            BP4 = sum(BP == "4"),
+            BP4.5 = sum(BP == "4.5"),
+            BP5 = sum(BP == "5")) %>%
+  right_join(metadata, by= c("sessionID", "Site")) %>% 
+  mutate(BPfreq_0 = BP0/BPct,
+         BPfreq_1 = BP1/BPct,
+         BPfreq_1.5 = BP1.5/BPct,
+         BPfreq_2 = BP2/BPct,
+         BPfreq_3 = BP3/BPct,
+         BPfreq_4 = BP4/BPct,
+         BPfreq_4.5 = BP4.5/BPct,
+         BPfreq_5 = BP5/BPct)
+summary(metadata_BPno$BPct)
+
+# translate numerical ranked to B/D/PD
+metadata_BPcode <- catches %>%
+  mutate(BPcode = mosaic::derivedFactor(
+    "B" = (BP == "B" | BP == "b" | BP == "2" | BP == "3"),
+    "D" = (BP == "D" | BP == "d" | BP == "0" | BP == "5"),
+    "PD" = (BP == "PD" | BP == "pd" | BP == "1" | BP == "1.5" | BP == "4" | BP == "4.5"),
+    .default = "ND")) %>% 
+  group_by(sessionID, Site) %>%
+  summarise(BPct = n(),
+            BP_B = sum(BPcode == "B"),
+            BP_D = sum(BPcode == "D"),
+            BP_PD = sum(BPcode == "PD")) %>%
+  right_join(metadata, by= c("sessionID", "Site")) %>% 
+  mutate(BPfreq_B = BP_B/BPct,
+         BPfreq_D = BP_D/BPct,
+         BPfreq_PD = BP_PD/BPct) 

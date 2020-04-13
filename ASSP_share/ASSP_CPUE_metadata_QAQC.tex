@@ -1,0 +1,247 @@
+\PassOptionsToPackage{unicode=true}{hyperref} % options for packages loaded elsewhere
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provides euro and other symbols
+\else % if luatex or xelatex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  pdftitle={QAQC of the CINP ASSP 1994 - 2018 CPUE data},
+  pdfauthor={EKelsey},
+  pdfborder={0 0 0},
+  breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-2}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+  \let\oldparagraph\paragraph
+  \renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+  \let\oldsubparagraph\subparagraph
+  \renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+% set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+
+
+\title{QAQC of the CINP ASSP 1994 - 2018 CPUE data}
+\author{EKelsey}
+\date{4/10/2020}
+
+\begin{document}
+\maketitle
+
+Load libraries
+
+Load data and add columns neccessary for QAQC:
+
+\hypertarget{time-and-mistnetting-effort}{%
+\section{Time and Mistnetting
+Effort}\label{time-and-mistnetting-effort}}
+
+\hypertarget{graphical-check-of-app_sunset}{%
+\subsection{Graphical check of
+App\_sunset}\label{graphical-check-of-app_sunset}}
+
+.
+
+\begin{quote}
+This graph shows the time of apparent sunset for netting sessions each
+month. The range and timing for that time of year is as we would expect.
+Thus we conclude that the suncalc function was used effectively to get
+the sunset times associated with each mistnetting session.
+\end{quote}
+
+\hypertarget{graphical-check-of-std_ending}{%
+\subsection{Graphical check of
+Std\_ending}\label{graphical-check-of-std_ending}}
+
+\hypertarget{plotted-by-month}{%
+\subsubsection{Plotted by month}\label{plotted-by-month}}
+
+.
+
+\begin{quote}
+This graph shows the time of standard ending (5.3 hours after sunset)
+for netting sessions each month. The range and timing for these ending
+track with sunset time as we would expect.
+\end{quote}
+
+\hypertarget{summarize-net_open-and-net_close}{%
+\section{Summarize net\_open and
+net\_close}\label{summarize-net_open-and-net_close}}
+
+\begin{quote}
+This is not a perfect way to summarize net open and close times because
+the ``summarize'' function doesn't recognize times across midnight here.
+But, by looking at the median and mean, we can tell that net open and
+close times are usually what we would expect, with a few late/early
+nights thrown in.
+\end{quote}
+
+\hypertarget{total-mistnetting-minutes-per-session}{%
+\subsection{Total mistnetting minutes per
+session}\label{total-mistnetting-minutes-per-session}}
+
+\begin{quote}
+Here we visualize the total number of minutes calcuated for each netting
+session. We want to check that minutes were added correctly across
+multiple open/close sessions and also that minutes were added accurately
+across midnight. It looks like minutes were not added accurately across
+midnight on four occasions (the outliers)
+\end{quote}
+
+\hypertarget{total-mistnetting-standard-minutes-per-session}{%
+\subsection{Total mistnetting standard minutes per
+session}\label{total-mistnetting-standard-minutes-per-session}}
+
+\hypertarget{from-start-until-end-or-standard-ending-whichever-came-first}{%
+\subsubsection{from start until end or standard ending, whichever came
+first}\label{from-start-until-end-or-standard-ending-whichever-came-first}}
+
+\begin{quote}
+Here we visualise the total number of mintues for the standardized
+session (from net open to net close or standard ending {[}5.3 hours
+after sunset{]} whichever came first). The standardized minutes cut out
+the erroneous minute calculations, as hoped. Also the max number of
+standardized minutes is 317, which makes sense as the maximum amount of
+time between sunset and 5.3 hours after.
+\end{quote}
+
+\hypertarget{compare-min-vs.-min_std-for-each-session}{%
+\subsection{Compare min vs.~min\_std for each
+session}\label{compare-min-vs.-min_std-for-each-session}}
+
+.
+
+\begin{quote}
+This plot of minutes vs.~standardized mintues (before the 5.3 hour
+standardized ending). Blue line = slope of 1. Here we can make sure that
+minutes standardized is always equal or less than total minutes and
+total number of standardized minutes isn't \textgreater{}317, indicating
+that the 5.3 hour cutoff was applied.
+\end{quote}
+
+\hypertarget{assp}{%
+\section{ASSP}\label{assp}}
+
+\hypertarget{histogram-of-total-assp-caught-per-session}{%
+\subsection{Histogram of total ASSP caught per
+session}\label{histogram-of-total-assp-caught-per-session}}
+
+\begin{quote}
+This graph and summary stats show the distribution of total numbers of
+ASSP caught per session.
+\end{quote}
+
+\hypertarget{histogram-of-total-assp-caught-per-standardized-session}{%
+\subsection{Histogram of total ASSP caught per standardized
+session}\label{histogram-of-total-assp-caught-per-standardized-session}}
+
+\begin{quote}
+This graph and summary stats show the distribution of total numbers of
+ASSP caught before standard ending or net close, whichever came first.
+This distribution is more constrained than the one above, which is what
+we would expect with the standard ending cutoff.
+\end{quote}
+
+\hypertarget{comparison-of-assp-vs-asspstd}{%
+\subsection{comparison of ASSP vs
+ASSPstd}\label{comparison-of-assp-vs-asspstd}}
+
+.
+
+\begin{quote}
+This plot of total number of ASSP vs.~total number of ASSP before the
+standard ending. Blue line = slope of 1. Here we double check that the
+standardized number of ASSP is always equal to or less than the total
+number.
+\end{quote}
+
+\hypertarget{cpue}{%
+\section{CPUE}\label{cpue}}
+
+\hypertarget{visualization-of-cpue-per-session}{%
+\subsection{visualization of CPUE per
+session}\label{visualization-of-cpue-per-session}}
+
+\begin{quote}
+This graph and summary stats show the distribution of
+catch-per-unit-effort (ASSP/min).
+\end{quote}
+
+\hypertarget{visualization-of-cpue-per-standardized-session}{%
+\subsection{visualization of CPUE per standardized
+session}\label{visualization-of-cpue-per-standardized-session}}
+
+\begin{quote}
+This graph and summary stats show the distribution of standardized
+catch-per-unit-effort (ASSPstd/min\_std). This distribution is more
+constrained than the one above, which is what we would expect with the
+standard ending cutoff.
+\end{quote}
+
+\hypertarget{comparision-of-cpue-vs-cpuestd}{%
+\subsection{comparision of CPUE vs
+CPUEstd}\label{comparision-of-cpue-vs-cpuestd}}
+
+.
+
+\begin{quote}
+This graph explores the correlation between CPUE and CPUE std. Blue line
+= slope of 1. As expected, the correlation is often 1:1, but with
+variation as the number of ASSP caught and number of mistnetting minutes
+were both effected by the standard ending cutoff but not always in a
+proportional way. The three outliers on the upper righthand side of the
+graph were checked to make sure the data was accurate. Sure enough,
+these were nights with high numbers of ASSP caught, but no errors in the
+data
+\end{quote}
+
+\end{document}
