@@ -32,10 +32,7 @@ metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon_minEd
   mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
               "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
             .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% 
-  # mutate(date = as.POSIXct(date, format="%m/%d/%Y")) %>% 
   filter(TRUE)
-  # mutate(min = as.integer(min), min_std = as.integer(min_std)) %>% 
-  
 
 ## update catches/banding datasheet: add catchID, locations, catch date (is diff from 'date' after midnight)
 catches <- catches_raw %>% 
@@ -68,9 +65,13 @@ catches_std <- catches %>%
          SNR = mosaic::derivedFactor(
            "Y" = (recapture =="SNR" | recapture =="YSN"), # remove same night recaptures
            "N" = (recapture =="N" | recapture =="Y"| recapture =="y"), # recaps from other nights still count 
-           .default = "UNK")) %>%
-  select(catchID, sessionID, Month, day, year:Notes) %>% 
+           .default = "UNK"),
+         catchPastSS = capture_time - App_sunset) %>%
+  select(catchID, sessionID, App_sunset, std_ending, Month, day, year:release_time, catchPastSS, species:recapture, std, diet:Notes) %>%
   filter(TRUE)
+
+catches_test <- catches_std %>% 
+  filter(catchPastSS > 600)
 
 # # compare Sites listed in catches vs. metadata datasets
 # summary(as.factor(catches_metadata$Site))
@@ -80,7 +81,10 @@ catches_std <- catches %>%
 # summary(catches_std$SNR)
 
 ### SAVE CATCHES FILE BEFORE IT IS FILTERED
-write.csv(catches_std, file = '~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200325.csv',
+write.csv(catches_std, file = '~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200414.csv',
+          row.names = FALSE)
+
+write.csv(catches_test, file = '~/WERC-SC/ASSP_share/ASSP_BANDING_catchTime2change.csv',
           row.names = FALSE)
 
 # missingMETADATA <- anti_join(metadata, catches_std, by = "sessionID")
@@ -128,7 +132,7 @@ summary(metadata_catches$ASSP)
 summary(metadata_catches$ASSPstd)
 
 #### SAVE CPUE DATA FOR ALL NETTING EFFORTS THAT CPUE CAN BE CALCULATED FOR
-write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200325.csv',
+write.csv(metadata_catches, file = '~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200413.csv',
           row.names = FALSE)
 # 
 # ## test to see if any duplicates were created

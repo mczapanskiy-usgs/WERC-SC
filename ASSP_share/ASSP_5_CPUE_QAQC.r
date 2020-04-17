@@ -1,7 +1,7 @@
 #### STORM-PETREL CPUE METADATA
 # this script calculates net time and CPUE
 # created: March 24, 2020 by: E Kelsey
-# last edited: March 25, 2020
+# last edited: April 14, 2020
 
 ### SET WORKING DIRECTORY
 setwd("~/WERC-SC/ASSP_share")
@@ -14,20 +14,31 @@ library(lubridate)
 library(ggplot2)
 
 ### READ IN DATA
-metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200325.csv') %>% 
+metadata_qaqc <- read.csv('~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200413.csv') %>% 
   mutate_at(c("App_sunset", "std_ending"), .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% 
   mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3",
               "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
             .funs = ~as.POSIXct(., format="%Y-%m-%d %H:%M:%S")) %>% 
-  filter(TRUE)
-# catches <- read.csv('~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200320.csv')
-
-# add columns neccessary for QAQC
-metadata_qaqc <- metadata %>% 
   mutate_at(c("App_sunset", "std_ending", "net_open_1", "net_close_1"), 
             .funs = list(time = ~ hms::as.hms(.))) %>% 
-  mutate(CPUE_ratio = CPUEstd/CPUEraw) %>% 
+  mutate(date = date(App_sunset),
+         MonthDay = md(App_sunset),
+         CPUE_ratio = CPUEstd/CPUEraw,
+         month = as.character(month)) %>% 
   filter(TRUE)
+
+catches <- read.csv('~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200414.csv') %>% 
+  mutate_at(c("App_sunset", "std_ending", "capture_time", "release_time"),
+            .funs = ~as.POSIXct(., format="%Y-%m-%d %H:%M:%S")) %>% 
+  mutate(capture_date = date(capture_time),
+           captureT = hms::as_hms(capture_time)) %>% 
+  filter(species == "ASSP",
+         catchPastSS > 0, catchPastSS < 600)
+
+catches_std <- catches %>% 
+  filter(std == "1")
+
+
 
 ### App_sunset (Plot per month)
 ggplot(metadata_qaqc, aes(month, App_sunset_time)) +
@@ -72,11 +83,34 @@ ggplot(metadata_qaqc, aes(min, min_std)) +
   theme_bw()
 # -- longer "min" periods shortened to <350 for "min_std" as expected --
 
+ggplot(catches, aes(catchPastSS)) +
+  geom_histogram() +
+  geom_vline(xintercept = 318, color = "red") +
+  theme_bw()
+
+ggplot(catches, aes(catchPastSS)) +
+  geom_histogram() +
+  geom_vline(xintercept = 318, color = "red") +
+  xlab("Time past Sunset (min)") + ylab("Number of Catches") +
+  facet_wrap(.~ year, scales = "free") +
+  theme_bw()
+
+
+ggplot(catches, aes(catchPastSS)) +
+  geom_histogram() +
+  geom_vline(xintercept = 318, color = "red") +
+  xlab("Time past Sunset (min)") + ylab("Number of Catches") +
+  facet_wrap(.~ Location) +
+  theme_bw()
+
+
+ggplot(catches, aes(captureT)) +
+  geom_histogram() +
+  theme_bw()
 
 ### ASSP and ASSPstd
 ggplot(metadata_qaqc, aes(ASSP)) +
   geom_histogram() +
-  stat(summary) +
   theme_bw()
 # -- lower counts more common, tail out to 60
 summary(metadata_qaqc$ASSP)
@@ -133,3 +167,28 @@ ggplot(metadata_qaqc, aes(Net_dim, CPUEstd)) +
 CPUEstd_outliers <- metadata_qaqc %>% 
   select(sessionID, App_sunset:net_close_1, min:CPUEstd, test) %>% 
   filter(CPUEstd > 0.2)
+
+monthCatches <- metadata_qaqc %>% 
+  group_by(month) %>% 
+  tally()
+
+ggplot(metadata_qaqc, aes(month, BPfreq_Y)) +
+  geom_boxplot() +
+  ylab("Frequency of Assumed Breeders") +
+  geom_text(data = monthCatches,
+            aes(month, Inf, label = n), vjust = 1) +
+  theme_bw()
+
+ggplot(metadata_qaqc, aes(month, BPfreq_N)) +
+  geom_boxplot() +
+  ylab("Frequency of Assumed Non-Breeders") +
+  geom_text(data = monthCatches,
+            aes(month, Inf, label = n), vjust = 1) +
+  theme_bw()
+
+ggplot(metadata_qaqc, aes(month, BPfreq_Y)) +
+  geom_point(position = "jitter", aes(color = year)) +
+  ylab("Frequency of Assumed Breeders") +
+  # scale_color_gradient(low="blue", high="yellow") +
+  facet_wrap(.~year) +
+  theme_bw()

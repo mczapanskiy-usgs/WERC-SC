@@ -176,3 +176,49 @@ b01 <- birth2[birth1==0]
 b01sim <- rbinom(10000, size = length(b01), prob = p.samples)
 dens(b01sim, adj = 0.1)
 abline(v=sum(b01), col = "red")
+
+
+#---------------------------------------------------------------------
+### ch. 3
+## LINEAR MODELS
+
+# M1
+mu <- rnorm(1000, 0, 10)
+sigma <- runif(1000, 0, 10)
+sim <- rnorm(1000, mu, sigma)
+dens(sim)
+
+# M2
+map4.2 <- alist(
+  y ~ dnorm(mu, sigma),
+  mu ~ dnorm(0, 10),
+  sigma ~ dunif(0, 10))
+
+# M3
+y ~ normal(mu, sigma)
+mu <- a +b*x
+a ~ normal(0, 50)
+b ~ uniform(0, 10)
+sigma ~ uniform(0, 50)
+
+# M4
+height ~ rnorm(mu, sigma)
+mu <- a + b*year
+a ~ rnorm(40, 5)
+b ~ dunif(2, 3)
+sigma ~ dunif(0, 10)
+
+# M4
+height ~ rnorm(mu, sigma)
+mu <- a + b*year
+a ~ rnorm(120, 5)
+b ~ dunif(0, 5)
+sigma ~ dunif(0, 10)
+
+# M6
+height ~ rnorm(mu, sigma)
+mu <- a + b*year
+a ~ rnorm(120, 5)
+b ~ dunif(0, 5)
+sigma ~ dunif(0, 64)
+

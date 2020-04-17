@@ -41,6 +41,46 @@
   breaklinks=true}
 \urlstyle{same}  % don't use monospace font for urls
 \usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
 \usepackage{graphicx,grffile}
 \makeatletter
 \def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
@@ -72,14 +112,72 @@
 
 \title{QAQC of the CINP ASSP 1994 - 2018 CPUE data}
 \author{EKelsey}
-\date{4/10/2020}
+\date{4/14/2020}
 
 \begin{document}
 \maketitle
 
 Load libraries
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(dplyr)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: package 'dplyr' was built under R version 3.6.3
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## Attaching package: 'dplyr'
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(ggplot2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: package 'ggplot2' was built under R version 3.6.3
+\end{verbatim}
+
 Load data and add columns neccessary for QAQC:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{metadata <-}\StringTok{ }\KeywordTok{read.csv}\NormalTok{(}\StringTok{'~/WERC-SC/ASSP_share/ASSP_4_metadata_CPUE_20200413.csv'}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{mutate_at}\NormalTok{(}\KeywordTok{c}\NormalTok{(}\StringTok{"App_sunset"}\NormalTok{, }\StringTok{"std_ending"}\NormalTok{), }\DataTypeTok{.funs =} \OperatorTok{~}\KeywordTok{as.POSIXct}\NormalTok{(., }\DataTypeTok{format=}\StringTok{"%m/%d/%Y %H:%M"}\NormalTok{)) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{mutate_at}\NormalTok{(}\KeywordTok{c}\NormalTok{(}\StringTok{"net_open_1"}\NormalTok{, }\StringTok{"net_close_1"}\NormalTok{, }\StringTok{"net_open_2"}\NormalTok{, }\StringTok{"net_close_2"}\NormalTok{, }\StringTok{"net_open_3"}\NormalTok{,}
+              \StringTok{"net_close_3"}\NormalTok{, }\StringTok{"net_open_4"}\NormalTok{, }\StringTok{"net_close_4"}\NormalTok{, }\StringTok{"net_open_5"}\NormalTok{, }\StringTok{"net_close_5"}\NormalTok{),}
+            \DataTypeTok{.funs =} \OperatorTok{~}\KeywordTok{as.POSIXct}\NormalTok{(., }\DataTypeTok{format=}\StringTok{"%Y-%m-%d %H:%M:%S"}\NormalTok{)) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{mutate_at}\NormalTok{(}\KeywordTok{c}\NormalTok{(}\StringTok{"App_sunset"}\NormalTok{, }\StringTok{"std_ending"}\NormalTok{, }\StringTok{"net_open_1"}\NormalTok{, }\StringTok{"net_close_1"}\NormalTok{), }
+            \DataTypeTok{.funs =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{time =} \OperatorTok{~}\StringTok{ }\NormalTok{hms}\OperatorTok{::}\KeywordTok{as_hms}\NormalTok{(.))) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{mutate}\NormalTok{(}\DataTypeTok{CPUE_ratio =}\NormalTok{ CPUEstd}\OperatorTok{/}\NormalTok{CPUEraw,}
+         \DataTypeTok{month =} \KeywordTok{as.character}\NormalTok{(month)) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{filter}\NormalTok{(}\OtherTok{TRUE}\NormalTok{)}
+
+\NormalTok{catches <-}\StringTok{ }\KeywordTok{read.csv}\NormalTok{(}\StringTok{'~/WERC-SC/ASSP_share/ASSP_4_catches_BANDING_20200414.csv'}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{mutate_at}\NormalTok{(}\KeywordTok{c}\NormalTok{(}\StringTok{"App_sunset"}\NormalTok{, }\StringTok{"std_ending"}\NormalTok{, }\StringTok{"capture_time"}\NormalTok{, }\StringTok{"release_time"}\NormalTok{),}
+            \DataTypeTok{.funs =} \OperatorTok{~}\KeywordTok{as.POSIXct}\NormalTok{(., }\DataTypeTok{format=}\StringTok{"%Y-%m-%d %H:%M:%S"}\NormalTok{)) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{filter}\NormalTok{(species }\OperatorTok{==}\StringTok{ "ASSP"}\NormalTok{,}
+\NormalTok{         catchPastSS }\OperatorTok{>}\StringTok{ }\DecValTok{0}\NormalTok{, catchPastSS }\OperatorTok{<}\StringTok{ }\DecValTok{600}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
 
 \hypertarget{time-and-mistnetting-effort}{%
 \section{Time and Mistnetting
@@ -89,6 +187,16 @@ Effort}\label{time-and-mistnetting-effort}}
 \subsection{Graphical check of
 App\_sunset}\label{graphical-check-of-app_sunset}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(month, App_sunset_time)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{color =}\NormalTok{ year)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{scale_color_gradient}\NormalTok{(}\DataTypeTok{low=}\StringTok{"purple"}\NormalTok{, }\DataTypeTok{high=}\StringTok{"orange"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-3-1.pdf}
 .
 
 \begin{quote}
@@ -105,17 +213,59 @@ Std\_ending}\label{graphical-check-of-std_ending}}
 \hypertarget{plotted-by-month}{%
 \subsubsection{Plotted by month}\label{plotted-by-month}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(month, std_ending_time)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{color =}\NormalTok{ year)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{scale_color_gradient}\NormalTok{(}\DataTypeTok{low=}\StringTok{"black"}\NormalTok{, }\DataTypeTok{high=}\StringTok{"light blue"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-4-1.pdf}
 .
 
 \begin{quote}
 This graph shows the time of standard ending (5.3 hours after sunset)
-for netting sessions each month. The range and timing for these ending
-track with sunset time as we would expect.
+for netting sessions each month. The range and timing of the standard
+ending track with sunset time as we would expect.
 \end{quote}
 
 \hypertarget{summarize-net_open-and-net_close}{%
 \section{Summarize net\_open and
 net\_close}\label{summarize-net_open-and-net_close}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# first (and usually only) net open time}
+\KeywordTok{summary}\NormalTok{(}\KeywordTok{as.POSIXct}\NormalTok{(metadata}\OperatorTok{$}\NormalTok{net_open_}\DecValTok{1}\NormalTok{_time))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                  Min.               1st Qu.                Median 
+## "1970-01-01 00:00:00" "1970-01-01 20:45:00" "1970-01-01 21:02:30" 
+##                  Mean               3rd Qu.                  Max. 
+## "1970-01-01 20:33:23" "1970-01-01 21:36:00" "1970-01-01 23:35:00" 
+##                  NA's 
+##                  "22"
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# first (and usually only) net close time}
+\KeywordTok{summary}\NormalTok{(}\KeywordTok{as.POSIXct}\NormalTok{(metadata}\OperatorTok{$}\NormalTok{net_close_}\DecValTok{1}\NormalTok{_time))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                  Min.               1st Qu.                Median 
+## "1970-01-01 00:00:00" "1970-01-01 01:24:00" "1970-01-01 02:00:00" 
+##                  Mean               3rd Qu.                  Max. 
+## "1970-01-01 03:37:47" "1970-01-01 02:17:30" "1970-01-01 23:59:00" 
+##                  NA's 
+##                  "21"
+\end{verbatim}
 
 \begin{quote}
 This is not a perfect way to summarize net open and close times because
@@ -129,12 +279,40 @@ nights thrown in.
 \subsection{Total mistnetting minutes per
 session}\label{total-mistnetting-minutes-per-session}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(ggplot2)}
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(min)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{(}\DataTypeTok{binwidth =} \DecValTok{10}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 22 rows containing non-finite values (stat_bin).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-6-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# summary of total mistnetting minutes}
+\KeywordTok{summary}\NormalTok{(metadata}\OperatorTok{$}\NormalTok{min)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    56.0   214.0   293.0   280.3   316.0  1022.0      22
+\end{verbatim}
+
 \begin{quote}
-Here we visualize the total number of minutes calcuated for each netting
-session. We want to check that minutes were added correctly across
-multiple open/close sessions and also that minutes were added accurately
-across midnight. It looks like minutes were not added accurately across
-midnight on four occasions (the outliers)
+The graph and summary stats above show minutes calcuated for each
+netting session. We want to check that minutes were added correctly
+across multiple open/close sessions and also that minutes were added
+accurately across midnight. It looks like minutes were not added
+accurately across midnight on four occasions (the outliers to the far
+right)
 \end{quote}
 
 \hypertarget{total-mistnetting-standard-minutes-per-session}{%
@@ -145,27 +323,70 @@ session}\label{total-mistnetting-standard-minutes-per-session}}
 \subsubsection{from start until end or standard ending, whichever came
 first}\label{from-start-until-end-or-standard-ending-whichever-came-first}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(min_std)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{(}\DataTypeTok{binwidth =} \DecValTok{10}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 22 rows containing non-finite values (stat_bin).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-7-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# summary of mistnetting minutes cut to standard ending time}
+\KeywordTok{summary}\NormalTok{(metadata}\OperatorTok{$}\NormalTok{min_std)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##     0.0   189.0   239.6   223.0   267.3   317.1      22
+\end{verbatim}
+
 \begin{quote}
-Here we visualise the total number of mintues for the standardized
-session (from net open to net close or standard ending {[}5.3 hours
-after sunset{]} whichever came first). The standardized minutes cut out
-the erroneous minute calculations, as hoped. Also the max number of
-standardized minutes is 317, which makes sense as the maximum amount of
-time between sunset and 5.3 hours after.
+The above graph and summary stats show the total number of mintues for
+the standardized session (from net open to net close or standard ending
+whichever came first). The standard ending is 5.3 hours (318 minutes)
+after sunset. Nets opened sometime after sunset.
 \end{quote}
 
 \hypertarget{compare-min-vs.-min_std-for-each-session}{%
 \subsection{Compare min vs.~min\_std for each
 session}\label{compare-min-vs.-min_std-for-each-session}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(ggplot2)}
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(min, min_std)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{color =}\NormalTok{ Flagged_Y.N)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_abline}\NormalTok{(}\DataTypeTok{intercept =} \DecValTok{0}\NormalTok{, }\DataTypeTok{slope =} \DecValTok{1}\NormalTok{, }\DataTypeTok{color =} \StringTok{"blue"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_hline}\NormalTok{(}\DataTypeTok{yintercept =} \DecValTok{318}\NormalTok{, }\DataTypeTok{color =} \StringTok{"red"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{xlim}\NormalTok{(}\DecValTok{0}\NormalTok{,}\DecValTok{1050}\NormalTok{) }\OperatorTok{+}\StringTok{ }\KeywordTok{ylim}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{550}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 22 rows containing missing values (geom_point).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-8-1.pdf}
 .
 
 \begin{quote}
 This plot of minutes vs.~standardized mintues (before the 5.3 hour
-standardized ending). Blue line = slope of 1. Here we can make sure that
-minutes standardized is always equal or less than total minutes and
-total number of standardized minutes isn't \textgreater{}317, indicating
-that the 5.3 hour cutoff was applied.
+standardized ending). Blue line = slope of 1. Red line = standard
+ending. Here we can make sure standardized net open minutes is equal or
+less the total number of minutes and sunset to standard ending of 5.3
+hours (318 minutes). Red points = data that has been flagged due to
+inconsistencies in data entry. It does not appear that the reason these
+entries were flagged effects net minutes.
 \end{quote}
 
 \hypertarget{assp}{%
@@ -175,33 +396,215 @@ that the 5.3 hour cutoff was applied.
 \subsection{Histogram of total ASSP caught per
 session}\label{histogram-of-total-assp-caught-per-session}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(ASSP)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{(}\DataTypeTok{binwidth =} \DecValTok{1}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 27 rows containing non-finite values (stat_bin).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-9-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# summary of ASSP catches}
+\KeywordTok{summary}\NormalTok{(metadata}\OperatorTok{$}\NormalTok{ASSP)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    1.00    8.00   14.00   17.18   23.00   56.00      27
+\end{verbatim}
+
 \begin{quote}
-This graph and summary stats show the distribution of total numbers of
-ASSP caught per session.
+The graph and summary stats above show the distribution of total numbers
+of ASSP caught per session.
 \end{quote}
 
 \hypertarget{histogram-of-total-assp-caught-per-standardized-session}{%
 \subsection{Histogram of total ASSP caught per standardized
 session}\label{histogram-of-total-assp-caught-per-standardized-session}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(ASSPstd)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{(}\DataTypeTok{binwidth =} \DecValTok{1}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 27 rows containing non-finite values (stat_bin).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-10-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# summary of standardized ASSP catches}
+\KeywordTok{summary}\NormalTok{(metadata}\OperatorTok{$}\NormalTok{ASSPstd)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##    0.00    7.00   12.00   14.03   19.00   45.00      27
+\end{verbatim}
+
 \begin{quote}
-This graph and summary stats show the distribution of total numbers of
-ASSP caught before standard ending or net close, whichever came first.
-This distribution is more constrained than the one above, which is what
-we would expect with the standard ending cutoff.
+The graph and summary stats above show the distribution of total numbers
+of ASSP caught before standard ending or net close, whichever came
+first. This distribution is more constrained than the one above, which
+is what we would expect with the standard ending cutoff. Next we will
+look into what else could effect the number of birds caught
+\end{quote}
+
+\hypertarget{number-of-assp-caught-in-relation-to-net-size}{%
+\subsection{number of ASSP caught in relation to net
+size}\label{number-of-assp-caught-in-relation-to-net-size}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{netUse <-}\StringTok{ }\NormalTok{metadata }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{group_by}\NormalTok{(Net_dim) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{tally}\NormalTok{()}
+
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(Net_dim, ASSPstd)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_boxplot}\NormalTok{() }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_text}\NormalTok{(}\DataTypeTok{data =}\NormalTok{ netUse,}
+            \KeywordTok{aes}\NormalTok{(Net_dim, }\OtherTok{Inf}\NormalTok{, }\DataTypeTok{label =}\NormalTok{ n), }\DataTypeTok{vjust =} \DecValTok{1}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 27 rows containing non-finite values (stat_boxplot).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-11-1.pdf}
+.
+
+\begin{quote}
+The graph above shows the number of ASSP caught within the standardized
+period in relation to net dimensions. Number at top of each box plot =
+sample size. The size of the net doesn't seem to effect the number of
+birds caught in a specific night. Below we will explore this effect with
+number of catches standardized to effort.
 \end{quote}
 
 \hypertarget{comparison-of-assp-vs-asspstd}{%
 \subsection{comparison of ASSP vs
 ASSPstd}\label{comparison-of-assp-vs-asspstd}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(ASSP, ASSPstd)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{color =}\NormalTok{ Flagged_Y.N)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_abline}\NormalTok{(}\DataTypeTok{intercept =} \DecValTok{0}\NormalTok{, }\DataTypeTok{slope =} \DecValTok{1}\NormalTok{, }\DataTypeTok{color =} \StringTok{"blue"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{xlim}\NormalTok{(}\DecValTok{0}\NormalTok{,}\DecValTok{60}\NormalTok{) }\OperatorTok{+}\StringTok{ }\KeywordTok{ylim}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{60}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 27 rows containing missing values (geom_point).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-12-1.pdf}
 .
 
 \begin{quote}
-This plot of total number of ASSP vs.~total number of ASSP before the
-standard ending. Blue line = slope of 1. Here we double check that the
-standardized number of ASSP is always equal to or less than the total
-number.
+The plot above shows the total number of ASSP vs.~total number of ASSP
+before the standard ending. Blue line = slope of 1. Here we double check
+that the standardized number of ASSP is always equal to or less than the
+total number. Red points = data that has been flagged due to
+inconsistencies in data entry. It does not appear that the reason these
+entries were flagged effects the number of birds caught.
+\end{quote}
+
+\hypertarget{timing-of-assp-catches}{%
+\subsection{Timing of ASSP catches}\label{timing-of-assp-catches}}
+
+\begin{quote}
+Next lets explore the frequency of catches in relation to the standard
+ending. Do catches start dropping off before 5.3 hours after sunset?
+After? NOTE - the timing of net closures will effect the number of late
+night captures
+\end{quote}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(catches, }\KeywordTok{aes}\NormalTok{(catchPastSS)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{(}\DataTypeTok{binwidth =} \DecValTok{10}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_vline}\NormalTok{(}\DataTypeTok{xintercept =} \DecValTok{318}\NormalTok{, }\DataTypeTok{color =} \StringTok{"red"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{xlab}\NormalTok{(}\StringTok{"Time past Sunset (min)"}\NormalTok{) }\OperatorTok{+}\StringTok{ }\KeywordTok{ylab}\NormalTok{(}\StringTok{"Number of ASSP Catches"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-13-1.pdf}
+
+\begin{quote}
+5.3 hour cutoff occurs when number of catches are still relatively high.
+How does that differ across years? In recent years (2014 - 2018) nets
+were usually closed at 2am. In earlier years nets were sometimes left
+open past 2am.
+\end{quote}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(catches, }\KeywordTok{aes}\NormalTok{(catchPastSS)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{(}\DataTypeTok{binwidth =} \DecValTok{10}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_vline}\NormalTok{(}\DataTypeTok{xintercept =} \DecValTok{318}\NormalTok{, }\DataTypeTok{color =} \StringTok{"red"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{xlab}\NormalTok{(}\StringTok{"Time past Sunset (min)"}\NormalTok{) }\OperatorTok{+}\StringTok{ }\KeywordTok{ylab}\NormalTok{(}\StringTok{"Number of ASSP Catches"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{facet_wrap}\NormalTok{(.}\OperatorTok{~}\StringTok{ }\NormalTok{year, }\DataTypeTok{scales =} \StringTok{"free"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-14-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# }\AlertTok{NOTE}\CommentTok{: scales on x- and y- axis differ between panes}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{quote}
+No clear pattern of catch timing can be seen across years.
+\end{quote}
+
+\begin{quote}
+How does catch time post sunset differ between netting locations?
+\end{quote}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(catches, }\KeywordTok{aes}\NormalTok{(catchPastSS)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{() }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_vline}\NormalTok{(}\DataTypeTok{xintercept =} \DecValTok{318}\NormalTok{, }\DataTypeTok{color =} \StringTok{"red"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{xlab}\NormalTok{(}\StringTok{"Time past Sunset (min)"}\NormalTok{) }\OperatorTok{+}\StringTok{ }\KeywordTok{ylab}\NormalTok{(}\StringTok{"Number of Catches"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{facet_wrap}\NormalTok{(.}\OperatorTok{~}\StringTok{ }\NormalTok{Location) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-15-1.pdf}
+
+\begin{quote}
+There doesn't appear to be any distinct pattern in timing of catches
+between locations, especially given the variation in sample sizes
+between locations.
 \end{quote}
 
 \hypertarget{cpue}{%
@@ -211,8 +614,34 @@ number.
 \subsection{visualization of CPUE per
 session}\label{visualization-of-cpue-per-session}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(CPUEraw)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{(}\DataTypeTok{binwidth =} \FloatTok{0.01}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 46 rows containing non-finite values (stat_bin).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-16-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# summary of CPUE per session}
+\KeywordTok{summary}\NormalTok{(metadata}\OperatorTok{$}\NormalTok{CPUEraw)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+## 0.00282 0.03245 0.05298 0.06270 0.08795 0.20779      46
+\end{verbatim}
+
 \begin{quote}
-This graph and summary stats show the distribution of
+The graph and summary stats above show the distribution of
 catch-per-unit-effort (ASSP/min).
 \end{quote}
 
@@ -220,28 +649,164 @@ catch-per-unit-effort (ASSP/min).
 \subsection{visualization of CPUE per standardized
 session}\label{visualization-of-cpue-per-standardized-session}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(CPUEstd)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_histogram}\NormalTok{(}\DataTypeTok{binwidth =} \FloatTok{0.01}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 47 rows containing non-finite values (stat_bin).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-17-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# summary of CPUE per standardized session}
+\KeywordTok{summary}\NormalTok{(metadata}\OperatorTok{$}\NormalTok{CPUEstd)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+## 0.00000 0.02858 0.05351 0.06161 0.08511 0.25810      47
+\end{verbatim}
+
 \begin{quote}
-This graph and summary stats show the distribution of standardized
+The graph and summary stats above show the distribution of standardized
 catch-per-unit-effort (ASSPstd/min\_std). This distribution is more
-constrained than the one above, which is what we would expect with the
-standard ending cutoff.
+constrained than the previous one, which is what we would expect with
+the standard ending cutoff.
 \end{quote}
 
 \hypertarget{comparision-of-cpue-vs-cpuestd}{%
 \subsection{comparision of CPUE vs
 CPUEstd}\label{comparision-of-cpue-vs-cpuestd}}
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(CPUEraw, CPUEstd)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{color =}\NormalTok{ Flagged_Y.N)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_abline}\NormalTok{(}\DataTypeTok{intercept =} \DecValTok{0}\NormalTok{, }\DataTypeTok{slope =} \DecValTok{1}\NormalTok{, }\DataTypeTok{color =} \StringTok{"blue"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 47 rows containing missing values (geom_point).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-18-1.pdf}
 .
 
 \begin{quote}
-This graph explores the correlation between CPUE and CPUE std. Blue line
-= slope of 1. As expected, the correlation is often 1:1, but with
+The above graph explores the correlation between CPUE and CPUE std. Blue
+line = slope of 1. As expected, the correlation is often 1:1, but with
 variation as the number of ASSP caught and number of mistnetting minutes
 were both effected by the standard ending cutoff but not always in a
-proportional way. The three outliers on the upper righthand side of the
-graph were checked to make sure the data was accurate. Sure enough,
-these were nights with high numbers of ASSP caught, but no errors in the
-data
+proportional way. Red points = data that has been flagged due to
+inconsistencies in data entry. It does not appear that the reason these
+entries were flagged effects the overall CPUE. The three outliers on the
+upper righthand side of the graph were checked to make sure the data was
+accurate. Sure enough, these were nights with high numbers of ASSP
+caught, but no errors in the data
+\end{quote}
+
+\hypertarget{what-other-variables-could-influence-cpue}{%
+\subsection{What other variables could influence
+CPUE?}\label{what-other-variables-could-influence-cpue}}
+
+\hypertarget{net-dimensions}{%
+\subsubsection{net dimensions}\label{net-dimensions}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(Net_dim, CPUEstd)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_boxplot}\NormalTok{() }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_text}\NormalTok{(}\DataTypeTok{data =}\NormalTok{ netUse,}
+            \KeywordTok{aes}\NormalTok{(Net_dim, }\OtherTok{Inf}\NormalTok{, }\DataTypeTok{label =}\NormalTok{ n), }\DataTypeTok{vjust =} \DecValTok{1}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 47 rows containing non-finite values (stat_boxplot).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-19-1.pdf}
+.
+
+\begin{quote}
+Here is the frequency of standardized CPUE values broken up by the
+dimensions of the net. The number above each box plot = the sample size.
+Unknown net sizes make it hard to determine if the size of the net
+influenced catch rates.
+\end{quote}
+
+\hypertarget{brood-patch-and-assumed-breeders}{%
+\section{Brood Patch and Assumed
+Breeders}\label{brood-patch-and-assumed-breeders}}
+
+\begin{quote}
+Below we explore the relationship between ASSP assumed to be breeding
+and the time of year. ASSP were assumed to be breeding if they had a
+bare broodpatch (brood patch score of 2-4; Ainley et al.~1990)
+\end{quote}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{monthCatches <-}\StringTok{ }\NormalTok{metadata }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{group_by}\NormalTok{(month) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{tally}\NormalTok{()}
+
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(month, BPfreq_Y)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_boxplot}\NormalTok{() }\OperatorTok{+}
+\StringTok{  }\KeywordTok{ylab}\NormalTok{(}\StringTok{"Frequency of Assumed Breeders"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_text}\NormalTok{(}\DataTypeTok{data =}\NormalTok{ monthCatches,}
+            \KeywordTok{aes}\NormalTok{(month, }\OtherTok{Inf}\NormalTok{, }\DataTypeTok{label =}\NormalTok{ n), }\DataTypeTok{vjust =} \DecValTok{1}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 27 rows containing non-finite values (stat_boxplot).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-20-1.pdf}
+.
+
+\begin{quote}
+The above graph shows frequency of assumed breeders (brood patch 2-4) in
+relation to the month of netting effort. The number above each box plot
+= sample size. The number of assumed breeders appears to be higher later
+in the breeding season.
+\end{quote}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{ggplot}\NormalTok{(metadata, }\KeywordTok{aes}\NormalTok{(month, BPfreq_Y)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_point}\NormalTok{(}\DataTypeTok{position =} \StringTok{"jitter"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{ylab}\NormalTok{(}\StringTok{"Frequency of Assumed Breeders"}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\CommentTok{# scale_color_gradient(low="blue", high="yellow") +}
+\StringTok{  }\KeywordTok{facet_wrap}\NormalTok{(.}\OperatorTok{~}\NormalTok{year) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{theme_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Removed 27 rows containing missing values (geom_point).
+\end{verbatim}
+
+\includegraphics{ASSP_CPUE_metadata_QAQC_files/figure-latex/unnamed-chunk-21-1.pdf}
+.
+
+\begin{quote}
+The above graph shows the frequency of assumed breeders caught in
+mistnetting sessions across months, broken up by years. No distinct
+patterns appear here.
 \end{quote}
 
 \end{document}

@@ -1,0 +1,554 @@
+---
+title: "CHIS ASSP Mistnetting Database QA/QC"
+author: "Amelia DuVall (ajduvall@uw.edu) & Emma Kelsey (ekelsey@usgs.gov)"
+date: "2 April 2020"
+output: pdf_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is `r paste0("v.", (Sys.Date()))`
+
+This document explains the QA/QC conducted on the Channel Islands National Park (CHIS) Ashy Storm-Petrel (ASSP) Mistnetting database. The purpose of this exercise is to capture incongruent values in the database that likely arose from data entry and/or data manipulation errors. We cannot verify observor errors (e.g., if errors were made while taking morphometric measurements but were recorded properly). Whenever possible, we cross-referenced raw data (e.g., field notebooks or scanned data sheets) to verify and/or fix incongruent values. 
+
+The database is an Excel file that contains (6) sheets: 6 sheet: Banding, Banding_Data_Dictionary, CPUE, CPUE_Data_Dictionary, Mistnetting_Locations, Participant_Initials. This document is divided into two categories: Banding QAQC and CPUE QAQC. Amelia DuVall conducted QAQC on the Banding data and Emma Kelsey conducted QAQC on the CPUE metadata. 
+
+## Load libraries
+```{r libraries, message = FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(openxlsx)
+library(readxl)
+
+```
+
+## Read-in data and set-up for analysis
+```{r readin}
+
+banding <- read_excel("CHIS_ASSP_mistnet_database_04162020.xlsx", sheet = "Banding", 
+                         col_names = TRUE, na = c("NA", "ND"))
+
+cpue <- read_excel("CHIS_ASSP_mistnet_database_04162020.xlsx", sheet = "CPUE", 
+                      col_names = TRUE, na = c("NA", "ND"))
+```
+
+# Banding Data QAQC
+Filter data to ASSP species and banded individuals only.
+```{r filter}
+ASSP <- group_by(.data = banding) %>%
+          filter(species == "ASSP") %>%
+          filter(band_no != "notbanded") %>%
+          ungroup()
+
+```
+
+## Summarize band numbers and capture rates.
+Summarize data by band number and determine capture rate for each band number (e.g., each individual). 
+```{r bands}
+summary <-  group_by(.data = ASSP, band_no) %>% 
+              summarise(no_captures = n()) %>% 
+              ungroup()
+```
+
+There are `r NROW(unique(ASSP$band_no))` unique band numbers. 
+
+Summarize capture rates.
+```{r captures}
+summarycaptures <- group_by(summary, no_captures) %>%
+                      summarise(count = n()) %>%
+                      ungroup()
+
+show(summarycaptures)
+```
+
+Summarize recapture rates.
+```{r recapture}
+recap <- group_by(.data = ASSP, recapture) %>%
+            summarise(no_captures = n()) %>%
+            ungroup()
+
+show(recap)
+```
+The recapture rates will not necessarily match the unique band numbers because we encounteed some individuals only once as a recapture (i.e., we did not band them). These bands need to be cross-referenced against BBL data to determine when/where they were first banded. This database does not contain all ASSP mistnetting banding records from CHIS.
+
+Another way to check the recapture field is to sort the band numbers sequentially and look for outliers. In theory, these would be on someone else's banding permit (and a recapture). 
+```{r seqbands}
+seq <- arrange(.data = ASSP, band_no)
+```
+We visually inspected these data and flagged any bands that were out of order to cross-reference against raw data. 
+
+## Capture time
+```{r capturetime}
+# Change data type of time stamp and isolate hour as a new field. 
+ASSP$capture_time <- mdy_hm(ASSP$capture_time, tz="US/Pacific")
+ASSP$cap_hour <- hour(ASSP$capture_time)
+
+# Which unique hour values are represented in the data?
+unique(ASSP$cap_hour)
+# The unique values at 11, 10, and 12 are incongruent with nighttime mistnetting. Perhaps these were not entered in military time?
+# Also, 4 also seems like a late capture time, but it's plausible.
+
+# Create histogram of capture time.
+ggplot(data = ASSP) +
+  geom_histogram(mapping = aes(x = cap_hour), binwidth = 1) +
+  theme_bw()
+
+# Isolate questionable data.
+cap_hour_chk <- group_by(.data = ASSP, cap_hour) %>%
+                  filter(cap_hour %in% c(4, 10, 11, 12)) %>%
+                  ungroup()
+
+# Export to csv and cross-reference raw data. 
+#write.csv(cap_hour_chk, "captimeQAQC.csv")
+```
+
+## Release time
+```{r release}
+# Change data type of release time stamp and isolate hour as new field.
+ASSP$release_time <- mdy_hm(ASSP$release_time, tz="US/Pacific")
+ASSP$rel_hour <- hour(ASSP$release_time)
+
+# Which unique hour values are represented in the data?
+unique(ASSP$rel_hour)
+# The unique values at 12 are incongruent with nighttime mistnetting. Perhaps these were not entered in military time?
+# Double-check 3am and 4am also. 
+
+summary(ASSP$rel_hour)
+# There are a lot of NA's since the release time was often unrecorded. 
+
+ggplot(data = ASSP) +
+  geom_histogram(mapping = aes(x = rel_hour), binwidth = 1) +
+  theme_bw()
+
+#Isolate questionable data
+rel_hour_chk <- group_by(.data = ASSP, rel_hour) %>%
+                  filter(rel_hour %in% c(3, 4, 12)) %>%
+                  ungroup()
+
+# Export to csv and cross-reference raw data. 
+#write.csv(rel_hour_chk, "reltimeQAQC.csv")
+```
+               
+## Brood patch
+```{r BP}
+# What are the unique BP values represented in the data?
+unique(ASSP$BP)
+# All these values fall within the range of values included in data dictionary.
+```
+
+
+## Mass 
+There are three mass values recorded in the database: mass (uncorrected), mass (tare), and mass (corrected). The mass (corrected) field is the remainder of mass (uncorrected) - mass (tare).
+```{r mass}
+unique(ASSP$mass_corr)
+summary(ASSP$mass_corr)
+# Large range in values recorded.
+
+ggplot(data = ASSP) +
+  geom_histogram(mapping = aes(x = as.numeric(mass_corr)), binwidth = 1) +
+  theme_bw()
+
+# Mass (g) values reported in Adams (2016) paper: 36.1 +/- 2.8 (female) and 34.7 +/- 2.1 (male).
+
+# Isolate questionable data.
+mass_corr_chk <- filter(ASSP, mass_corr < 25 | mass_corr > 50)
+
+# Export to csv and cross-reference raw data. 
+#write.csv(mass_corr_chk, "masscorrQAQC.csv")
+```
+
+
+## Culmen
+```{r culmen}
+summary(ASSP$culmen)
+# Large range in values recorded.
+
+ggplot(data = ASSP) +
+  geom_bar(mapping = aes(x = culmen)) +
+  theme_bw()
+
+# Bill length (mm) values reported in Adams (2016) paper: 14.9 +/- 0.5 (f) and 14.6 +/- 0.8 (m).
+# Values reported in Pyle guide: 13.1-15.2 (95% CI).
+
+#Isolate questionable data
+culmen_chk <- filter(ASSP, culmen < 13 | culmen > 16) 
+
+# Export to csv and cross-reference raw data. 
+#write.csv(culmen_chk, "culmenQAQC.csv")
+# Update (4/15): It seems like the range I picked (13-16) was too narrow. Most were not typos. 
+```
+
+
+## Skull length
+```{r skull}
+summary(ASSP$skull_length)
+
+ggplot(data = ASSP) +
+  geom_bar(mapping = aes(x = skull_length))
+
+# Skull length (mm) values reported in Adams (2016): 38.1 +/- 1.1 (f) and 37.9 +/- 0.8 (m).
+# No information on skull length in Pyle guide.
+
+#Isolate questionable data.
+skull_chk <- filter(ASSP, skull_length < 35 | skull_length > 41) 
+
+# Export to csv and cross-reference raw data. 
+#write.csv(skull_chk, "skullQAQC.csv")
+```
+
+
+## Tarsus
+```{r tarsus}
+summary(ASSP$tarsus)
+# Large range in values recorded. 
+
+ggplot(data = ASSP) +
+  geom_bar(mapping = aes(x = tarsus)) +
+  theme_bw()
+
+# Tarsus (mm) values reported in Adams (2016): 23.2 +/- 0.9 (f) and 23.1 +/- 0.8 (m).
+# Values reported in Pyle guide: 21-25 (95% CI).
+
+#Isolate questionable data.
+tarsus_chk <- filter(ASSP, tarsus < 19 | tarsus > 27) 
+
+# Export to csv and cross-reference raw data. 
+#write.csv(tarsus_chk, "tarsusQAQC.csv")
+```
+
+## Wing chord
+```{r wing}
+summary(ASSP$wing)
+# Large range in values recorded.
+
+ggplot(data = ASSP) +
+  geom_bar(mapping = aes(x = wing)) +
+  theme_bw()
+
+# Max flat wing (mm) values reported in Adams (2016): 142.7 +/- 2.8 (f) and 140.4 +/- 3.3 (m).
+# Values reported in Pyle guide: 132-148 (95% CI).
+
+#Isolate questionable data.
+wing_chk <- filter(ASSP, wing < 130 | wing > 150) 
+
+# Export to csv and cross-reference raw data. 
+#write.csv(wing_chk, "wingQAQC.csv")
+```
+We decided to check for a bimodal distribution of the wing chord morphometric data once the data entry errors had been rectified. A bimodal distribution could be an indication of different methods used to measure wing chord (e.g, flattened wing chord versus relaxed wing chord). 
+
+```{r wingmethod}
+# Plot wing chord values.
+ggplot(data = ASSP) +
+  geom_bar(mapping = aes(x = wing)) +
+  theme_bw()
+# There does not appear to be a bimodal distribution.
+
+# How about mean wing chord observed per session?
+WC_ses <- group_by(.data = ASSP, session_ID, year) %>%
+          summarise(wing_av = mean(wing, na.rm = TRUE)) %>%
+          ungroup()
+
+ggplot(WC_ses) +
+  geom_point(aes(x = session_ID, y = wing_av, color = year)) 
+# Values in earlier years (~1990s) appear smaller. 
+
+# How about mean wing chord observed per year?
+WC_yr <- group_by(.data = ASSP, year) %>%
+          summarise(wing_av = mean(wing, na.rm = TRUE)) %>%
+          ungroup()
+
+ggplot(WC_yr) +
+  geom_point(aes(x = year, y = wing_av)) 
+
+# Boxplot of wing chord values
+ggplot(ASSP, aes(x = as.factor(year), y = wing, fill = island_code)) +
+         geom_boxplot()
+```
+It does look like the wing chord values recorded in the 1990s on Santa Barbara Island (PRBO) and Anacapa Island (Harry Carter) are significantly smaller than the values recorded by USGS and CHIS collaborators in the 2000-2010s. It's possible they used a relaxed wing measurement as opposed to a flattened wing measurement used later on. We made a note in the Banding Data Dictionary under "wing" that a different method might have been used to take wing chord measurements over time.
+
+
+## Tail
+```{r tail}
+summary(ASSP$tail)
+# Large range in values recorded.
+
+ggplot(data = ASSP) +
+  geom_bar(mapping = aes(x = tail)) +
+  theme_bw()
+
+# Values reported in Pyle guide: 72-84 (95% CI).
+             
+#Isolate questionable data.
+tail_chk <- filter(ASSP, tail < 71 | tail > 85) 
+
+# Export to csv and cross-reference raw data. 
+#write.csv(tail_chk, "tailQAQC.csv")
+```
+
+We reviewed the exported data and cross-reference it with raw data (if available). If there was a data entry error, we rectified the mistake in the database and tracked changes in a separate csv file. 
+
+# CPUE 
+
+## Set-up data for analysis. 
+``` {r cpue}
+metadata <- cpue %>% 
+              mutate_at(c("app_sunset", "std_ending"), 
+                        .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% 
+              mutate_at(c("net_open_1", "net_close_1", "net_open_2", "net_close_2", "net_open_3", 
+                          "net_close_3", "net_open_4", "net_close_4", "net_open_5", "net_close_5"),
+                        .funs = ~as.POSIXct(., format="%Y-%m-%d %H:%M:%S")) %>%
+              mutate_at(c("app_sunset", "std_ending", "net_open_1", "net_close_1"), 
+                        .funs = list(time = ~ hms::as_hms(.))) %>% 
+              mutate(CPUE_ratio = CPUEstd/CPUEraw, 
+                     month = as.character(month)) %>% 
+              filter(TRUE)
+
+metadata_effort <- metadata %>%
+                      select(session_ID, site_code, app_sunset, std_ending, lat, long)
+
+catches <- banding %>% 
+  left_join(metadata_effort, by = c("session_ID", "site_code", "lat", "long")) %>%
+  mutate_at(c("app_sunset", "std_ending", "capture_time", "release_time"),
+            .funs = ~as.POSIXct(., format="%Y-%m-%d %H:%M:%S")) %>%
+  filter(species == "ASSP") %>%
+  mutate(std = if_else(std_ending > capture_time, "1", "0"),
+         catchPastSS = capture_time - app_sunset,
+         assumeBreed = mosaic::derivedFactor(
+    "Y" = (BP == "B" | BP == "b" | BP == "2" | BP == "3" | BP == "4"),
+    "N" = (BP == "D" | BP == "d" | BP == "0" | BP == "5" | BP == "PD" | BP == "pd" | BP == "1" | BP == "1.5" | BP == "4.5"),
+    .default = "ND")) %>%
+  filter(TRUE)
+
+metadata_BP <- catches %>%
+  group_by(session_ID, site_code) %>%
+  summarise(ASSP = n(),
+            ASSPstd = sum(std == "1"),
+            BPct = n(),
+            BP_Y = sum(assumeBreed == "Y"), # number of birds that have a broodpatch (2-4, B)
+            BP_N = sum(assumeBreed == "N")) %>% # number of birds that dont have a broodpatch (1, 1.5, 4.5, 5, PB, D)
+  right_join(metadata, by= c("session_ID", "site_code")) %>%
+  mutate(BPfreq_Y = BP_Y/BPct, # frequency of birds that have a broodpatch
+         BPfreq_N = BP_N/BPct) 
+
+```
+
+
+## Time and Mistnetting Effort
+### Graphical check of App_sunset 
+```{r}
+ggplot(metadata, aes(month, app_sunset_time)) +
+  geom_point(aes(color = year)) +
+  scale_color_gradient(low="purple", high="orange") +
+  theme_bw()
+```
+This graph shows the time of apparent sunset for netting sessions each month. The range and timing for that time of year is as we would expect. Thus we conclude that the suncalc function was used effectively to get the sunset times associated with each mistnetting session.
+
+## Graphical check of Std_ending 
+### Plotted by month
+```{r}
+ggplot(metadata, aes(month, std_ending_time)) +
+  geom_point(aes(color = year)) +
+  scale_color_gradient(low="black", high="light blue") +
+  theme_bw()
+```
+This graph shows the time of standard ending (5.3 hours after sunset) for netting sessions each month. The range and timing of the standard ending track with sunset time as we would expect.
+
+## Summarize net_open and net_close 
+```{r}
+
+# first (and usually only) net open time
+summary(as.POSIXct(metadata$net_open_1_time))
+# first (and usually only) net close time
+summary(as.POSIXct(metadata$net_close_1_time))
+```
+This is not a perfect way to summarize net open and close times because the "summarize" function doesn't recognize times across midnight here. But, by looking at the median and mean, we can tell that net open and close times are usually what we would expect, with a few late/early nights thrown in.
+
+## Total mistnetting minutes per session
+```{r}
+ggplot(metadata, aes(min)) +
+  geom_histogram(binwidth = 10) +
+  theme_bw()
+# summary of total mistnetting minutes
+summary(metadata$min)
+```
+The graph and summary stats above show minutes calcuated for each netting session. We want to check that minutes were added correctly across multiple open/close sessions and also that minutes were added accurately across midnight. It looks like minutes were not added accurately across midnight on four occasions (the outliers to the far right)
+
+
+## Total mistnetting standard minutes per session 
+### from start until end or standard ending, whichever came first
+```{r}
+ggplot(metadata, aes(min_std)) +
+  geom_histogram(binwidth = 10) +
+  theme_bw()
+# summary of mistnetting minutes cut to standard ending time
+summary(metadata$min_std)
+```
+The above graph and summary stats show the total number of mintues for the standardized session (from net open to net close or standard ending whichever came first). The standard ending is 5.3 hours (318 minutes) after sunset. Nets opened sometime after sunset.
+
+## Compare min vs. min_std for each session
+```{r}
+ggplot(metadata, aes(min, min_std)) +
+  geom_point(aes(color = flagged)) +
+  geom_abline(intercept = 0, slope = 1, color = "blue") +
+  geom_hline(yintercept = 318, color = "red") +
+  xlim(0,1050) + ylim(0, 550) +
+  theme_bw()
+```
+This plot of minutes vs. standardized mintues (before the 5.3 hour standardized ending).  Blue line = slope of 1. Red line = standard ending.  Here we can make sure standardized net open minutes is equal or less the total number of minutes and sunset to standard ending of 5.3 hours (318 minutes).  Red points = data that has been flagged due to inconsistencies in data entry. It does not appear that the reason these entries were flagged effects net minutes.
+
+## ASSP
+### Histogram of total ASSP caught per session
+```{r}
+ggplot(metadata, aes(ASSP)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw()
+# summary of ASSP catches
+summary(metadata$ASSP)
+```
+The graph and summary stats above show the distribution of total numbers of ASSP caught per session.
+
+
+## Histogram of total ASSP caught per standardized session
+```{r}
+ggplot(metadata, aes(ASSPstd)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw()
+# summary of standardized ASSP catches
+summary(metadata$ASSPstd)
+```
+The graph and summary stats above show the distribution of total numbers of ASSP caught before standard ending or net close, whichever came first.  This distribution is more constrained than the one above, which is what we would expect with the standard ending cutoff.
+
+Next we will look into what else could effect the number of birds caught.
+
+## Number of ASSP caught in relation to net size
+```{r}
+netUse <- metadata %>% 
+  group_by(net_dim) %>% 
+  tally()
+
+ggplot(metadata, aes(net_dim, ASSPstd)) +
+  geom_boxplot() +
+  geom_text(data = netUse,
+            aes(net_dim, Inf, label = n), vjust = 1) +
+  theme_bw()
+```
+The graph above shows the number of ASSP caught within the standardized period in relation to net dimensions.  Number at top of each box plot = sample size. The size of the net doesn't seem to effect the number of birds caught in a specific night. Below we will explore this effect with number of catches standardized to effort.
+
+## Comparison of ASSP vs ASSPstd 
+```{r}
+ggplot(metadata, aes(ASSP, ASSPstd)) +
+  geom_point(aes(color = flagged)) +
+  geom_abline(intercept = 0, slope = 1, color = "blue") +
+  xlim(0,60) + ylim(0, 60) +
+  theme_bw()
+```
+The plot above shows the total number of ASSP vs. total number of ASSP before the standard ending. Blue line = slope of 1. Here we double check that the standardized number of ASSP is always equal to or less than the total number. Red points = data that has been flagged due to inconsistencies in data entry.  It does not appear that the reason these entries were flagged effects the number of birds caught.
+
+# ## Timing of ASSP catches
+# Next lets explore the frequency of catches in relation to the standard ending. Do catches start dropping off before 5.3 hours after sunset?  After?  NOTE - the timing of net closures will effect the number of late night captures
+
+```{r}
+ggplot(catches, aes(catchPastSS)) +
+  geom_histogram(binwidth = 10) +
+  geom_vline(xintercept = 318, color = "red") +
+  xlab("Time past Sunset (min)") + ylab("Number of ASSP Catches") +
+  theme_bw()
+```
+The 5.3 hour cutoff occurs when number of catches are still relatively high. How does that differ across years? In recent years (2014 - 2018) nets were usually closed at 2am. In earlier years nets were sometimes left open past 2am. 
+
+```{r}
+ggplot(catches, aes(catchPastSS)) +
+  geom_histogram(binwidth = 10) +
+  geom_vline(xintercept = 318, color = "red") +
+  xlab("Time past Sunset (min)") + ylab("Number of ASSP Catches") +
+  facet_wrap(.~ year, scales = "free") +
+  theme_bw()
+# NOTE: scales on x- and y- axis differ between panes
+```
+No clear pattern of catch timing can be seen across years.
+
+How does catch time post sunset differ between netting sub-islands?
+``` {r}
+ggplot(catches, aes(catchPastSS)) +
+  geom_histogram() +
+  geom_vline(xintercept = 318, color = "red") +
+  xlab("Time past Sunset (min)") + ylab("Number of Catches") +
+  facet_wrap(.~ subisland_code) +
+  theme_bw()
+```
+There doesn't appear to be any distinct pattern in timing of catches between locations, especially given the variation in sample sizes between locations.
+
+## CPUE
+### visualization of CPUE per session
+```{r}
+ggplot(metadata, aes(CPUEraw)) +
+  geom_histogram(binwidth = 0.01) +
+  theme_bw()
+# summary of CPUE per session
+summary(metadata$CPUEraw)
+```
+The graph and summary stats above show the distribution of catch-per-unit-effort (ASSP/min).
+
+
+### Visualization of CPUE per standardized session
+```{r}
+ggplot(metadata, aes(CPUEstd)) +
+  geom_histogram(binwidth = 0.01) +
+  theme_bw()
+# summary of CPUE per standardized session
+summary(metadata$CPUEstd)
+```
+The graph and summary stats above show the distribution of standardized catch-per-unit-effort (ASSPstd/min_std). This distribution is more constrained than the previous one, which is what we would expect with the standard ending cutoff.
+
+### Comparision of CPUE vs CPUEstd
+```{r}
+ggplot(metadata, aes(CPUEraw, CPUEstd)) +
+  geom_point(aes(color = flagged)) +
+  geom_abline(intercept = 0, slope = 1, color = "blue") +
+  theme_bw()
+```
+The above graph explores the correlation between CPUE and CPUE std.  Blue line = slope of 1. As expected, the correlation is often 1:1, but with variation as the number of ASSP caught and number of mistnetting minutes were both effected by the standard ending cutoff but not always in a proportional way.  Red points = data that has been flagged due to inconsistencies in data entry. It does not appear that the reason these entries were flagged effects the overall CPUE.
+
+The three outliers on the upper righthand side of the graph were checked to make sure the data was accurate.  Sure enough, these were nights with high numbers of ASSP caught, but no errors in the data
+
+
+## What other variables could influence CPUE?
+### Net dimensions
+```{r}
+ggplot(metadata, aes(net_dim, CPUEstd)) +
+  geom_boxplot() +
+  geom_text(data = netUse,
+            aes(net_dim, Inf, label = n), vjust = 1) +
+  theme_bw()
+```
+Here is the frequency of standardized CPUE values broken up by the dimensions of the net. The number above each box plot = the sample size. Unknown net sizes make it hard to determine if the size of the net influenced catch rates.
+
+## Brood Patch and Assumed Breeders
+Below we explore the relationship between ASSP assumed to be breeding and the time of year. ASSP were assumed to be breeding if they had a bare broodpatch (brood patch score of 2-4; Ainley et al. 1990)
+
+``` {r}
+monthCatches <- metadata %>%
+  group_by(month) %>%
+  tally()
+
+ggplot(metadata, aes(month, BPfreq_Y)) +
+  geom_boxplot() +
+  ylab("Frequency of Assumed Breeders") +
+  geom_text(data = monthCatches,
+            aes(month, Inf, label = n), vjust = 1) +
+  theme_bw()
+```
+The above graph shows frequency of assumed breeders (brood patch 2-4) in relation to the month of netting effort. The number above each box plot = sample size. The number of assumed breeders appears to be higher later in the breeding season.
+
+```{r}
+ggplot(metadata, aes(month, BPfreq_Y)) +
+  geom_point(position = "jitter") +
+  ylab("Frequency of Assumed Breeders") +
+  # scale_color_gradient(low="blue", high="yellow") +
+  facet_wrap(.~year) +
+  theme_bw()
+```
+The above graph shows the frequency of assumed breeders caught in mistnetting sessions across months, broken up by years. No distinct patterns appear here.
