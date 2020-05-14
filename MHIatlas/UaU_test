@@ -1,0 +1,59 @@
+library(leaflet)
+library(sp)
+library(raster)
+library(ggplot2)
+
+##starting with a dataframe called "UaU" with fields "Xlong", "Ylat", "BurrowID", and "Study"
+UaU <- read.csv("C:/Users/jfelis/Downloads/UaUDummy.csv")
+
+pal <- colorFactor(c("navy", "red"), domain = c("Park", "State"))#set colors for values from the fiel dyou are going to map to color
+leaflet(UaU) %>%
+  addTiles() %>%
+  # addProviderTiles(providers$OpenTopoMap) %>%
+  addCircleMarkers(lng = UaU$Xlong,
+                   lat = UaU$Ylat,
+                   popup = paste(UaU$BurrowID, UaU$Study, sep="; "), #if you want to use multiple fields you have to paste them together
+                   radius=6,
+                   color=~pal(Study),#tell it a field that is a factor, for which you mapped the values and colors above
+                   stroke = FALSE, 
+                   fillOpacity = 0.5) %>%
+  addScaleBar()
+
+#make it a spatial points object
+UaU_sp <- UaU
+coordinates(UaU_sp) <- ~Xlong+Ylat #define the coordinate fields
+proj4string(UaU_sp) <- CRS("+proj=longlat +datum=WGS84") #define the projection, in this case Geographic WGS84
+
+leaflet(UaU_sp) %>%
+  # addTiles() %>%
+  addProviderTiles(providers$OpenTopoMap) %>%
+  addCircleMarkers(popup = UaU$BurrowID,
+                   radius=6,
+                   color=~pal(Study),
+                   stroke = FALSE, 
+                   fillOpacity = 0.5) %>%
+  # addPolylines(data=v_lines) %>%
+  addScaleBar()
+
+#### habitat rasters
+elevation <- raster("C:/JJF/Hawaii_BaseLayers/Landfire/hi_dem")
+slope <- raster("C:/JJF/Hawaii_BaseLayers/Landfire/hi_dem_sl")
+evt <- raster("C:/JJF/Hawaii_BaseLayers/Landfire/EVT/HI_130EVT/hi_130evt")
+evc <- raster("C:/JJF/Hawaii_BaseLayers/Landfire/EVC/HI_130EVC/hi_130evc")
+
+# get burrows into same projection as habitat layers
+UaU_sp <- spTransform(UaU_sp, crs(elevation))
+# extent <- 1.3*extent(UaU_sp)
+# elevation_sm <- crop(elevation, extent)
+# evc_sm <- crop(evc, extent)
+# plot(evc_sm)
+# plot(UaU_sp, add=TRUE)
+
+#extract values 
+UaU_sp$elev <- raster::extract(elevation, UaU_sp)
+UaU_sp$slope <- raster::extract(slope, UaU_sp)
+# UaU_sp$evt <- raster::extract(evt, UaU_sp)
+# UaU_sp$evc <- raster::extract(evc, UaU_sp)
+# evt_df <- as.data.frame(evt)
+
+ggplot(as.data.frame(UaU_sp), aes(x=evt)) + geom_histogram()

@@ -188,37 +188,497 @@ sigma <- runif(1000, 0, 10)
 sim <- rnorm(1000, mu, sigma)
 dens(sim)
 
-# M2
-map4.2 <- alist(
-  y ~ dnorm(mu, sigma),
-  mu ~ dnorm(0, 10),
-  sigma ~ dunif(0, 10))
+# H1
+data(Howell1)
+d <- Howell1
+d2 <- d[d$age>=18, ]
+xbar <- mean(d2$weight)
+weight.vec <-  c(46.95, 43.72, 64.78, 32.59, 54.63)
+
+m1 <- quap(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b*(weight - xbar), 
+    a ~ dnorm(150, 30),
+    b ~ dnorm(0, 20),
+    sigma ~ dunif(0, 50)
+    ), data = d2,
+  )
+
+precis(m1)
+
+post <- extract.samples(object = m1)
+
+height.pred.mat <- matrix(NA, nrow = nrow(post),
+                          ncol = length(weight.vec))
+
+for(i in 1:length(weight.vec)) {
+  height.pred.mat[ ,1] <- post$a + post$b * (weight.vec[i]-xbar)
+}
+
+head(height.pred.mat)
+
+apply(height.pred.mat, 2, mean)
+apply(height.pred.mat, 2, PI)
+
+pred.m1 <- link(fit = m1,
+                data = data.frame(weight.vec))
+
+head(pred.m1)
+dim(pred.m1)
+apply(pred.m1, 2, mean)
+apply(pred.m1, 2, PI)
+
+
+# H2
+d3 <- d[d$age < 18, ]
+xbar3 <- mean(d3$weight)
+weight.seq <- seq(min(d3$weight),
+                  max(d3$weight),
+                  by = 1)
+
+m3 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b*(weight - xbar3), 
+    a ~ dnorm(100, 30),
+    b ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)),
+  data = d3,
+  )
+
+precis(m3)
+
+plot(height ~ weight, data = d3)
+
+pred.m3 <- link(fit = m3,
+                data = data.frame(weight = weight.seq))
+
+mu.pred.m3 <- apply(pred.m3, 2, mean)
+HPDI.pred.m3 <- apply(pred.m3, 2, HPDI)
+
+ind.pred.m3 <- sim(fit = m3, 
+                   data = data.frame(weight = weight.seq))
+
+mu.ind.pred.m3 <- apply(ind.pred.m3, 2, mean)
+HPDI.ind.pred.m3 <- apply(ind.pred.m3, 2, HPDI)
+
+plot(height ~ weight, data = d3)
+lines(weight.seq, mu.pred.m3)
+shade(HPDI.pred.m3, weight.seq, col = col.alpha(rangi2))
+shade(HPDI.ind.pred.m3, weight.seq, col = col.alpha(rangi2))
+
 
 # M3
-y ~ normal(mu, sigma)
-mu <- a +b*x
-a ~ normal(0, 50)
-b ~ uniform(0, 10)
-sigma ~ uniform(0, 50)
+d$log_weight <- log(d$weight)
+log_xbar <- mean(d$log_weight)
 
+m4 <- quap(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * (log_weight - log_xbar), 
+    a ~ dnorm(150, 30),
+    b ~ dnorm(0, 100),
+    sigma ~ dunif(0, 50)
+  ), data = d,
+)
+
+precis(m4)
+
+weight.seq <- seq(min(d$weight), max(d$weight), length = 100)
+log_weight.seq <- log(weight.seq)
+pred.m4 <- link(m4, data = data.frame(log_weight = log.weight.seq))
+
+mu.pred.m4 <- apply(pred.m4, 2, mean)
+HPDI.pred.m4 <- apply(pred.m4, 2, HPDI, prob = 0.97)
+
+ind.pred.m4 <- sim(fit = m4, 
+                   data = data.frame(weight = weight.seq))
+
+mu.ind.pred.m4 <- apply(ind.pred.m4, 2, mean)
+HPDI.ind.pred.m4 <- apply(ind.pred.m4, 2, HPDI, prob = 0.97)
+
+
+
+plot(height ~ weight, data = d,
+     col = col.alpha(rangi2, 0.4))
+lines(weight.seq, mu.pred.m4, lwd = 3)
+shade(HPDI.pred.m4, weight.seq, col = col.alpha(rangi2))
+shade(HPDI.ind.pred.m4, weight.seq, col = col.alpha(rangi2))
+
+
+#---------------------------------------------------------------------
+### ch 5
 # M4
-height ~ rnorm(mu, sigma)
-mu <- a + b*year
-a ~ rnorm(40, 5)
-b ~ dunif(2, 3)
-sigma ~ dunif(0, 10)
+library(rethinking)
+data(WaffleDivorce)
+d <- WaffleDivorce
+d$pct_LDS <- c(0.75, 4.53, 6.18, 1, 2.01, 2.82, 0.43, 0.55, 0.38,
+               0.75, 0.82, 5.18, 26.35, 0.44, 0.66, 0.87, 1.25, 0.77, 0.64, 0.81,
+               0.72, 0.39, 0.44, 0.58, 0.72, 1.14, 4.78, 1.29, 0.61, 0.37, 3.34,
+               0.41, 0.82, 1.48, 0.52, 1.2, 3.85, 0.4, 0.37, 0.83, 1.27, 0.75,
+               1.21, 67.97, 0.74, 1.13, 3.99, 0.92, 0.44, 11.5 )
 
-# M4
-height ~ rnorm(mu, sigma)
-mu <- a + b*year
-a ~ rnorm(120, 5)
-b ~ dunif(0, 5)
-sigma ~ dunif(0, 10)
+d_std <- d %>% 
+  mutate(
+    Marriage.s <- standardize(Marriage),
+    MedianAgeMarriage.s <- standardize(MedianAgeMarriage),
+    pct_LDS.s <- standardize(pct_LDS),
+    Divorce.s <- standardize(Divorce)
+  )
 
-# M6
-height ~ rnorm(mu, sigma)
-mu <- a + b*year
-a ~ rnorm(120, 5)
-b ~ dunif(0, 5)
-sigma ~ dunif(0, 64)
+mormon <- map(
+  alist(
+    Divorce ~ dnorm(mu, sigma),
+    mu <- a + b1*Marriage + b2*MedianAgeMarriage + b3*pct_LDS,
+    sigma ~ dunif(0, 50),
+    b1 ~ dnorm(0, 10),
+    b2 ~ dnorm(0, 10),
+    b3 ~ dnorm(0, 10),
+    a ~ dnorm(50, 50)
+  ), data = d)
+
+precis(mormon)
+
+#H1
+data(foxes)
+
+fox.1 <- map(alist(
+  weight <- dnorm(mu, sigma),
+  mu <- a + b1*area,
+  a ~ dnorm(0, 10),
+  b1 ~ dnorm(0, 10),
+  sigma ~ dunif(0, 50)
+), data = foxes)
+
+fox.2 <- map(alist(
+  weight <- dnorm(mu, sigma),
+  mu <- a + b2*groupsize,
+  a ~ dnorm(0, 10),
+  b2 ~ dnorm(0, 10),
+  sigma ~ dunif(0, 50)
+), data = foxes)
+
+precis(fox.1)
+precis(fox.2)
+
+x <- seq(0, 8, 1) # setting range of x-axis
+
+# area
+fox.1.line <- link(fox.1, data = data.frame(area = x))
+line.mean <- apply(fox.1.line, 2, mean)
+line.ci <- apply(fox.1.line, 2, PI)
+plot(weight ~ area, data = foxes)
+line(x, line.mean)
+lines(x, line.ci[1,])
+lines(x, line.ci[2,])
+
+# group size
+fox.2.line <- link(fox.2, data = data.frame(area = x))
+line.mean <- apply(fox.2.line, 2, mean)
+line.ci <- apply(fox.2.line, 2, PI)
+plot(weight ~ groupsize, data = foxes)
+lines(x, line.mean)
+lines(x, line.ci[1,])
+lines(x, line.ci[2,])
+
+#H1
+fox.3 <- map(alist(
+  weight <- dnorm(mu, sigma),
+  mu <- a + b1*area + b2*groupsize,
+  a ~ dnorm(0, 10),
+  b1 ~ dnorm(0, 10),
+  b2 ~ dnorm(0, 10),
+  sigma ~ dunif(0, 50)
+), data = foxes)
+
+precis(fox.3)
+
+x.area <- seq(0, max(foxes$area), 1) # setting range of x-axis
+x.groupsize <- seq(0, max(foxes$groupsize), 1) # setting range of x-axis
+
+fox.3.line <- link(fox.3, data = data.frame(groupsize = x.groupsize, area = mean(foxes$area)))
+line.mean <- apply(fox.3.line, 2, mean)
+line.ci <- apply(fox.3.line, 2, PI)
+plot(weight ~ groupsize, data = foxes)
+lines(x.groupsize, line.mean)
+lines(x.groupsize, line.ci[1,])
+lines(x.groupsize, line.ci[2,])
+
+fox.3.1.line <- link(fox.3, data = data.frame(area = x.area, groupsize = mean(foxes$groupsize)))
+line.mean <- apply(fox.3.1.line, 2, mean)
+line.ci <- apply(fox.3.1.line, 2, PI)
+plot(weight ~ area, data = foxes)
+lines(x.area, line.mean)
+lines(x.area, line.ci[1,])
+lines(x.area, line.ci[2,])
+
+# H3
+fox.4 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bG*groupsize + bF*avgfood,
+    a ~ dnorm(0, 10),
+    bG ~ dnorm(0, 10),
+    bF ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)
+  ), data = foxes)
+
+fox.5 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bA*area + bG*groupsize + bF*avgfood,
+    a ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    bG ~ dnorm(0, 10),
+    bF ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)
+  ), data = foxes)
+
+precis(fox.4)
+precis(fox.5)
+
+fox.4.line <- link(fox.4, data = data.frame(groupsize = x.groupsize, area = mean(foxes$area)))
+line.mean <- apply(fox.4.line, 2, mean)
+line.ci <- apply(fox.4.line, 2, PI)
+plot(weight ~ groupsize, data = foxes)
+lines(x.groupsize, line.mean)
+lines(x.groupsize, line.ci[1,])
+lines(x.groupsize, line.ci[2,])
+
+x.food <- seq(0, max(foxes$avgfood), 0.1)
+fox.5.line <- link(fox.5, data = data.frame(avgfood = x.food, area = mean(foxes$area), groupsize = mean(foxes$groupsize)))
+line.mean <- apply(fox.5.line, 2, mean)
+line.ci <- apply(fox.5.line, 2, PI)
+plot(weight ~ avgfood, data = foxes)
+lines(x.food, line.mean)
+lines(x.food, line.ci[1,])
+lines(x.food, line.ci[2,])
+
+
+#---------------------------------------------------------------------
+### ch 6
+# E2
+p2 <- c(0.3, 0.7)
+-sum(p2*log(p2))
+
+# E3
+p3 <- c(0.2, 0.25, 0.3, 0.25)
+-sum(p3*log(p3))
+
+# E4
+p4 <- c(0.33, 0.33, 0.33)
+-sum(p4*log(p4))
+
+
+library(rethinking)
+data(Howell1)
+d <- Howell1
+d$age <- (d$age - mean(d$age))/sd(d$age)
+set.seed(1000)
+i <- sample(1:nrow(d), size = nrow(d)/2)
+d1 <- d[i, ]
+d2 <- d[-i, ]
+
+
+f1 <- alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1*age,
+  c(a,b1) ~ dnorm(0,100),
+  sigma ~ dunif(0,50))
+
+f2 <- alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1*age + b2*age^2,
+  c(a,b1,b2) ~ dnorm(0,100),
+  sigma ~ dunif(0,50))
+
+f3 <- alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1*age + b2*age^2 + b3*age^3,
+  c(a,b1,b2,b3) ~ dnorm(0,100),
+  sigma ~ dunif(0,50))
+
+f4 <- alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1*age + b2*age^2 + b3*age^3 + b4*age^4,
+  c(a,b1,b2,b3,b4) ~ dnorm(0,100),
+  sigma ~ dunif(0,50))
+
+f5 <- alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1*age + b2*age^2 + b3*age^3 + b4*age^4 + b5*age^5,
+  c(a,b1,b2,b3,b4,b5) ~ dnorm(0,100),
+  sigma ~ dunif(0,50))
+
+f6 <- alist(
+  height ~ dnorm(mu,sigma),
+  mu <- a + b1*age + b2*age^2 + b3*age^3 + b4*age^4 + b5*age^5 +
+    b6*age^6,
+  c(a,b1,b2,b3,b4,b5,b6) ~ dnorm(0,100),
+  sigma ~ dunif(0,50))
+
+a.start <- mean(d1$height)
+sigma.start <- sd(d1$height)
+
+# fit models 5.7
+m1 <- map(f1, data=d1,
+           start=list(a=a.start,sigma=sigma.start,b1=0))
+
+m2 <- map(f2, data=d1,
+           start=list(a=a.start,sigma=sigma.start, b1=0, b2=0))
+
+m3 <- map(f3, data=d1,
+           start=list(a=a.start,sigma=sigma.start,b1=0,b2=0,
+                      b3=0))
+
+m4 <- map(f4, data=d1,
+           start=list(a=a.start,sigma=sigma.start,b1=0,b2=0,
+                      b3=0,b4=0))
+
+m5 <- map(f5, data=d1,
+           start=list(a=a.start,sigma=sigma.start,b1=0,b2=0,
+                      b3=0,b4=0,b5=0))
+
+m6 <- map(f6, data=d1,
+           start=list(a=a.start,sigma=sigma.start,b1=0,b2=0,
+                      b3=0,b4=0,b5=0,b6=0))
+
+compare(m1, m2, m3, m4, m5, m6)
+
+
+# 6H2
+# select out model to plot
+m_plot <- m4
+# define sequence of ages to compute values over
+age.seq <- seq(from=-2, to=3, length.out=30)
+# compute posterior predictions for mu
+mu <- link(m_plot, data=list(age=age.seq))
+# compute average prediction
+mu.mean <- apply(mu, 2, mean)
+
+# compute 97% interval of average
+mu.ci <- apply(mu, 2, PI, prob=0.97)
+# compute interval of height
+h <- sim(m_plot, data=list(age=age.seq)) # function = "sim" b/c its trying to simulate data
+height.ci <- apply(h, 2, PI)
+# plot it all
+plot(height ~ age, d1, col="slateblue", xlim=c(-2,3))
+lines(age.seq, mu.mean)
+shade(mu.ci, age.seq)
+shade(height.ci, age.seq)
+
+# 6H3
+h.ensemble <- ensemble( m4,m5,m6 , data=list(age=age.seq) )
+mu.mean <- apply( h.ensemble$link , 2 , mean )
+mu.ci <- apply( h.ensemble$link , 2 , PI )
+height.ci <- apply( h.ensemble$sim , 2 , PI )
+plot( height ~ age , d1 , col="slateblue" , xlim=c(-2,3) )
+lines( age.seq , mu.mean )
+shade( mu.ci , age.seq )
+shade( height.ci , age.seq )
+
+
+# 6H4
+k <- coef(m1)
+mu <- k['a'] + k['b1']*d2$age
+dev.m1 <- (-2)*sum( dnorm( d2$height , mu , k['sigma'] , log=TRUE ) )
+k <- coef(m2)
+mu <- k['a'] + k['b1']*d2$age + k['b2']*d2$age^2
+dev.m2 <- (-2)*sum( dnorm( d2$height , mu , k['sigma'] , log=TRUE ) )
+k <- coef(m3)
+mu <- k['a'] + k['b1']*d2$age + k['b2']*d2$age^2 + k['b3']*d2$age^3
+dev.m3 <- (-2)*sum( dnorm( d2$height , mu , k['sigma'] , log=TRUE ) )
+k <- coef(m4)
+mu <- k['a'] + k['b1']*d2$age + k['b2']*d2$age^2 + k['b3']*d2$age^3 +
+  k['b4']*d2$age^4
+dev.m4 <- (-2)*sum( dnorm( d2$height , mu , k['sigma'] , log=TRUE ) )
+k <- coef(m5)
+mu <- k['a'] + k['b1']*d2$age + k['b2']*d2$age^2 + k['b3']*d2$age^3 +
+  k['b4']*d2$age^4 + k['b5']*d2$age^5
+dev.m5 <- (-2)*sum( dnorm( d2$height , mu , k['sigma'] , log=TRUE ) )
+k <- coef(m6)
+mu <- k['a'] + k['b1']*d2$age + k['b2']*d2$age^2 + k['b3']*d2$age^3 +
+  k['b4']*d2$age^4 + k['b5']*d2$age^5 + k['b6']*d2$age^6
+dev.m6 <- (-2)*sum( dnorm( d2$height , mu , k['sigma'] , log=TRUE ) )
+
+
+# 6H5
+compare.tab <- compare(m1,m2,m3,m4,m5,m6,sort=FALSE) 
+tab <- data.frame(
+  WAIC=compare.tab@output$WAIC,
+  dev_out=c(dev.m1,dev.m2,dev.m3,dev.m4,dev.m5,dev.m6)
+)
+rownames(tab) <- rownames(compare.tab@output)
+# display, sorted by dev out
+tab[ order(tab$dev_out) , ]
+
+
+# 6H6
+f <- alist(
+  height ~ dnorm(mu, sigma),
+  mu <- a + b1*age + b2*age^2 + b3*age^3 + b4*age^4 + b5*age^5 + b6*age^6,
+  c(b1, b2, b3, b4, b5, b6) ~ dnorm(0, 5))
+
+m <- map(f, data = d1,
+         start = list(a = mean(d1$height),
+                      b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0,
+                      sigma = sd(d1$height)))
+
+mpredict <- link(m, data = data.frame(age = age.seq))
+mu.mean <- apply(mpredict, 2, mean)
+mu.pi <- apply(mpredict, 2, pi)
+heightout <- sim(m, data = data.frame(age = age.seq))
+height.pi <- apply(m)
+
+plot(d1$age, d1$height)
+lines(mu.mean, age.seq)
+shade(mu.pi, age.seq)
+
+k <- coef(m)
+mu <- k['a'] + k['b1']*d2$age + k['b2']*d2$age^2 + k['b3']*d2$age^3 +
+  k['b4']*d2$age^4 + k['b5']*d2$age^5 + k['b6']*d2$age^6
+
+dev.m <- (-2)*sum( dnorm( d2$height , mu , k['sigma'] , log=TRUE ) )
+
+WAIC(m)
+
+### chapter 7
+# 7H1
+data("tulips")
+d <- tulips
+d$blooms_std <- d$blooms/max(d$blooms)
+d$shade_cent <- d$shade - mean(d$shade)
+d$water_cent <- d$water - mean(d$water)
+
+m7H1 <- quap(
+  alist(
+    blooms_std ~ dnorm(mu, sigma),
+    mu <- a[bed] + bW*water_cent + bS*shade_cent + bSW*shade_cent*water_cent,
+    a[bed] ~ dnorm(0.5, 0.25),
+    bW ~ dnorm(0, 0.25),
+    bS ~ dnorm(0, 0.25),
+    bSW ~ dnorm(0, 0.25),
+    sigma ~ dexp(1)
+  ), data = d
+)
+
+precis(m7H1, depth = 2)
+
+# 7H2
+m7H2 <- quap(
+  alist(
+    blooms_std ~ dnorm(mu, sigma),
+    mu <- a + bW*water_cent + bS*shade_cent + bSW*shade_cent*water_cent,
+    a ~ dnorm(0.5, 0.25),
+    bW ~ dnorm(0, 0.25),
+    bS ~ dnorm(0, 0.25),
+    bSW ~ dnorm(0, 0.25),
+    sigma ~ dexp(1)
+  ), data = d
+)
+
+precis(m7H2, depth = 2)
+
+compare(m7H1, m7H2)
 

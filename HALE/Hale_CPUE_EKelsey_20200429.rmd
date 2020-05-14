@@ -1,0 +1,131 @@
+---
+title: "Hale_CPUE_EKelsey_20200429"
+author: "EKelsey"
+date: "4/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+## set working directory
+setwd("~/WERC-SC/HALE")
+
+## load libraries
+library(data.table)
+library(dplyr)
+library(lubridate)
+library(mosaic)
+
+## read in file
+read.csv('~/WERC-SC/HALE/catch_10_traploc_weeks_baitTypes_predEvent_w14_20190220.csv',stringsAsFactors = FALSE) %>% 
+  mutate(date = mdy(date), 
+         # add variable IDing the check week so all traps in a given week are group together by trapline
+         Week = as.numeric(as.period(lubridate::interval(min(date), date, unit = "week"))),
+         # Week = as.numeric(as.period(lubridate::interval(min(date), date) %/% weeks(1))), 
+         # rank predEvent by importance
+         predEvent = factor(predEvent, level = c('catCaught', 'mongooseCaught', 'ratCaught', 'mouseCaught', 'birdOtherCaught', 'baitLost', 'trapTriggered', 'none'), ordered = TRUE))-> catches
+```
+
+
+```{r}
+## count the number of Trapline events (weeklyCatches) per week (aka number of traps in the trapline)
+trapsPerLineWeek <- catches %>%
+  group_by(Trapline, Year, Month, Week) %>%
+  dplyr::summarize(NTraps = n())
+
+# count number of each predEvent per week per trapline
+predEventsPerLineWeek <- catches %>% 
+  group_by(Trapline, Year, Week, Month, predEvent) %>% 
+  dplyr::summarise(NEvents = n()) 
+
+## number of predEvents per number of traps, for each week on each Trapline
+predEventPUE <- merge(trapsPerLineWeek, predEventsPerLineWeek) %>% 
+  mutate(CPUE = NEvents/NTraps) %>% 
+  arrange(Trapline, Year, Week, predEvent) 
+
+## from predEventPUE, need to add back in all predEvents that have a CPUE of 0
+# identify what variables should be consistent for each week
+varFill <- group_by(predEventPUE, Trapline, Week) %>% 
+  summarise(Year = first(Year), 
+            Month = first(Month),
+            NTraps = first(NTraps))
+
+## save predEventPUE data file
+write.csv(predEventPUE, file = '~/WERC-SC/HALE/TraplinePredEventPUE_11_20161209.csv',
+          row.names = FALSE) 
+
+```
+
+
+## Data Validation
+```{r}
+## data validation: ID how many times a trap was checked multiple times in a week (and thus only the most important trap event was chosen)
+uniqueTrapsPerWeek <- catches %>% 
+  filter(!TrapChecked) # first remove dates when trap hadn't been checked in >14 days
+  group_by(Trapline, Week, TrapNum) %>% 
+  summarize(N = n()) %>% 
+  filter(N > 1) %>% 
+  arrange(-N)
+  
+### summary stats and graphs of predEventPUE
+# frequency of predEvents per trapline per year
+traplineCPUE <- 
+  predEventPUE %>%
+  group_by(Trapline, Year, predEvent) %>%
+  summarize(annualFreq = mean(CPUE)) # summarize(sumWeeklyFreq = sum(CPUE))
+
+count <- weeklyCatches %>% 
+  group_by(predEvent) %>% 
+  count(weeks)
+```
+
+
+
+
+## Plots
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+# plot of predEvents per trapline per year
+ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
+  geom_point() +
+  labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort') +
+  facet_wrap(~ Trapline, nrow = 4) +
+  scale_y_log10() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=60, hjust=1))
+
+#plot cat, rat, mongoose or mice caught per trapline per year
+preds <- ggplot(traplineCPUE, aes(Year, annualFreq, color=predEvent)) +
+  geom_point() +
+  labs(x = 'Year', y = 'Annual Frequency of Events per Unit Effort') +
+  facet_wrap(~ Trapline, nrow = 4) +
+  scale_y_log10() +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle=60, hjust=1)) 
+  # ylim(0, 0.4)
+preds %+% subset(traplineCPUE, predEvent %in% c("catCaught", "mongooseCaught", "ratCaught", "mouseCaught"))
+
+# a historgram of count of different trap event types
+hist <-  qplot(factor(predEvent), data = weeklyCatches, geom = "bar") +
+  labs(x = 'Trap Event Type', y = 'Number of Events (years 2000 - 2015)') +
+    theme_bw() # + theme(axis.text.x = element_text(angle=25, hjust=1))
+
+## plot of predEvents per trapline per month
+monthlyTraplineCPUE$Month  <- factor(monthlyTraplineCPUE$Month, as.character(monthlyTraplineCPUE$Month))
+
+ggplot(monthlyTraplineCPUE, aes(Month, monthlyFreq), stat = monthlyN) + # , color = Year)) +
+  geom_boxplot() + # geom_point() 
+  # scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(x = 'Month', y = 'Monthly Frequency') +
+  facet_wrap(~ predEvent, nrow = 4) +
+  # scale_x_discrete(limits=c(2,3,4,5,6,7,8,9,10,11)) +
+  scale_y_log10() +
+  theme_bw() 
+  # theme(axis.text.x = element_text(angle=60, hjust=1))
+
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

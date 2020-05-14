@@ -64,6 +64,7 @@ varFill <- group_by(predEventPUE, Trapline, Week) %>%
             Month = first(Month),
             NTraps = first(NTraps))
 # make a grid of each trapline, week, predEvent
+
 CPUEgrid <- expand.grid(Trapline = unique(predEventPUE$Trapline), Week = unique(predEventPUE$Week), predEvent = unique(predEventPUE$predEvent)) %>% 
   mutate(dummyPUE = 0) %>% 
   merge(predEventPUE, all.x = TRUE) %>% 
