@@ -9,6 +9,7 @@ setwd("~/WERC-SC/MHIatlas")
 library(plyr)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 
 ### load data
 ## WTSH
@@ -53,7 +54,7 @@ RTTRstruc <- RTTR %>%
 
 structure <- ggplot(RTTRstruc, aes(NestLoc, fill = Structure)) +
   geom_bar(position = "fill") +
-  ylab("Prop of nests in diff habitat structures") + xlab("Nest Location at KPNWR") +
+  ylab("Prop of nests in diff habitat structures") + xlab("Nest Location at KPNWR") + labs(fill = "Habitat Structure") +
   scale_fill_brewer(palette="BrBG") +
   theme_bw()
 structure %+% subset(RTTRstruc, NestLoc %in% c("Crater Hill", "Kilauea Point", "Mokolea"))
@@ -65,8 +66,8 @@ RTTRland <- RTTR %>%
 
 landform <- ggplot(RTTRland, aes(NestLoc, fill = Landform)) +
   geom_bar(position = "fill") +
-  ylab("Prop of nests on diff landforms") + xlab("Nest Location at KPNWR") +
-  scale_fill_brewer(palette="RdGy") +
+  ylab("Prop of nests on diff landforms") + xlab("Nest Location at KPNWR") + labs(fill = "Landform Type") +
+  scale_fill_brewer(palette="BrBG") +
   theme_bw()
 landform %+% subset(RTTRland, NestLoc %in% c("Crater Hill", "Kilauea Point", "Mokolea"))
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/MHIatlas/RTTR_nestLand.pdf")
@@ -76,8 +77,8 @@ RTTRveg <- RTTR %>%
 
 vegdom <- ggplot(RTTRveg, aes(NestLoc, fill = VegDom1)) +
   geom_bar(position = "fill") +
-  ylab("Prop of nests on dominant vegetation types") + xlab("Nest Location at KPNWR") +
-  scale_fill_brewer(palette="RdYlGn") +
+  ylab("Prop of nests on dominant vegetation types") + xlab("Nest Location at KPNWR") + labs(fill = "Dominant Vegetation") +
+  scale_fill_brewer(palette="BrBG") +
   theme_bw()
 vegdom %+% subset(RTTRveg, NestLoc %in% c("Crater Hill", "Kilauea Point", "Mokolea"))
 ggsave(width = 8.5, height = 5, dpi=300, filename = "~/WERC-SC/MHIatlas/RTTR_nestVeg.pdf")

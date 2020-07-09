@@ -116,14 +116,15 @@ metadata_catches <- catches_std %>%
   summarise(ASSP = n(),
             ASSPstd = sum(std == "1"),
             BPct = n(),
+            BPct_std = sum(std == "1"),
             BP_Y = sum(assumeBreed == "Y"),
-            BP_N = sum(assumeBreed == "N")) %>%
+            BP_Ystd = sum(assumeBreed == "N" | std == "1")) %>%
   right_join(metadata, by= c("sessionID", "Site")) %>%
   # filter(min_std > 0) %>%
   mutate(CPUEraw =  ASSP/min,
          CPUEstd = ASSPstd/min_std,
          BPfreq_Y = BP_Y/BPct,
-         BPfreq_N = BP_N/BPct) %>%
+         BPfreq_Ystd = BP_Ystd/BPct_std) %>%
   select(sessionID, Island, Location, Site, Site_Name, Lat, Long, month, day, year, seriesID, App_sunset, std_ending,
          net_open_1, net_close_1, net_open_2, net_close_2, net_open_3, net_close_3, net_open_4, net_close_4, net_open_5, net_close_5,
          min, min_std, ASSP, ASSPstd, CPUEraw, CPUEstd, BPfreq_Y, BPfreq_N, Net_mesh:Flagged_notes)

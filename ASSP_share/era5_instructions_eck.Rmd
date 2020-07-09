@@ -1,0 +1,438 @@
+---
+title: "How to Join ERA5 data to a Time Series"
+author: Abram B. Fleishman
+date: "29 June 2020"
+output: html_notebook
+---
+
+This notebook shows you how to prep a time series for attaching `ERA5` data.  
+
+### Load your data
+
+To be able to download the correct `ERA5` data files, we need to do some data
+wrangling.  First we will load it and do some time-wrangling for attachment.
+
+```{r}
+setwd("~/WERC-SC/ASSP_share")
+
+#install any missing packages
+install.packages(c("raster","ncdf4","oce","dplyr", "lubridate","tidyr","purrr","here","reticulate"))
+
+# A key package for this workflow is `velox` (for fast raster extraction).  It is
+# no longer maintained and may notwork with new versions of R.  We can discus
+# ideas for working around it if you have issues, but for now, installing from
+# github is the best option
+
+devtools::install_github("hunzikp/velox")
+
+library(easypackages)
+libraries("raster","ncdf4","velox","oce","dplyr", "lubridate","tidyr","purrr","here","reticulate")
+
+# set the local time zone
+project_tz = "America/Los_Angeles"
+
+# load the data
+dat_raw<-readRDS(here::here("Data", "ASSPwx.csv")) 
+
+#look at the data
+head(dat_raw)
+
+# create a DF with one row per hour of effort 
+dat<-dat_raw %>% 
+  rowwise %>% 
+  mutate(DateTime_h=seq(from = floor_date(start,unit = "hour"),
+                        to = ceiling_date(end,"hour"),
+                        by = "1 hour") %>%
+           unique %>% 
+           list) %>%
+  unnest(cols = c(DateTime_h)) %>% 
+  mutate(DateTime_h = DateTime_h %>% #fix the time zones
+           force_tz(project_tz) %>% 
+           with_tz("UTC"),
+         Longitude360=ifelse(long<0,long+360,long),
+         Latitude=lat)
+
+head(dat) %>% as.data.frame()
+
+```
+
+
+### Download data from Climate Data Store
+
+To access the Climate Data Store,  you must first register for an account, follow the directions for setting up your computer to access the api ("install" the key), and download the API client (a python package).  Please go to [this page](https://cds.climate.copernicus.eu/api-how-to) for instructions.
+
+Once things are set up, we can run `python` in `RStudio` (version 1.2+) using the `reticulate` package.  To do so, must point `RStudio` to the `python` executable with the `use_python()` function.
+
+```{r}
+
+use_python(python = "C:/Users/ConservationMetrics/AppData/Local/r-miniconda/python.exe")
+```
+
+The we can define `python` chunks just like we would `R` chunks.
+
+```{r}
+# these will give you the values needed for downloading via python
+floor(min(dat$lat))
+ceiling(max(dat$lat))
+floor(min(dat$long)+360)
+ceiling(max(dat$long)+360)
+
+dates_to_download<-dat %>% 
+  group_by(year=year(DateTime_h),
+           month=month(DateTime_h),
+           day=day(DateTime_h),add=T) %>%
+  count %>% 
+  as.data.frame()
+
+dates_to_download
+
+```
+
+Use the values above to populate the info for `python` below.
+
+```{python, python.reticulate = TRUE,eval=F}
+
+# load the climate data store API library
+import cdsapi
+
+# Define the years and months you want the data for
+years=['1994']
+# years=['1994','2004','2005','2006','2009','2011','2014','2015','2016','2017','2018']
+months=[4,5,6,7,8,9]
+
+# define the bounding box for the area you are interested in downloading.
+lats = [32, 35]
+lons = [238, 242]
+
+# Start the client (and call it 'c')
+c = cdsapi.Client()
+
+for jj in years:
+		c.retrieve(
+			'reanalysis-era5-single-levels',
+			{
+				'product_type':'reanalysis',
+				'format':'netcdf', # Supported format: grib and netcdf. Default: grib
+				'grid': [0.25, 0.25],# Latitude/longitude grid: east-west (longitude) and north-south resolution (latitude). Default: 0.25 x 0.25
+				'area': [lats[0], lons[0], lats[1], lons[1]],# North, West, South, East. Default: global
+				'variable':[
+      '10m_u_component_of_wind','10m_v_component_of_wind','2m_dewpoint_temperature',
+      '2m_temperature','low_cloud_cover','mean_sea_level_pressure',
+      'mean_wave_direction','mean_wave_period','sea_surface_temperature',
+      'significant_height_of_combined_wind_waves_and_swell','surface_pressure','total_cloud_cover',
+      'total_precipitation'
+      ],
+				'year':jj,
+				'month':months,
+				'day':[
+					'01','02','03',
+					'04','05','06',
+					'07','08','09',
+					'10','11','12',
+					'13','14','15',
+					'16','17','18',
+					'19','20','21',
+					'22','23','24',
+					'25','26','27',
+					'28','29','30',
+					'31'
+				],
+				'time':[
+					'00:00','01:00','02:00',
+					'03:00','04:00','05:00',
+					'06:00','07:00','08:00',
+					'09:00','10:00','11:00',
+					'12:00','13:00','14:00',
+					'15:00','16:00','17:00',
+					'18:00','19:00','20:00',
+					'21:00','22:00','23:00'
+				]
+			},
+			'era5_'+jj+'_N'+'{:02d}'.format(lats[1])+'_W'+'{:03d}'.format(lons[0])+'_S'+'{:02d}'.format(lats[0])+'_E'+'{:03d}'.format(lons[1])+'.nc')
+```
+
+### Extracting and attaching WX to your Data
+
+Now that you have downloaded the weather data as rasters lets look at a few.
+
+### Load weather data
+
+```{r}
+
+
+# ERA5 functions
+
+#' Read NC names
+read_nc_names<-function(nc){
+  data.frame(name=names(nc$var),
+             longname=purrr::map_chr(names(nc$var),
+                                     function(x)nc$var[[x]]$longname))
+}
+
+#' Read ERA5 Raster Stack
+read_stack<-function(file_list,varname){
+  temp<-lapply(file_list, function(x)stack(x,varname=varname))
+  stack(temp)
+}
+
+#' Read a date and extract with velox
+read_vx_date<-function(dat,spdf,datex){
+  vx<- velox(dat[[datex]])
+  vx$extract(spdf, fun=function(x)mean(x,na.rm=T))
+}
+
+# List your files (can be a single file)
+files<-list.files(here::here('ERA5'),pattern = "\\.nc$",full.names = T,recursive = T)
+files<-as.character(files)
+
+# opena connection to one of the files
+nc<-files[1] %>% ncdf4::nc_open() 
+
+# you can see  info about this file by printing it, but there is too much info
+# to see what we are looking for.
+nc
+
+# So use the helper function from the ERA5 package I am writing
+names<-read_nc_names(nc)
+
+# Now that we know the names we can load the files with the read_stack function
+# from the ERA5 package I am writing
+u10<-read_stack(files,varname = "u10")
+u10
+plot(u10[[1:4]])
+
+# Go ahead and load all the vars
+v10<-read_stack(files,varname = "v10")
+swh<-read_stack(files,varname = "swh")
+mwd<-read_stack(files,varname = "mwd")
+tp<- read_stack(files,varname = "tp")
+tcc<-read_stack(files,varname = "tcc")
+sp<- read_stack(files,varname = "sp")
+sst<-read_stack(files,varname = "sst")
+mwp<-read_stack(files,varname = "mwp")
+msl<-read_stack(files,varname = "msl")
+lcc<-read_stack(files,varname = "lcc")
+t2m<-read_stack(files,varname = "t2m")
+d2m<-read_stack(files,varname = "d2m")
+
+
+```
+
+
+### Create a "Dates" table
+
+We are going to loop through the data and with each loop we will attach the data
+to our data.frame of interest, but first we must create a table of dates to loop
+through. First we will extract the "dates" from the names of the layers in the
+raster stacks.
+
+```{r}
+# Create a date table for the ERA5 vars
+DateTable<-data.frame(xdate=names(tp),
+                      DateTime=ymd_hms(gsub("X","",names(tp)),tz="UTC") %>%
+                        with_tz(project_tz)
+) %>%
+  mutate(
+    year=year(DateTime),
+    month=month(DateTime),
+    day=day(DateTime),
+    hour=hour(DateTime),
+    minute=minute(DateTime),
+    second=second(DateTime),
+    Date=as.Date(DateTime)
+  )
+```
+
+### Loop through Dates and attach
+
+Now the moment we have all been waiting for!!! We are going to loop through each
+raster layer and extract the mean value within 20km or 40km of each point (for
+atmospheric and oceanic vars respectively).
+
+```{r}
+
+# Get the unique Dates in the dat data frame for which we will loop through
+Dates<-sort(unique(dat$DateTime_h))
+
+# go through each Date in the dat data, extract the vars at each of the
+# points with a buffer, aggregate the buffered data to end up with a single
+# value for each point.
+
+buff <- 20000
+
+# Create empty columns to populate
+dat$tot_precip<-NA
+dat$wind_u<-NA
+dat$wind_v<-NA
+dat$wave_height<-NA
+dat$wave_dir<-NA
+dat$wave_period<-NA
+dat$tot_cloud<-NA
+dat$low_cloud<-NA
+dat$pressure<-NA
+dat$surface_pressure<-NA
+dat$sst<-NA
+dat$temp_c<-NA
+dat$dew_point<-NA
+
+for(i in 1:length(Dates)){
+  
+  print(paste("i =",i,"; Date/Time =",Dates[i]))
+  
+  # This is the index for a single date/time      
+  datex<-as.character(DateTable$xdate[DateTable$DateTime==Dates[i]])[1]
+  
+  # If the datetime isNA skip
+  if(length(datex)<1|is.na(datex)) next
+  
+  # subset the specific rows in your data that corrispond to datex
+  dat_subseter<-which(dat$DateTime_h==Dates[i])
+  
+  # Create a SpatialPointsDataFrame for the atmospheric variables
+  pt<-data.frame(Longitude360=dat$Longitude360[dat_subseter],
+                 Latitude=dat$Latitude[dat_subseter])
+  
+  coordinates(pt)<-cbind(dat$Longitude360[dat_subseter],
+                         dat$Latitude[dat_subseter])
+  crs(pt)<-CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +lon_wrap=180")
+  
+  # reproject into an equalarea projection
+  pt_sp<-spTransform(pt,CRS("+proj=utm +zone=4 +north"))
+  # buffer by buff (at least 20km?)
+  spol <- rgeos::gBuffer(pt_sp, width=buff, byid=TRUE)
+  
+  #reproejct in to latlong again
+  spdf <- SpatialPolygonsDataFrame(spol, data.frame(id=1:length(spol)), FALSE)
+  spdf <- spTransform(spdf,CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +lon_wrap=180"))
+  
+  # repeat for the Oceanic vars (bigger buffer)
+  spol1 <- rgeos::gBuffer(pt_sp, width=buff*2, byid=TRUE)
+  
+  spdf1 <- SpatialPolygonsDataFrame(spol1, data.frame(id=1:length(spol1)), FALSE)
+  spdf1 <- spTransform(spdf1,CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +lon_wrap=180"))
+  
+  if(i==1){
+    plot(u10[[datex]])
+    points(pt)
+    plot(spdf1,add=T)
+    maps::map('world2',add = T)
+  }
+  dat$tot_precip[dat_subseter] <- read_vx_date(dat=tp,spdf = spdf,datex=datex)
+  
+  dat$wind_u[dat_subseter] <- read_vx_date(dat=u10,spdf = spdf,datex=datex)
+  
+  dat$wind_v[dat_subseter] <- read_vx_date(dat=v10,spdf = spdf,datex=datex)
+  
+  dat$wave_height[dat_subseter] <- read_vx_date(dat=swh,spdf = spdf1,datex=datex)
+  
+  dat$wave_dir[dat_subseter] <- read_vx_date(dat=mwd,spdf = spdf1,datex=datex)
+  
+  dat$wave_period[dat_subseter] <- read_vx_date(dat=mwp,spdf = spdf1,datex=datex)
+  
+  dat$tot_cloud[dat_subseter] <- read_vx_date(dat=tcc,spdf = spdf,datex=datex)
+  
+  dat$low_cloud[dat_subseter] <- read_vx_date(dat=lcc,spdf = spdf,datex=datex)
+  
+  dat$pressure[dat_subseter] <- read_vx_date(dat=msl,spdf = spdf,datex=datex)
+  
+  dat$surface_pressure[dat_subseter] <- read_vx_date(dat=sp,spdf = spdf,datex=datex)
+  
+  dat$sst[dat_subseter] <- read_vx_date(dat=sst,spdf = spdf1,datex=datex)
+  
+  dat$temp_c[dat_subseter] <- read_vx_date(dat=t2m,spdf = spdf,datex=datex)
+  
+  dat$dew_point[dat_subseter] <- read_vx_date(dat=d2m,spdf = spdf,datex=datex)
+  
+}
+
+```
+### add Moon variables
+
+The last thing we will do is add some moon variables.  We will use the oce package
+```{r}
+# Moon data -------------------------------------------------------------------
+
+# generate moon data and use moon altitude to determine if the moon was above
+# the horizon
+
+# The time needs to be in UTC 
+tz(dat$DateTime_h)
+
+moonInfo<-oce::moonAngle(dat$DateTime_h,
+                    longitude =dat$long,
+                    latitude = dat$lat)
+
+moonInfo<-bind_rows(moonInfo)
+
+# T or F for if moon is above horizon 
+dat$Moonup<-ifelse(moonInfo$altitude>0,1,0) 
+dat$MoonAltitude<-moonInfo$altitude
+dat$Illu<-moonInfo$illuminatedFraction
+
+```
+
+
+# Save
+
+And there you have it, this concludes the instructions on how to use the era5 data attacher!
+
+```{r}
+# summarize the mean per session (group by all the vars you want in the final dataset)
+dat_out<-dat %>% group_by(session_ID,
+                          island_code,
+                          site_code,
+                          lat,
+                          long,
+                          month,
+                          day,
+                          start,
+                          end) %>% 
+  mutate(tot_precip=ifelse(tot_precip<0,0,tot_precip),
+         wave_height=ifelse(wave_height<0,NA,wave_height),
+         wave_period=ifelse(wave_period<0,NA,wave_period),
+         tot_cloud=ifelse(tot_cloud<0,NA,tot_cloud),
+         low_cloud=ifelse(low_cloud<0,NA,low_cloud),
+         pressure=ifelse(pressure<0,NA,pressure),
+         surface_pressure=ifelse(surface_pressure<0,NA,surface_pressure),
+         sst=ifelse(sst<0,NA,sst),
+         temp_c=ifelse(temp_c<0,NA,temp_c),
+         dew_point=ifelse(dew_point<0,NA,dew_point)) %>% 
+  summarise(tot_precip = mean(tot_precip ,na.rm=T),
+            wind_u = mean(wind_u ,na.rm=T),
+            wind_v = mean(wind_v ,na.rm=T),
+            wave_height = mean(wave_height ,na.rm=T),
+            wave_dir = mean(wave_dir ,na.rm=T),
+            wave_period = mean(wave_period ,na.rm=T),
+            tot_cloud = mean(tot_cloud ,na.rm=T),
+            low_cloud = mean(low_cloud ,na.rm=T),
+            pressure = mean(pressure/100 ,na.rm=T),
+            surface_pressure = mean(surface_pressure/100 ,na.rm=T),
+            sst = mean(sst-273 ,na.rm=T),
+            temp_c = mean(temp_c ,na.rm=T),
+            dew_point = mean(dew_point-273 ,na.rm=T),
+            Moonup = mean(Illu ,na.rm=T),
+            MoonAltitude = mean(MoonAltitude ,na.rm=T),
+            Illu = mean(Illu ,na.rm=T))
+
+par(mfrow=c(3,6))
+hist(dat_out$tot_precip,breaks=30)
+hist(dat_out$wind_u,breaks=30)
+hist(dat_out$wind_v,breaks=30)
+hist(dat_out$wave_height,breaks=30)
+hist(dat_out$wave_dir,breaks=30)
+hist(dat_out$wave_period,breaks=30)
+hist(dat_out$pressure,breaks=30)
+hist(dat_out$tot_cloud,breaks=30)
+hist(dat_out$low_cloud,breaks=30)
+hist(dat_out$surface_pressure,breaks=30)
+hist(dat_out$sst,breaks=30)
+hist(dat_out$dew_point,breaks=30)
+hist(dat_out$temp_c,breaks=30)
+hist(dat_out$Illu,breaks=30)
+hist(dat_out$MoonAltitude,breaks=30)
+hist(dat_out$Moonup,breaks=30)
+
+saveRDS(dat_out,here::here("Data","mistnet_w_weather.rds"))
+write.csv(dat_out,here::here("Data","mistnet_w_weather.csv"),row.names=F)
+```
+

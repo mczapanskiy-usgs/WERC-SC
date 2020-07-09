@@ -643,6 +643,7 @@ dev.m <- (-2)*sum( dnorm( d2$height , mu , k['sigma'] , log=TRUE ) )
 
 WAIC(m)
 
+#------------------------------------------------------------------------
 ### chapter 7
 # 7H1
 data("tulips")
@@ -681,4 +682,372 @@ m7H2 <- quap(
 precis(m7H2, depth = 2)
 
 compare(m7H1, m7H2)
+
+# 6H3 
+data(rugged)
+r <- rugged
+rug <- r[ complete.cases(r$rgdppc_2000) , ]
+rug$logrgdppc_2000 <- log(rug$rgdppc_2000)
+rug2 <- rug[ rug$country!="Seychelles" , ]
+
+
+  
+
+f7h3.1 <- map(
+  alist(
+    logrgdppc_2000 ~ dnorm( mu , sigma ) ,
+    mu <- a + bA*cont_africa + br*rugged +
+      bAr*cont_africa*rugged,
+    a ~ dnorm(5, 10),
+    c(bA,br,bAr) ~ dnorm(0,10),
+    sigma ~ dunif(0,50)
+  ) ,
+  data=rug2 )
+
+
+
+rug2 <- rug[!rug$country==c("Seychelles"),]
+
+
+f7h3.2 <- map(
+  alist(
+    logrgdppc_2000 ~ dnorm(mu, sigma),
+    mu <- a + bC*cont_africa + bR*rugged + bCR*cont_africa*rugged,
+    a ~ dnorm(5, 10),
+    bC ~ dnorm(0, 10),
+    bR ~ dnorm(0, 10),
+    bCR ~ dnorm(0, 10)
+  ), data = rug2,
+)
+
+mu.rug <- link(f7h3.2, data = data.frame(rugged = seq(0,7, length = 30), cont_africa = 1))
+mu.rug <- link(f7h3.2, data = data.frame(rugged = seq(0,7, length = 30), cont_africa = 0))
+
+plot(rug$rugged, rug$logrgdppc_2000)
+str(mu.rug1)
+
+mu.rug1.mean <- apply(mu.rug1, 2, mean)
+mu.rug0.mean <- apply(mu.rug0, 2, mean)
+
+lines(rugged.seq, mu.rug1.mean)
+lines(rugged.seq, mu.rug0.mean)
+
+
+# 6H4
+data("nettle")
+d2 <- nettle
+head(d2)
+d2$langCap <- d2$num.lang/d2$k.pop
+d2$loglang <- log(d2$langCap)
+d2$logarea <- log(d2$area)
+
+
+fH4.1 <- map(
+  alist(
+    loglang ~ dnorm(mu, theta),
+    mu <- a + bA*logarea + bG*mean.growing.season,
+    a ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bG ~ dnorm(0, 10),
+    theta ~ dunif(0,10)
+  ), data = d2
+)
+precis(fH4.1)
+
+fH4.2 <- map(
+  alist(
+    loglang ~ dnorm(mu, theta),
+    mu <- a + bA*logarea + bG*sd.growing.season,
+    a ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bG ~ dnorm(0, 10),
+    theta ~ dunif(0,10)
+  ), data = d2
+)
+precis(fH4.2)
+
+fH4.3 <- map(
+  alist(
+    loglang ~ dnorm(mu, theta),
+    mu <- a + bA*logarea + bS*sd.growing.season + bG*mean.growing.season + bGS*sd.growing.season*mean.growing.season,
+    a ~ dnorm(0,10), 
+    bA ~ dnorm(0,10),
+    bS ~ dnorm(0, 10),
+    bG ~ dnorm(0, 10),
+    bGS ~ dnorm(0, 10),
+    theta ~ dunif(0,10)
+  ), data = d2
+)
+
+precis(fH4.2)
+compare(fH4.1, fH4.2, fH4.3)
+plot(coeftab(fH4.1, fH4.2, fH4.3))
+
+#------------------------------------------------------------------------
+### chapter 8
+# 8M1
+data(rugged)
+d <- rugged %>% 
+  mutate(log_gdp = log(rgdppc_2000))
+dd <- d[complete.cases(d$rgdppc_2000), ]
+
+dd <- dd %>% 
+  mutate(log_gdp_std = log_gdp/mean(log_gdp),
+         rugged_std = rugged/max(rugged))
+
+dat_slim <- dd %>% 
+  select(log_gdp, rugged_std, cont_africa)
+
+m1_unif <- map2stan(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR*rugged_std + bA*cont_africa + bAR*rugged_std*cont_africa,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dunif(0,10)
+  ),
+  data = dat_slim , chains = 2)
+
+m1_exp <- map2stan(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR*rugged_std + bA*cont_africa + bAR*rugged_std*cont_africa,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dexp(1)
+  ),
+  data = dat_slim , chains = 2)
+
+precis(m1_unif)
+precis(m1_exp)
+
+plot(m1_unif)
+plot(m1_exp)
+
+#8M1
+m2_cau1 <- map2stan(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR*rugged_std + bA*cont_africa + bAR*rugged_std*cont_africa,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dcauchy(0,1)
+  ),
+  data = dat_slim , chains = 2)
+
+m2_cau2 <- map2stan(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR*rugged_std + bA*cont_africa + bAR*rugged_std*cont_africa,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dcauchy(0,2)
+  ),
+  data = dat_slim , chains = 2)
+
+m2_cau0.5 <- map2stan(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR*rugged_std + bA*cont_africa + bAR*rugged_std*cont_africa,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dcauchy(0,0.5)
+  ),
+  data = dat_slim , chains = 2)
+
+m1_exp1 <- map2stan(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR*rugged_std + bA*cont_africa + bAR*rugged_std*cont_africa,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dexp(1)
+  ),
+  data = dat_slim , chains = 2)
+
+m1_exp0.5 <- map2stan(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR*rugged_std + bA*cont_africa + bAR*rugged_std*cont_africa,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dexp(0.5)
+  ),
+  data = dat_slim , chains = 2)
+
+m1_exp0.25 <- map2stan(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR*rugged_std + bA*cont_africa + bAR*rugged_std*cont_africa,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dexp(0.25)
+  ),
+  data = dat_slim , chains = 2)
+
+precis(m1_exp1)
+precis(m1_exp0.5)
+precis(m1_exp0.25)
+
+precis(m2_cau0.5)
+precis(m2_cau1)
+precis(m2_cau2)
+
+
+plot(m1_exp1)
+plot(m1_exp0.5)
+plot(m1_exp0.25)
+
+plot(m2_cau0.5)
+plot(m2_cau1)
+plot(m2_cau2)
+
+
+#------------------------------------------------------
+### CH 10
+
+data(chimpanzees)
+dchimp <- chimpanzees
+
+h10.quad <- map(
+  alist(
+    pulled_left ~ dbinom(1, p),
+    logit(p) <- a[actor] + (bp + bpC*condition)*prosoc_left,
+    a[actor] ~ dnorm(0,10),
+    bp ~ dnorm(0, 10),
+    bpC ~ dnorm(0, 10)
+  ), data = dchimp)
+
+h10.mcmc <- map2stan(
+  alist(
+    pulled_left ~ dbinom(1, p),
+    logit(p) <- a[actor] + (bp + bpC*condition)*prosoc_left,
+    a[actor] ~ dnorm(0,10),
+    bp ~ dnorm(0, 10),
+    bpC ~ dnorm(0, 10)
+  ), data = dchimp, chains = 2, iter = 2500, warmup = 500)
+
+
+plot(coeftab(h10.mcmc, h10.quad))
+
+h10.mcmc.simp <- map2stan(
+  alist(
+    pulled_left ~ dbinom(1, p),
+    logit(p) <- a + (bp + bpC*condition)*prosoc_left,
+    a ~ dnorm(0, 10),
+    bp ~ dnorm(0, 10),
+    bpC ~ dnorm(0, 10)
+  ), data = dchimp, chains = 2, iter = 2500, warmup = 500)
+
+compare(h10.mcmc, h10.mcmc.simp)
+
+library(MASS)
+data(eagles)
+head(eagles)
+
+eagles$P1 <- ifelse(eagles$P == "L", 1, 0)
+eagles$A1 <- ifelse(eagles$A == "A", 1, 0)
+eagles$V1 <- ifelse(eagles$V == "L", 1, 0)
+
+
+h10.eagles <- map2stan(
+  alist(
+    y ~ dbinom(n, p),
+    logit(p) <- a + bp*P1 + bv*V1 + ba*A1,
+    a ~ dnorm(0, 10),
+    bp ~ dnorm(0, 5),
+    bv ~ dnorm(0, 5), 
+    ba ~ dnorm(0, 5)
+  ), data = eagles, chains = 2, iter = 2500, warmup = 500
+)
+
+post.stan <- extract.samples(h10.eagles)
+
+pred.eg <- link(h10.eagles, post = post.stan, data = eagles)
+
+pred.mu <- apply(pred.eg, 2, mean)
+pred.PI <- apply(pred.eg, 2, PI, prob = 0.89)
+
+
+#10H4
+data("salamanders")
+head(salamanders)
+sala <- salamanders
+
+stdz <- function(x) (x-mean(x))/sd(x)
+sala$PCTCOVERstd <- stdz(sala$PCTCOVER)
+sala$FORESTAGEstd <- stdz(sala$FORESTAGE)
+
+h10salam.1 <- map(
+  alist(
+    SALAMAN ~ dpois(lambda),
+    log(lambda) <- a + bc*PCTCOVERstd,
+    a ~ dnorm(0, 1),
+    bc ~ dnorm(0, 1)), 
+  data = sala)
+
+h10salam.2 <- map2stan(
+  alist(
+    SALAMAN ~ dpois(lambda),
+    log(lambda) <- a + bc*PCTCOVERstd,
+    a ~ dnorm(0, 1),
+    bc ~ dnorm(0, 1)), 
+  data = sala, chains = 2, iter = 2500, warmup = 500)
+
+
+#------------------------------------------------------
+### CH 11
+library(dplyr)
+data("Hurricanes")
+
+#11H1
+m1 <- quap(
+  alist(
+    deaths ~ dpois(lambda),
+    log(lambda) <- a + dF*femininity,
+    a ~ dnorm(0, 10),
+    dF ~ dnorm(0, 10)
+  ), Hurricanes
+)
+
+precis(m1, digits = 3)
+plot(precis(m1))
+
+pred.link <- link(m1)
+
+deadly <- Hurricanes %>% 
+  filter(deaths >= 50)
+
+
+#11H2
+m2 <- map2stan(
+  alist(
+    deaths ~ dgampois(mu, theta),
+    log(mu) <- a + dF*femininity,
+    a ~ dnorm(0, 10),
+    dF ~ dnorm(0, 10),
+    theta ~ dunif(0, 10)
+  ), data = Hurricanes, chains = 4, log_lik = TRUE)
+
+apply(data, 2, anyNA)
+
+
+
+
 
