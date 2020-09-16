@@ -16,7 +16,7 @@ wrangling.  First we will load it and do some time-wrangling for attachment.
 setwd("~/WERC-SC/ASSP_share")
 
 #install any missing packages
-install.packages(c("raster","ncdf4","oce","dplyr", "lubridate","tidyr","purrr","here","reticulate"))
+# install.packages(c("raster","ncdf4","oce","dplyr", "lubridate","tidyr","purrr","here","reticulate"))
 
 # A key package for this workflow is `velox` (for fast raster extraction).  It is
 # no longer maintained and may notwork with new versions of R.  We can discus
@@ -32,7 +32,7 @@ libraries("raster","ncdf4","velox","oce","dplyr", "lubridate","tidyr","purrr","h
 project_tz = "America/Los_Angeles"
 
 # load the data
-dat_raw<-readRDS(here::here("Data", "ASSPwx.csv")) 
+dat_raw<-readRDS("ASSP_share", "ASSPwx.csv") # here::here
 
 #look at the data
 head(dat_raw)

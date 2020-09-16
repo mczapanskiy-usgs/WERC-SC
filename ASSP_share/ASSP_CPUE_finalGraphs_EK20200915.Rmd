@@ -1,0 +1,666 @@
+---
+title: "ASSP_CPUE_finalGraphs.rmd"
+author: "EKelsey & ADuVall"
+date: "7/8/2020"
+output: pdf_document
+---
+This is `r paste0("v.", (Sys.Date()))`
+
+## STORM-PETREL MISTNETTING CPUE GRAPHS FOR FINAL NFWF REPORT
+# this script creates final graphs representing CPUE across years, between sites, and related to other variables
+
+```{r message = FALSE}
+### SET WORKING DIRECTORY
+# setwd("~/WERC-SC/ASSP_share")
+
+## LOAD LIBRARIES
+library(tidyr)
+library(dplyr)
+library(lubridate)
+library(hms)
+library(tidyverse)
+library(ggplot2)
+library(EnvStats)
+library(here)
+# library(calecopal)
+library(cowplot)
+library(anchors)
+library(gridExtra)
+library(pastecs)
+
+
+### READ IN DATA
+banding <- readRDS(here("ASSP_share", "captures.RDS"))
+metadata <- readRDS(here("ASSP_share", "cpue.RDS"))
+
+## Filter data to ASSP species and remove SNRs and unbanded individuals 
+ASSP <- banding %>% 
+  filter(species == "ASSP" & recapture != "SNR" & band_no != "notbanded") # 3799 observations
+   
+
+ASSP_BP <- ASSP %>% 
+  filter(BP != "NR" & BP != "NA") %>% 
+  mutate(assumeBreed = mosaic::derivedFactor(
+                "Y" = (BP == "B" | BP == "b" | BP == "2" | BP == "3" | BP == "4"),
+                "N" = (BP == "D" | BP == "d" | BP == "0" | BP == "5" | BP == "PD" | BP == "pd" | BP == "1" | BP == "1.5" | BP == "4.5"),
+                .default = "ND")) %>% 
+  left_join(metadata, by = c("site_code", "session_ID", "lat", "long")) %>% 
+  mutate(std = if_else(std_ending > capture_date, "1", "0"))
+
+metadata_BP <- ASSP_BP %>%
+  group_by(session_ID, site_code) %>%
+  summarise(BPct = n(),
+            BPct_std = sum(std == "1"),
+            BP_Y = sum(assumeBreed == "Y"), # number of birds that have a broodpatch (2-4, B)
+            BP_Ystd = sum(assumeBreed == "Y" & std == "1")) %>% # number of birds that have a have a broodpatch and were caught within the std time 
+  right_join(metadata, by= c("session_ID", "site_code")) %>%
+  mutate(BPfreq_Y = BP_Y/BPct, # frequency of birds that have a broodpatch
+         BPfreq_Ystd = BP_Ystd/BPct_std,
+         CPUEbrd = BP_Y/min,
+         CPUEbrd_std = BP_Ystd/min_std) 
+
+unbanded <- banding %>%
+  filter(species == "ASSP" & band_no == "notbanded") # 20 unbanded ASSP
+```
+
+# Summary Statistics
+```{r summaries}
+# CPUEraw
+summary(metadata$CPUEraw)
+stat.desc(metadata$CPUEraw)
+
+# CPUEstd
+summary(metadata$CPUEstd)
+stat.desc(metadata$CPUEstd)
+
+# broodpatch frequency
+summary(metadata$BPfreq_Y)
+stat.desc(metadata$BPfreq_Y)
+# summary(metadata$BPfreq_N)
+
+sites <- metadata %>%
+  group_by(island_code, site_name) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+
+months <- metadata %>%
+  group_by(session_month) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+
+species <- banding %>%
+  group_by(species) %>%
+  summarize(n=n()) %>%
+  arrange(desc(n))
+```
+
+#### CPUE graphs
+# month and year
+
+### MONTH
+```{r CPUE month 1}
+metadata_month <- metadata %>%
+  dplyr::select(CPUEraw, CPUEstd, session_month)
+metadata_month <- gather(metadata_month, "CPUEtype", "CPUE", CPUEraw:CPUEstd)
+
+month <- ggplot(metadata, aes(as.character(session_month), CPUEstd)) +
+  geom_boxplot() +
+  stat_n_text(y.pos = 0.5) +
+  xlab("Month") + ylab("Standardized CPUE") +
+  theme_cowplot(12) # theme_bw()
+month
+ggsave(width = 5, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/month.pdf")
+
+month2 <- ggplot(metadata_month, aes(as.character(session_month), CPUE)) +
+  geom_boxplot() +
+  facet_wrap(.~CPUEtype) +
+  stat_n_text(y.pos = 0.5) +
+  xlab("Month") + ylab("Catch-Per-Unit-Effort") +
+  theme_cowplot(12) # theme_bw()
+month2
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/month2.pdf")
+```
+This graph show how catch rates varied across months 
+
+```{r CPUE month 2}
+# sub-island
+month_subisl <- ggplot(metadata, aes(as.character(session_month), CPUEstd)) +
+  geom_boxplot() +
+  facet_wrap(.~subisland_code) +
+  xlab("Month") + ylab("Standardized CPUE") +
+  stat_n_text(y.pos = 0.35) +
+  theme_cowplot(12) # theme_bw()
+month_subisl %+% subset(metadata, subisland_code %in% c("DR", "EAI", "PI", "SBI", "SR", "Sutil"))
+
+# island
+month_isl <- ggplot(metadata, aes(as.character(session_month), CPUEstd)) +
+  geom_boxplot() +
+  facet_wrap(.~island_code) +
+  xlab("Month") + ylab("Standardized CPUE") +
+  stat_n_text(y.pos = 0.42) +
+  theme_cowplot(12) # theme_bw()
+month_isl
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_month_isl.pdf")
+```
+This graph shows catch rates by month for all locations combined and then each sub-island and island separately
+
+
+## MONTH AND ASSUMED BREEDERS
+```{r CPUE month 3}
+metadata_brd <- metadata_BP %>%
+  dplyr::select(CPUEstd, CPUEbrd_std, session_month)
+## CPUEbrd_std are brood patches w/in the std effort 
+
+metadata_brd <- gather(metadata_brd, "CPUEtype", "CPUE", CPUEstd:CPUEbrd_std)
+
+month_brd <- ggplot(metadata_brd, aes(as.character(session_month), CPUE, color = CPUEtype)) +
+  geom_boxplot() +
+  stat_n_text(y.pos = 0.4) +
+  xlab("Month") + ylab("Standardized CPUE") +
+  theme_cowplot(12) # theme_bw()
+month_brd
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUEbrd_month.pdf")
+```
+This graphs shows the total CPUE each month, as well as the CPUE of assumed breeders (based on broodpatch score)
+NOTE: the samples sizes at the top are the sum of CPUEbrd_std and CPUEstd
+
+### YEAR
+```{r CPUE year 1}
+metadata_yr <- metadata %>%
+  dplyr::select(CPUEraw, CPUEstd, session_year)
+metadata_yr <- gather(metadata_yr, "CPUEtype", "CPUE", CPUEraw:CPUEstd)
+
+year <- ggplot(metadata, aes(as.character(session_year), CPUEstd)) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Standardized CPUE") +
+  stat_n_text(size = 4, y.pos = 0.41) +
+  theme_cowplot(12) # theme_bw()
+year
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_yr.pdf")
+
+year2 <- ggplot(metadata_yr, aes(as.character(session_year), CPUE)) +
+  geom_boxplot() +
+  facet_grid(CPUEtype~.) +
+  xlab("Year") + ylab("Catch-Per-Unit-Effort") +
+  stat_n_text(size = 3, y.pos = 0.37) +
+  theme_bw()
+year2
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_yr2.pdf")
+```
+This graph show how catch rates varied across years for all sites combined
+
+```{r CPUE year 2}
+# by subisland
+year_subisl <- ggplot(metadata, aes(as.character(session_year), CPUEstd)) +
+  geom_boxplot() +
+  facet_wrap(.~subisland_code) +
+  xlab("Year") + ylab("Standardized CPUE") +
+  stat_n_text(size = 2, y.pos = 0.3) +
+  theme(axis.text.x = element_text(angle = 90)) 
+year_subisl %+% subset(metadata, subisland_code %in% c("DR", "EAI", "PI", "SBI", "SR", "Sutil"))
+
+# by island
+year_isl <- ggplot(metadata, aes(as.character(session_year), CPUEstd)) +
+  geom_boxplot() +
+  facet_wrap(.~island_code) +
+  xlab("Year") + ylab("Standardized CPUE") +
+  stat_n_text(size = 2, y.pos = 0.41) +
+  theme(axis.text.x = element_text(angle = 90)) 
+year_isl 
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_yr_isl.pdf")
+```
+This graph shows how catch rates vary across years forsub-island separately
+NOTE: This graph is broken out by sub-island which is intermediate between "island" and "site".  Using "island" or "site" for this graph might ultimately make more sense
+
+## YEAR AND ASSUMED BREEDERS
+```{r CPUE year 3}
+metadata_brd_yr <- metadata_BP %>%
+  dplyr::select(CPUEstd, CPUEbrd_std, session_year)
+metadata_brd_yr <- gather(metadata_brd_yr, "CPUEtype", "CPUE", CPUEstd:CPUEbrd_std)
+
+year_brd <- ggplot(metadata_brd_yr, aes(as.character(session_year), CPUE, color = CPUEtype)) +
+  geom_boxplot() +
+  xlab("Year") + ylab("Standardized CPUE") +
+  stat_n_text(size = 3, y.pos = 0.4) +
+  theme(axis.text.x = element_text(angle = 90))
+year_brd
+ggsave(width = 10, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUEbrd_yr.pdf")
+```
+This graph shows annual CPUE compared to the CPUE of assumed breeders (based on broodpatch score)
+NOTE: the samples sizes at the top are the sum of CPUEbrd_std and CPUEstd
+
+## MONTH VS YEAR
+```{r CPUE month year}
+month_year <- ggplot(metadata, aes(as.character(session_month), CPUEstd)) +
+  geom_boxplot() +
+  facet_wrap(.~session_year) +
+  xlab("Month") + ylab("Standardized CPUE") +
+  stat_n_text(size = 2.5, y.pos = 0.35) +
+  theme_cowplot(12) # theme_bw()
+month_year %+% subset(metadata, session_year %in% c("1994", "1995", "1996", "2004", "2005", "2006", "2007", "2009", 
+                                            "2010", "2011", "2014", "2015", "2016", "2017", "2018"))
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_month_yr.pdf")
+```
+This graph shows how catches varied across months, for each year separately.  Most years do not have enough data to show much of a pattern
+
+### CATCHES AT ISLANDS AND SITES THROUGH TIME
+```{r CPUE sites 1}
+metadata_isl <- metadata %>%
+  dplyr::select(CPUEraw, CPUEstd, island_code)
+metadata_isl <- gather(metadata_isl, "CPUEtype", "CPUE", CPUEraw:CPUEstd)
+
+island <- ggplot(metadata, aes(island_code, CPUEstd)) +
+  geom_boxplot() +
+  xlab("Island") + ylab("Standardized CPUE") +
+  stat_n_text(size = 4, y.pos = 0.41) +
+  theme_cowplot(12) # theme_bw()
+island 
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_isl.pdf")
+
+island2 <- ggplot(metadata_isl, aes(island_code, CPUE)) +
+  geom_boxplot() +
+  facet_wrap(.~CPUEtype) +
+  xlab("Island") + ylab("Standardized CPUE") +
+  stat_n_text(size = 4, y.pos = 0.41) +
+  theme_cowplot(12) # theme_bw()
+island2 
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_isl2.pdf")
+```
+
+```{r CPUE sites 2}
+site <- ggplot(metadata, aes(site_code, CPUEstd)) +
+  geom_boxplot() +
+  facet_wrap(.~island_code, scales = "free_x") +
+  xlab("Sites Across Islands") + ylab("Standardized CPUE") +
+  stat_n_text(size = 3, y.pos = 0.4) +
+  theme_cowplot(12) # theme_bw()
+site # %+% subset(metadata, island_code %in% c("DR", "EAI", "PI", "SBI", "SR", "Sutil"))
+```
+These graphs show how catch rates varied across islands, and varied across all sites within islands.
+```{r CPUE sites 2}
+metadata_ARU <- metadata %>% 
+  filter(site_code == c("AP", "ESP", "SR", "PI"))
+isl_yr <- ggplot(metadata_ARU, aes(as.character(session_year), CPUEstd)) +
+  geom_boxplot() +
+  facet_grid(.~site_code) +
+  xlab("Island") + ylab("Standardized CPUE") +
+  stat_n_text(size = 3, y.pos = 0.3) +
+  theme_cowplot(12) # theme_bw()
+isl_yr %+% subset(metadata_ARU, session_year %in% c("2016", "2017", "2018"))
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_ARUsites.pdf")
+```
+This graph shows now catches varied across islands in 2016 - 2018, the years in which acoustic data was collected.  This graph is comprable to the call rate outputs graphs being generated by Kerry.
+
+## ISLAND AND ASSUMED BREEDERS
+```{R CPUE sites 4}
+metadata_brd_isl <- metadata_BP %>%
+  dplyr::select(CPUEstd, CPUEbrd_std, island_code)
+metadata_brd_isl <- gather(metadata_brd_isl, "CPUEtype", "CPUE", CPUEstd:CPUEbrd_std)
+
+island_brd <- ggplot(metadata_brd_isl, aes(island_code, CPUE, color = CPUEtype)) +
+  geom_boxplot() +
+  xlab("Island") + ylab("Standardized CPUEof Assumed Breeders") +
+  stat_n_text(size = 4, y.pos = 0.4) +
+  theme_cowplot(12) # theme_bw()
+island_brd # %+% subset(metadata, site_code %in% c("DR", "EAI", "PI", "SBI", "SR", "Sutil"))
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUEbrd_isl.pdf")
+```
+This graph shows the average CPUE at on each island and also the average CPUE of assumed breeders (based on broodpatch score)
+NOTE: the samples sizes at the top are the sum of CPUEbrd_std and CPUEstd
+
+
+#### CATCH TIMES
+```{r catch times 1}
+metadata_effort <- metadata %>% 
+  dplyr::select(site_code, session_ID, app_sunset, std_ending, lat, long)
+
+catches <-  banding %>% 
+  left_join(metadata_effort, by = c("site_code", "session_ID", "lat", "long")) %>% 
+  # mutate(app_sunset = as.POSIXct(app_sunset), capture_date = as.POSIXct(capture_date),
+  #        catchesPastSS = duration(capture_date, app_sunset, "minutes")) %>% 
+  mutate(app_sunset = as.POSIXct(app_sunset), capture_date = as.POSIXct(capture_date),
+         catchPastSS = difftime(capture_date, app_sunset, tz = "America/Los_Angeles", units = "mins")) %>%
+  # mutate(app_sunset = as.POSIXct(app_sunset), capture_date = as.POSIXct(capture_date),
+  #        catchPastSS = minutes(app_sunset) - minutes(capture_date)) %>%  # %>% app_sunset - capture_date) %>% 
+  dplyr::select(catch_ID:site_code, app_sunset, capture_date, catchPastSS)
+
+# catches$catchPastSS = difftime(catches$capture_date, catches$app_sunset, units = "mins")
+
+  # std = if_else(std_ending > capture_date, "1", "0"),
+  # #        captureT = hms(capture_date),
+
+catches_test <- catches %>% 
+  filter(catchPastSS <= 0) %>% 
+  dplyr::select(catch_ID:site_code, app_sunset, capture_date, catchPastSS)
+```
+
+## catch times vs. 5.3 hours post SS, subset by year
+```{r catch times 2}
+endT_yr <- ggplot(catches, aes(catchPastSS)) +
+  geom_histogram(binwidth = 10) +
+  geom_vline(xintercept = 318, color = "red") +
+  geom_vline(xintercept = 0, color = "green") +
+  xlab("Time past Sunset (min)") + ylab("Number of ASSP Catches") +
+  theme_bw()
+endT_yr
+
+endT_yr <- ggplot(catches, aes(catchPastSS)) +
+  geom_histogram(binwidth = 10) +
+  geom_vline(xintercept = 318, color = "red") +
+  geom_vline(xintercept = 0, color = "green") +
+  xlab("Time past Sunset (min)") + ylab("Number of ASSP Catches") +
+  facet_wrap(.~ session_year) +
+  theme_bw()
+endT_yr
+```
+This graph shows the time after sunset of ASSP catches, broken out by year.  The green vertical line indicates sunset, the red vertical line indicates 5.3 hours after sunset, the cutoff time indicated by Adams (2016).
+NOTE: in some years there were catches recorded before sunset.  This probably isn't accurate and is a bug in how time was calcualted in R.  Needs review. 
+
+## catch times vs. 5.3 hours post SS, subset by island
+```{r cath times 3}
+endT_isl <- ggplot(catches, aes(catchPastSS)) +
+  geom_histogram(binwidth = 10) +
+  geom_vline(xintercept = 318, color = "red") +
+  geom_vline(xintercept = 0, color = "green") +
+  xlab("Time past Sunset (min)") + ylab("Number of ASSP Catches") +
+  facet_wrap(.~ subisland_code) +
+  theme_bw()
+endT_isl %+% subset(catches, subisland_code %in% c("DR", "EAI", "PI", "SBI", "SR", "Sutil"))
+```
+This graph shows the time after sunset of ASSP catches, broken out by sub-island.  The green vertical line indicates sunset, the red vertical line indicates 5.3 hours after sunset, the cutoff time indicated by Adams (2016).
+NOTE: in some years there were catches recorded before sunset.  This probably isn't accurate and is a bug in how time was calcualted in R.  Needs review. 
+
+## CPUE vs. cumulative mintues
+```{r CPUE total min 1}
+lm_eqn <- function(df, y = y, x = x){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+
+CPUE_min <- ggplot(metadata, aes(min, CPUEraw)) +
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  geom_text(x = 450, y = 0.25, label = lm_eqn(metadata, y = metadata$CPUEraw, x = metadata$min), parse = TRUE) + 
+  xlab("Total Netting Minutes") + ylab("CPUE") +
+  theme_cowplot(12) # 
+CPUE_min
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_v_min.pdf")
+```
+This graphs show the CPUE in relation to the number of minutes the net was open.  The blue line shows the linear regression of these points.
+```{r CPUE total min 2}
+CPUE_minstd <- ggplot(metadata, aes(min_std, CPUEstd)) +
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  xlab("Total Netting Minutes") + ylab("Standardized CPUE") +
+  geom_text(x = 250, y = 0.35, label = lm_eqn(metadata, y = metadata$CPUEstd, x = metadata$min_std), parse = TRUE) + 
+  theme_cowplot(12) 
+CPUE_minstd
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUEstd_v_min.pdf")
+```
+this graph shows the standardized CPUE (until 5.3 hours after sunset) in relation to the total number of standardized minutes the net was open. The blue line shows the linear regression of these points. 
+```{r CPUE total min 3}
+CPUE_minstd_c <- ggplot(metadata, aes(min_std, CPUEstd, color = session_year)) + # 
+  geom_point() +
+  # geom_smooth(method = 'lm') +
+  xlab("Total Standardized Netting Minutes") + ylab("Standardized CPUE") +
+  # scale_fill_brewer(palette="Dark2")
+  theme_bw()
+CPUE_minstd_c
+```
+This graph shows the same scatter plot of standardized CPUE, broken out by year
+
+## MORPHOMETRIC DATA
+### Morphometrics across islands
+```{r morph}
+# mass <- ggplot(data = ASSP, aes(x = island_code, y = mass_corr)) +
+#   geom_boxplot() +
+#   xlab("Island") + ylab("Mass (corrected)")+
+#   theme_bw()
+# mass
+
+p1 <- ggplot(data = ASSP, aes(x = mass_corr), na.rm = TRUE) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, color = "white") +
+  geom_density(alpha = 0.5, fill = "cadetblue") +
+  geom_vline(aes(xintercept = mean(mass_corr, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .8) +
+  xlab("Mass (corrected)") +
+  geom_text(aes(x = mean(mass_corr, na.rm = TRUE) + 10, label= paste0("mean =\n", round(mean(mass_corr, na.rm = TRUE), 2)), y=0.1)) +
+  theme_cowplot(12)
+
+p2 <- ggplot(data = ASSP, aes(x = culmen), na.rm = TRUE) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.5, color = "white") +
+  geom_density(alpha = 0.5, fill = "cadetblue") +
+  geom_vline(aes(xintercept = mean(culmen, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .8) +
+  xlab("Culmen") +
+  theme_cowplot(12)
+
+p3 <- ggplot(data = ASSP, aes(x = skull_length), na.rm = TRUE) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.5, color = "white") +
+  geom_density(alpha = 0.5, fill = "cadetblue") +
+  geom_vline(aes(xintercept = mean(skull_length, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .8) +
+  xlab("Skull Length") +
+  theme_cowplot(12)
+
+p4 <- ggplot(data = ASSP, aes(x = tarsus), na.rm = TRUE) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.5, color = "white") +
+  geom_density(alpha = 0.5, fill = "cadetblue") +
+  geom_vline(aes(xintercept = mean(tarsus, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .8) +
+  xlab("Tarsus") +
+  theme_cowplot(12)
+
+p5 <- ggplot(data = ASSP, aes(x = wing), na.rm = TRUE) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, color = "white") +
+  geom_density(alpha = 0.5, fill = "cadetblue") +
+  geom_vline(aes(xintercept = mean(wing, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .8) +
+  xlab("Wing Chord") +
+  theme_cowplot(12)
+
+# plot in grid
+plot_grid(p1, p2, p3, p4, p5)
+
+# densityplot(~ mass_corr | island_code, data = ASSP)
+
+## try boxplots
+c1 <- ggplot(data = ASSP, aes(x = island_code, y = mass_corr, color = island_code)) +
+  geom_boxplot() +
+  xlab("Island") + ylab("Mass") +
+  geom_hline(aes(yintercept = mean(mass_corr, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .65) +
+  scale_color_manual(values = cal_palette("sbchannel")) +
+  theme_cowplot(12) +
+  theme(legend.position = "none") +
+  stat_n_text()
+
+c2 <- ggplot(data = ASSP, aes(x = island_code, y = culmen, color = island_code)) +
+  geom_boxplot() +
+  xlab("Island") + ylab("Culmen") +
+  geom_hline(aes(yintercept = mean(culmen, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .65) +
+  scale_color_manual(values = cal_palette("sbchannel")) +
+  theme_cowplot(12) +
+  theme(legend.position = "none") +
+  stat_n_text()
+
+# fix color palette for skull length since there are no ANI values
+slc <- calecopal::cal_palette("sbchannel")[2:4]
+
+c3 <- ggplot(data = ASSP, aes(x = island_code, y = skull_length, color = island_code)) +
+  geom_boxplot() +
+  xlab("Island") + ylab("Skull Length") +
+  geom_hline(aes(yintercept = mean(skull_length, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .5) +
+  scale_color_manual(values = slc) +
+  theme_cowplot(12) +
+  theme(legend.position = "none") +
+  stat_n_text()
+
+c4 <- ggplot(data = ASSP, aes(x = island_code, y = tarsus, color = island_code)) +
+  geom_boxplot() +
+  xlab("Island") + ylab("Tarsus") +
+  geom_hline(aes(yintercept = mean(tarsus, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .5) +
+  scale_color_manual(values = cal_palette("sbchannel")) +
+  theme_cowplot(12) +
+  theme(legend.position = "none") +
+  stat_n_text()
+
+c5 <- ggplot(data = ASSP, aes(x = island_code, y = wing, color = island_code)) +
+  geom_boxplot() +
+  xlab("Island") + ylab("Wing Chord") +
+  geom_hline(aes(yintercept = mean(wing, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .5) +
+  scale_color_manual(values = cal_palette("sbchannel")) +
+  theme_cowplot(12) +
+  theme(legend.position = "none") +
+  stat_n_text()
+
+# Look for indication of different methods used to measure wing chord 
+# (e.g, flattened wing chord versus relaxed wing chord). 
+# by island
+wing.isl <- ggplot(ASSP, aes(x = island_code, y = wing)) +
+  geom_boxplot() +
+  xlab("Island") + ylab("Wing Chord (mm)") +
+  geom_hline(yintercept = avwing, linetype = "dashed", color = "black", size = 1, alpha = 0.5) +
+  theme_bw()
+
+# by organization and island
+ASSPorg <- inner_join(ASSP, metadata, by = "session_ID") %>%
+  replace.value(., names = c("org"), from = "USGS WERC", to = "USGS") %>%
+  replace.value(., names = c("org"), from = "Calif. Institute of Env'l Studies (CIES)/Channel Islands National Park (CHIS)", 
+                to = "CIES/CHIS") %>%
+  replace.value(., names = c("org"), from = "PRBO (Point Blue Conservation Science)", to = "PRBO") %>%
+  replace.value(., names = c("org"), from = "Humboldt State University (H. Carter & D. Whitworth)", to = "HSU")
+
+c6 <- ggplot(ASSPorg, aes(x = org, y = wing)) +
+  geom_boxplot() +
+  xlab("Organization") + ylab("Wing Chord") +
+  geom_hline(yintercept = mean(wing, na.rm =  TRUE), linetype = "dashed", 
+             color = "black", size = 1, alpha = 0.5) +
+  theme_cowplot(12) +
+  stat_n_text()
+
+# plot in grid
+morphs <- plot_grid(c1, c2, c3, c4, c5, c6)
+# export dimensions 900x500
+
+## table of values
+morph_stats <- ASSP %>% 
+  rename(skulllength = skull_length, masscorr = mass_corr) %>%
+  summarise_at(vars(masscorr, culmen, skulllength, tarsus, wing), funs(mean,sd), na.rm = TRUE) %>%
+  dplyr::select(order(colnames(.))) %>%
+  tidyr::pivot_longer(contains("_"), # break out the measurement cols
+                      names_to = c("part", "measure"), # break them into these columns
+                      names_sep = "_") #  use the underscore to separate 
+
+```
+
+## RECAPTURES
+```{r recap}
+recap <- group_by(.data = ASSP, session_year, session_month, island_code) %>%
+  summarise(no_captures = n(),
+            recaps = sum(recapture == "Y"),
+            ratio = recaps/no_captures)
+
+# # recapture rate over time
+# ggplot(recap, aes(x = as.character(session_year), y = ratio)) +
+#   geom_boxplot() +
+#   xlab("Year") + ylab("Recapture Rate") +
+#   theme_bw()
+# 
+# ggplot(recap, aes(x = as.character(session_year), y = ratio, fill = island_code)) +
+#   geom_col() +
+#   xlab("Year") + ylab("Recapture Rate") +
+#   scale_fill_manual(values = cal_palette("sierra2")) +
+#   geom_hline(aes(yintercept = sum(recaps)/sum(no_captures)),
+#              colour = "black", linetype ="longdash", size = .65) +
+#   theme_bw()
+# 
+# ggplot(recap, aes(x = as.character(session_year), y = ratio)) +
+#   geom_boxplot() +
+#   theme_cowplot(12)
+
+# recap by month
+r1 <- ggplot(recap, aes(x = as.character(session_month), y = ratio)) +
+  geom_boxplot(na.rm = TRUE) +
+  ylab("Recapture Rate") +
+  xlab("Month")  +
+  theme_cowplot(12) +
+  stat_n_text()
+
+# recap by island
+r2 <- ggplot(recap, aes(x = island_code, y = ratio)) +
+  geom_boxplot(na.rm = TRUE) +
+  ylab("Recapture Rate") +
+  xlab("Island")  +
+  theme_cowplot(12) +
+  stat_n_text()
+
+# recap by year
+r3 <- ggplot(recap, aes(x = as.character(session_year), y = ratio)) +
+  geom_boxplot(na.rm = TRUE) +
+  ylab("Recapture Rate") +
+  xlab("Year")  +
+  theme_cowplot(12) +
+  theme(axis.text.x = element_text(angle = 30)) +
+  stat_n_text() +
+  geom_hline(aes(yintercept = mean(ratio, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .5) 
+
+# plot in grid
+# breeders <- plot_grid(b1, b2, b3)
+r <- grid.arrange(arrangeGrob(r1,r2, ncol=2, nrow=1),r3)
+ggsave("recaps.jpg", r, width = 9, height = 5)
+
+```
+
+## BROOD PATCH
+```{r broodpatch}
+summary(ASSP$BP)
+unique(ASSP$BP) 
+summary(metadata$BPfreq_Y, na.rm = TRUE)
+sd(metadata$BPfreq_Y, na.rm = TRUE)
+
+## Brood Patch and Assumed Breeders
+# breeder by month
+b1 <- ggplot(metadata, aes(x = as.character(session_month), y = BPfreq_Y)) +
+  geom_boxplot(na.rm = TRUE) +
+  ylab("Frequency of \n Assumed Breeders") +
+  # facet_wrap(.~island_code, ncol = 1) +
+  xlab("Month")  +
+  theme_cowplot(12) +
+  stat_n_text()
+
+# breeder by island
+b2 <- ggplot(metadata, aes(x = island_code, y = BPfreq_Y)) +
+  geom_boxplot(na.rm = TRUE) +
+  ylab("Frequency of \n Assumed Breeders") +
+  # facet_wrap(.~island_code, ncol = 1) +
+  xlab("Island")  +
+  theme_cowplot(12) +
+  stat_n_text()
+
+# breeder by year
+b3 <- ggplot(metadata, aes(x = as.character(session_year), y = BPfreq_Y)) +
+  geom_boxplot(na.rm = TRUE) +
+  ylab("Frequency of \n Assumed Breeders") +
+  # facet_wrap(.~island_code, ncol = 1) +
+  xlab("Year")  +
+  theme_cowplot(12) +
+  theme(axis.text.x = element_text(angle = 30)) +
+  stat_n_text() +
+  geom_hline(aes(yintercept = mean(BPfreq_Y, na.rm = TRUE)),
+             colour = "black", linetype ="longdash", size = .5) 
+
+# plot in grid
+# breeders <- plot_grid(b1, b2, b3)
+bp <- grid.arrange(arrangeGrob(b1,b2, ncol=2, nrow=1),b3)
+ggsave("breeders.jpg", bp, width = 9, height = 5)
+```

@@ -35,6 +35,7 @@ metadata <- read.csv('~/WERC-SC/ASSP_share/ASSP_3_CPUE_metadata_Sun_noMoon_minEd
   filter(TRUE)
 
 ## update catches/banding datasheet: add catchID, locations, catch date (is diff from 'date' after midnight)
+# clean up vars that had weird characters, add site locations
 catches <- catches_raw %>% 
   mutate(measurers = measurer.s.,
          recapture = recapture.,
@@ -51,7 +52,7 @@ catches <- catches_raw %>%
 # summary(as.factor(catches$Site))
 # summary(sites_tbl$Site)
 
-## bind sunset, net open, net closed, std_ending times with catches dataset
+# bind sunset, net open, net closed, std_ending times with catches dataset
 metadata_effort <- metadata %>% 
   select(Site, date, sessionID, net_close_1:net_open_5, App_sunset, std_ending, Lat, Long)
 
@@ -63,13 +64,14 @@ catches_std <- catches %>%
          # pre_close = if_else(net_close > capture_time, "1", "0"), # if bird was caught before net_close = 1, after = 0
          # post_open = if_else(net_open_1 < capture_time, "1", "0"),  # if bird was caught after net_open = 1, before = 0
          SNR = mosaic::derivedFactor(
-           "Y" = (recapture =="SNR" | recapture =="YSN"), # remove same night recaptures
+           "Y" = (recapture =="SNR" | recapture =="YSN"), # identify same night recaptures to be removed from CPUE
            "N" = (recapture =="N" | recapture =="Y"| recapture =="y"), # recaps from other nights still count 
            .default = "UNK"),
          catchPastSS = capture_time - App_sunset) %>%
   select(catchID, sessionID, App_sunset, std_ending, Month, day, year:release_time, catchPastSS, species:recapture, std, diet:Notes) %>%
   filter(TRUE)
 
+# look at catch times that seem too large
 catches_test <- catches_std %>% 
   filter(catchPastSS > 600)
 

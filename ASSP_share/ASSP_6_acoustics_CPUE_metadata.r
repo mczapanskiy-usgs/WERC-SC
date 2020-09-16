@@ -17,7 +17,7 @@ library(readxl)
 
 ### READ IN DATA
 # read in metadata (CPUE) and standardize date/time fields
-metadata <- read_excel("CHIS_ASSP_mistnet_database_07092020.xlsx", sheet = "CPUE", 
+metadata <- read_excel("CHIS_ASSP_mistnet_database_07092020_v2.xlsx", sheet = "CPUE", 
                    col_names = TRUE, na = c("NA", "ND")) %>% 
   mutate_at(c("app_sunset", "std_ending"), 
             .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% 
@@ -30,7 +30,7 @@ metadata_effort <- metadata %>%
   select(site_code, session_ID, app_sunset, std_ending, lat, long)
 
 # read in all catch (banding) data
-catches <- read_excel("CHIS_ASSP_mistnet_database_07092020.xlsx", sheet = "Banding", 
+catches <- read_excel("CHIS_ASSP_mistnet_database_07092020_v2.xlsx", sheet = "Banding", 
                       col_names = TRUE, na = c("NA", "ND")) %>% 
   mutate_at(c("capture_time", "release_time"),
             .funs = ~as.POSIXct(., format="%Y-%m-%d %H:%M:%S")) %>%
@@ -53,7 +53,7 @@ metadata_BP <- catches %>%
   summarise(BPct = n(),
             BPct_std = sum(std == "1"),
             BP_Y = sum(assumeBreed == "Y"), # number of birds that have a broodpatch (2-4, B)
-            BP_Ystd = sum(assumeBreed == "Y" & std == "1")) %>% # number of birds that dont have a broodpatch (1, 1.5, 4.5, 5, PB, D)
+            BP_Ystd = sum(assumeBreed == "Y" & std == "1")) %>% # number of birds that have a have a broodpatch and were caught within the std time 
   right_join(metadata, by= c("session_ID", "site_code")) %>%
   mutate(BPfreq_Y = BP_Y/BPct, # frequency of birds that have a broodpatch
          BPfreq_Ystd = BP_Ystd/BPct_std,

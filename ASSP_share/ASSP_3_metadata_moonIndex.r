@@ -44,6 +44,7 @@ sun_vec <- metadata %>%
   drop_na() %>%  
   filter(TRUE) 
 
+# get apparent sunset times, calculate standard ending based on sunset and join back with CPUE database
 metadata_sunsetTime <- getSunlightTimes(data = sun_vec,
                                     keep = c("sunset"), tz = "PST8PDT") %>% 
   mutate(std_ending = sunset + lubridate::hours(5) + lubridate::minutes(18), # standard ending = 5.3 hours after sunset
@@ -53,6 +54,7 @@ metadata_sunsetTime <- getSunlightTimes(data = sun_vec,
   left_join(sun_vec, by = c("date", "lat", "lon")) %>%
   select(-date, -lat, -lon, -sunset) %>%
   left_join(metadata, by = c("sessionID", "Site", "Lat", "Long")) %>% 
+  # calculate total number of minutes net was open, as well as total number of minutes before standard ending
   mutate(Site = as.factor(Site),
          Island = as.factor(Island),
          min_1 = net_close_1 - net_open_1,
