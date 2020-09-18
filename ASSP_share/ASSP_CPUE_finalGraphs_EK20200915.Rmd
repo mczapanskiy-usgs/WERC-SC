@@ -31,12 +31,27 @@ library(pastecs)
 
 ### READ IN DATA
 banding <- readRDS(here("ASSP_share", "captures.RDS"))
-metadata <- readRDS(here("ASSP_share", "cpue.RDS"))
+metadata <- readRDS(here("ASSP_share", "cpue.RDS")) 
+
+metadata_test <- metadata %>% 
+  # recreate app_sunset time to assure its accurate
+  mutate(app_sunset_old = app_sunset,
+         ss_hr = hour(app_sunset_old), ss_min = minute(app_sunset_old), ss_sec = second(app_sunset_old),
+         ss_min = str_pad(ss_min, width = 2, side = "left", pad = "0"), ss_sec = str_pad(ss_sec, width = 2, side = "left", pad = "0"),
+         ss_t = paste(ss_hr, ss_min, ss_sec, sep = ":"),
+         app_sunset_new = paste(session_date, ss_t),
+         app_sunset_new = as.POSIXct(app_sunset, format = "%Y-%m-%d %H:%M:%S"),
+         test = as.numeric(app_sunset_new) - as.numeric(session_date)) %>% 
+  # dplyr::select(session_date, app_sunset_old, app_sunset, app_sunset_new, ss_hr, ss_min, ss_sec, ss_t, test) %>% 
+  filter(TRUE)
+
+metadata_effort <- metadata_test %>% 
+  dplyr::select(site_code, session_ID, app_sunset_new, std_ending, lat, long)
 
 ## Filter data to ASSP species and remove SNRs and unbanded individuals 
 ASSP <- banding %>% 
-  filter(species == "ASSP" & recapture != "SNR" & band_no != "notbanded") # 3799 observations
-   
+  filter(species == "ASSP" & recapture != "SNR" & band_no != "notbanded") %>%  # 3799 observations
+  
 
 ASSP_BP <- ASSP %>% 
   filter(BP != "NR" & BP != "NA") %>% 
@@ -311,18 +326,25 @@ NOTE: the samples sizes at the top are the sum of CPUEbrd_std and CPUEstd
 
 #### CATCH TIMES
 ```{r catch times 1}
-metadata_effort <- metadata %>% 
-  dplyr::select(site_code, session_ID, app_sunset, std_ending, lat, long)
+# metadata_effort <- metadata %>% 
+#   dplyr::select(site_code, session_ID, app_sunset, std_ending, lat, long)
 
-catches <-  banding %>% 
+catches <-  ASSP %>% 
   left_join(metadata_effort, by = c("site_code", "session_ID", "lat", "long")) %>% 
-  # mutate(app_sunset = as.POSIXct(app_sunset), capture_date = as.POSIXct(capture_date),
-  #        catchesPastSS = duration(capture_date, app_sunset, "minutes")) %>% 
-  mutate(app_sunset = as.POSIXct(app_sunset), capture_date = as.POSIXct(capture_date),
-         catchPastSS = difftime(capture_date, app_sunset, tz = "America/Los_Angeles", units = "mins")) %>%
-  # mutate(app_sunset = as.POSIXct(app_sunset), capture_date = as.POSIXct(capture_date),
-  #        catchPastSS = minutes(app_sunset) - minutes(capture_date)) %>%  # %>% app_sunset - capture_date) %>% 
-  dplyr::select(catch_ID:site_code, app_sunset, capture_date, catchPastSS)
+  # filter(TRUE)
+  # mutate(app_sunset = as.numeric(app_sunset_new), capture_date = as.numeric(capture_date),
+  #        catchPastSS = minutes(app_sunset_new) - minutes(capture_date)) %>%
+         # catchPastSS = duration(capture_date, app_sunset_new, "minutes")) %>%
+  mutate(app_sunset_new = as.POSIXct(app_sunset_new, tz = "America/Los_Angeles"), capture_date = as.POSIXct(capture_date, tz = "America/Los_Angeles"),
+         catchPastSS = difftime(capture_date, app_sunset_new, tz = "America/Los_Angeles", units = "mins")) %>%
+         # catchPastSS = minutes(capture_date) - minutes(app_sunset_new)) %>% 
+  # mutate(catchPastSS = minutes(as.POSIXct(capture_date)) - minutes(as.POSIXct(app_sunset_new))) %>% 
+         # catchPastSS = minutes(app_sunset_new) - minutes(capture_date)) %>%  # %>% 
+  dplyr::select(catch_ID:site_code, app_sunset_new, capture_date, catchPastSS)
+
+test <- catches %>% 
+  mutate(session_date = as.numeric(as.POSIXct(session_date)), app_sunset = as.numeric(app_sunset_new), capture_date = as.numeric(capture_date)) %>%
+  dplyr::select(session_date, app_sunset, capture_date)
 
 # catches$catchPastSS = difftime(catches$capture_date, catches$app_sunset, units = "mins")
 
