@@ -1,0 +1,114 @@
+---
+title: "ASSP_CPUE_wxGraphs"
+author: "EKelsey"
+date: "9/24/2020"
+output: html_document
+---
+
+```{r }
+setwd("~/WERC-SC/ASSP_share")
+
+## LOAD LIBRARIES
+library(tidyr)
+library(dplyr)
+library(lubridate)
+library(hms)
+library(tidyverse)
+library(ggplot2)
+library(EnvStats)
+library(here)
+# library(calecopal)
+library(cowplot)
+library(anchors)
+library(gridExtra)
+library(pastecs)
+
+
+### READ IN DATA
+banding <- readRDS(here("ASSP_share", "captures.RDS"))
+metadata <- readRDS(here("ASSP_share", "cpue.RDS")) 
+wx_metadata <- readRDS(here("ASSP_share", "mistnet_w_weather.RDS")) 
+wx_metadata_hrly <- readRDS(here("ASSP_share", "mistnet_w_weather_hrly.RDS")) 
+
+### pull hour windspeed at midnight for each night
+wx_metadata_mdnt <- wx_metadata_hrly %>% 
+  mutate(wind_sp_mdnt = sqrt(wind_u^2+wind_v^2),
+         hour = hour(DateTime_h)) %>% 
+  filter(hour == "0") %>% 
+  dplyr::select(-hour) %>% 
+  left_join(metadata, by = c("session_ID", "island_code", "site_code", "session_year", "session_date", "flagged", "lat", "long"))
+  # dplyr::select(session_ID, island_code, site_code, lat, long, wind_sp_mdnt)
+
+### generate moon index during netting period
+wx_metadata_moon <- wx_metadata_hrly %>%
+  left_join(metadata, by = c("session_ID", "island_code", "site_code", "session_year", "session_date", "flagged", "lat", "long")) %>%
+  # mutate(start_rnd = floor_date(start, unit = "hour"),
+  #        end_rnd = ceiling_date(end, unit = "hour"),
+  #        std_start = ifelse(DateTime_h >= start_rnd, "0", "1"),
+  #        std_end = ifelse(DateTime_h <= end_rnd, "0", "1")) %>%
+  group_by(session_ID) %>% 
+  summarise(moonT = sum(Moonup)) %>% 
+  filter(TRUE)
+
+wx_metadata_full <- wx_metadata_mdnt %>% 
+  right_join(wx_metadata_moon, by = "session_ID") %>% 
+  mutate(wind_sp = sqrt(wind_u^2+wind_v^2),
+         moonIndex = moonT*Illu)
+
+```
+
+```{r wind speed, echo = FALSE}
+CPUE_windSp <- ggplot(wx_metadata_full, aes(wind_sp, CPUEstd)) +
+  geom_point() +
+  # geom_smooth(method = 'lm') +
+  xlab("Wind Speed (m/s)") + ylab("Standardized Catch-per-unit-effort") +
+  theme_cowplot(12) # 
+CPUE_windSp
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_windSp.pdf")
+
+
+
+
+```
+
+
+
+```{r cloud cover, echo=FALSE}
+CPUE_totCloud <- ggplot(wx_metadata_full, aes(tot_cloud, CPUEstd)) +
+  geom_point() +
+  # geom_smooth(method = 'lm') +
+  xlab("Proportion of Total Cloud Cover") + ylab("Standardized Catch-per-unit-effort") +
+  theme_cowplot(12) # 
+CPUE_totCloud
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_totCloud.pdf")
+
+CPUE_lowCloud <- ggplot(wx_metadata_full, aes(low_cloud, CPUEstd)) +
+  geom_point() +
+  # geom_smooth(method = 'lm') +
+  xlab("Proportion of Low Cloud Cover") + ylab("Standardized Catch-per-unit-effort") +
+  theme_cowplot(12) # 
+CPUE_lowCloud
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_lowCloud.pdf")
+```
+
+
+
+```{r precip, echo=FALSE}
+CPUE_dewP <- ggplot(wx_metadata_full, aes(dew_point, CPUEstd)) +
+  geom_point() +
+  # geom_smooth(method = 'lm') +
+  xlab("Dew Point") + ylab("Standardized Catch-per-unit-effort") +
+  theme_cowplot(12) # 
+CPUE_dewP
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_dewP.pdf")
+
+CPUE_totPrecip <- ggplot(wx_metadata_full, aes(tot_precip, CPUEstd)) +
+  geom_point() +
+  # geom_smooth(method = 'lm') +
+  xlab("Total Nightly Precipitation") + ylab("Standardized Catch-per-unit-effort") +
+  theme_cowplot(12) # 
+CPUE_totPrecip
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_totPrecip.pdf")
+```
+
+

@@ -32,25 +32,27 @@ library(pastecs)
 ### READ IN DATA
 banding <- readRDS(here("ASSP_share", "captures.RDS"))
 metadata <- readRDS(here("ASSP_share", "cpue.RDS")) 
+wx_metadata <- readRDS(here("ASSP_share", "mistnet_w_weather.RDS")) 
+wx_metadata_hrly <- readRDS(here("ASSP_share", "mistnet_w_weather_hrly.RDS")) 
 
-metadata_test <- metadata %>% 
-  # recreate app_sunset time to assure its accurate
-  mutate(app_sunset_old = app_sunset,
-         ss_hr = hour(app_sunset_old), ss_min = minute(app_sunset_old), ss_sec = second(app_sunset_old),
-         ss_min = str_pad(ss_min, width = 2, side = "left", pad = "0"), ss_sec = str_pad(ss_sec, width = 2, side = "left", pad = "0"),
-         ss_t = paste(ss_hr, ss_min, ss_sec, sep = ":"),
-         app_sunset_new = paste(session_date, ss_t),
-         app_sunset_new = as.POSIXct(app_sunset, format = "%Y-%m-%d %H:%M:%S"),
-         test = as.numeric(app_sunset_new) - as.numeric(session_date)) %>% 
-  # dplyr::select(session_date, app_sunset_old, app_sunset, app_sunset_new, ss_hr, ss_min, ss_sec, ss_t, test) %>% 
-  filter(TRUE)
+# metadata_test <- metadata %>% 
+#   # recreate app_sunset time to assure its accurate
+#   mutate(app_sunset_old = app_sunset,
+#          ss_hr = hour(app_sunset_old), ss_min = minute(app_sunset_old), ss_sec = second(app_sunset_old),
+#          ss_min = str_pad(ss_min, width = 2, side = "left", pad = "0"), ss_sec = str_pad(ss_sec, width = 2, side = "left", pad = "0"),
+#          ss_t = paste(ss_hr, ss_min, ss_sec, sep = ":"),
+#          app_sunset_new = paste(session_date, ss_t),
+#          app_sunset_new = as.POSIXct(app_sunset, format = "%Y-%m-%d %H:%M:%S"),
+#          test = as.numeric(app_sunset_new) - as.numeric(session_date)) %>% 
+#   # dplyr::select(session_date, app_sunset_old, app_sunset, app_sunset_new, ss_hr, ss_min, ss_sec, ss_t, test) %>% 
+#   filter(TRUE)
 
-metadata_effort <- metadata_test %>% 
-  dplyr::select(site_code, session_ID, app_sunset_new, std_ending, lat, long)
+wx_metadata_full <- wx_metadata %>% 
+  left_join(metadata, by = c("session_ID", "island_code", "site_code", "lat", "long"))
 
 ## Filter data to ASSP species and remove SNRs and unbanded individuals 
 ASSP <- banding %>% 
-  filter(species == "ASSP" & recapture != "SNR" & band_no != "notbanded") %>%  # 3799 observations
+  filter(species == "ASSP" & recapture != "SNR" & band_no != "notbanded")  # 3799 observations
   
 
 ASSP_BP <- ASSP %>% 
@@ -110,6 +112,27 @@ species <- banding %>%
 ```
 
 #### CPUE graphs
+```{r CPUE sessions}
+metadata_series <- metadata %>% 
+  filter(!is.na(series_ID))
+
+series <- ggplot(metadata_series, aes(as.character(series_ID), CPUEraw)) +
+  geom_boxplot() +
+  stat_n_text(y.pos = 0.4) +
+  xlab("Sequential Night") + ylab("Catch-Per-Unit-Effort") +
+  theme_cowplot(12) # theme_bw()
+series
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUEseries.pdf")
+
+series_std <- ggplot(metadata_series, aes(as.character(series_ID), CPUEstd)) +
+  geom_boxplot() +
+  stat_n_text(y.pos = 0.4) +
+  xlab("Sequential Night") + ylab("Standardized CPUE") +
+  theme_cowplot(12) # theme_bw()
+series_std
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUEseries_std.pdf")
+```
+
 # month and year
 
 ### MONTH
@@ -261,7 +284,7 @@ This graph shows how catches varied across months, for each year separately.  Mo
 ### CATCHES AT ISLANDS AND SITES THROUGH TIME
 ```{r CPUE sites 1}
 metadata_isl <- metadata %>%
-  dplyr::select(CPUEraw, CPUEstd, island_code)
+  dplyr::select(CPUEraw, CPUEstd, island_code, site_code)
 metadata_isl <- gather(metadata_isl, "CPUEtype", "CPUE", CPUEraw:CPUEstd)
 
 island <- ggplot(metadata, aes(island_code, CPUEstd)) +
@@ -275,7 +298,7 @@ ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/
 island2 <- ggplot(metadata_isl, aes(island_code, CPUE)) +
   geom_boxplot() +
   facet_wrap(.~CPUEtype) +
-  xlab("Island") + ylab("Standardized CPUE") +
+  xlab("Island") + ylab("Catch-Per-Unit-Effort") +
   stat_n_text(size = 4, y.pos = 0.41) +
   theme_cowplot(12) # theme_bw()
 island2 
@@ -283,13 +306,23 @@ ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/
 ```
 
 ```{r CPUE sites 2}
+site <- ggplot(metadata, aes(site_code, CPUEraw)) +
+  geom_boxplot() +
+  facet_wrap(.~island_code, scales = "free_x") +
+  xlab("Sites Across Islands") + ylab("Raw Catch-Per-Unit-Effort") +
+  stat_n_text(size = 3, y.pos = 0.4) +
+  theme_cowplot(12) # theme_bw()
+site  %+% subset(metadata, site_code %in% c("AP", "ESP", "PI", "SR"))
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_siteRaw.pdf")
+
 site <- ggplot(metadata, aes(site_code, CPUEstd)) +
   geom_boxplot() +
   facet_wrap(.~island_code, scales = "free_x") +
-  xlab("Sites Across Islands") + ylab("Standardized CPUE") +
+  xlab("Sites Across Islands") + ylab("Standardized Catch-Per-Unit-Effort") +
   stat_n_text(size = 3, y.pos = 0.4) +
   theme_cowplot(12) # theme_bw()
-site # %+% subset(metadata, island_code %in% c("DR", "EAI", "PI", "SBI", "SR", "Sutil"))
+site  %+% subset(metadata, site_code %in% c("AP", "ESP", "PI", "SR"))
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_siteStd.pdf")
 ```
 These graphs show how catch rates varied across islands, and varied across all sites within islands.
 ```{r CPUE sites 2}
@@ -326,47 +359,50 @@ NOTE: the samples sizes at the top are the sum of CPUEbrd_std and CPUEstd
 
 #### CATCH TIMES
 ```{r catch times 1}
-# metadata_effort <- metadata %>% 
-#   dplyr::select(site_code, session_ID, app_sunset, std_ending, lat, long)
+metadata_effort <- metadata_test %>% 
+  dplyr::select(site_code, session_ID, app_sunset_new, std_ending, lat, long)
 
 catches <-  ASSP %>% 
   left_join(metadata_effort, by = c("site_code", "session_ID", "lat", "long")) %>% 
-  # filter(TRUE)
+  filter(TRUE)
   # mutate(app_sunset = as.numeric(app_sunset_new), capture_date = as.numeric(capture_date),
   #        catchPastSS = minutes(app_sunset_new) - minutes(capture_date)) %>%
          # catchPastSS = duration(capture_date, app_sunset_new, "minutes")) %>%
-  mutate(app_sunset_new = as.POSIXct(app_sunset_new, tz = "America/Los_Angeles"), capture_date = as.POSIXct(capture_date, tz = "America/Los_Angeles"),
-         catchPastSS = difftime(capture_date, app_sunset_new, tz = "America/Los_Angeles", units = "mins")) %>%
+  # mutate(app_sunset_new = as.POSIXct(app_sunset_new, tz = "America/Los_Angeles"), capture_date = as.POSIXct(capture_date, tz = "America/Los_Angeles"),
+  #        catchPastSS = difftime(capture_date, app_sunset_new, tz = "America/Los_Angeles", units = "mins")) %>%
          # catchPastSS = minutes(capture_date) - minutes(app_sunset_new)) %>% 
   # mutate(catchPastSS = minutes(as.POSIXct(capture_date)) - minutes(as.POSIXct(app_sunset_new))) %>% 
          # catchPastSS = minutes(app_sunset_new) - minutes(capture_date)) %>%  # %>% 
-  dplyr::select(catch_ID:site_code, app_sunset_new, capture_date, catchPastSS)
+  # dplyr::select(catch_ID:site_code, app_sunset_new, capture_date, catchPastSS)
 
-test <- catches %>% 
-  mutate(session_date = as.numeric(as.POSIXct(session_date)), app_sunset = as.numeric(app_sunset_new), capture_date = as.numeric(capture_date)) %>%
-  dplyr::select(session_date, app_sunset, capture_date)
-
-# catches$catchPastSS = difftime(catches$capture_date, catches$app_sunset, units = "mins")
-
+write.csv(catches, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_7_catchesPastSS.csv',
+          row.names = FALSE)
+catches_rev <- read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_7_catchesPastSS_rev.csv') %>%  
+  mutate_at(c("app_sunset", "std_ending", "capture_date", "release_date"),
+            .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% # SECONDS dropped from app_sunset and std_ending during transition to and from excel
+  mutate(session_date = as.POSIXct(session_date, format="%m/%d/%Y"),
+         hrsPastSS = catchPastSS/60) %>% 
+  filter(TRUE)
   # std = if_else(std_ending > capture_date, "1", "0"),
   # #        captureT = hms(capture_date),
 
-catches_test <- catches %>% 
-  filter(catchPastSS <= 0) %>% 
+catches_test <- catches_rev %>% 
+  filter(catchPastSS > 500) %>% 
   dplyr::select(catch_ID:site_code, app_sunset, capture_date, catchPastSS)
 ```
 
 ## catch times vs. 5.3 hours post SS, subset by year
 ```{r catch times 2}
-endT_yr <- ggplot(catches, aes(catchPastSS)) +
-  geom_histogram(binwidth = 10) +
-  geom_vline(xintercept = 318, color = "red") +
-  geom_vline(xintercept = 0, color = "green") +
-  xlab("Time past Sunset (min)") + ylab("Number of ASSP Catches") +
+endT_yr <- ggplot(catches_rev, aes(hrsPastSS)) +
+  geom_histogram(binwidth = 0.1) +
+  geom_vline(xintercept = 5.3, color = "red") +
+  # geom_vline(xintercept = 0, color = "green") +
+  xlab("Time past Sunset (hours)") + ylab("ASSP Catch Frequency") +
   theme_bw()
 endT_yr
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/catchTime_hist.pdf")
 
-endT_yr <- ggplot(catches, aes(catchPastSS)) +
+endT_yr <- ggplot(catches_rev, aes(catchPastSS)) +
   geom_histogram(binwidth = 10) +
   geom_vline(xintercept = 318, color = "red") +
   geom_vline(xintercept = 0, color = "green") +
@@ -380,14 +416,14 @@ NOTE: in some years there were catches recorded before sunset.  This probably is
 
 ## catch times vs. 5.3 hours post SS, subset by island
 ```{r cath times 3}
-endT_isl <- ggplot(catches, aes(catchPastSS)) +
+endT_isl <- ggplot(catches_rev, aes(catchPastSS)) +
   geom_histogram(binwidth = 10) +
   geom_vline(xintercept = 318, color = "red") +
   geom_vline(xintercept = 0, color = "green") +
   xlab("Time past Sunset (min)") + ylab("Number of ASSP Catches") +
   facet_wrap(.~ subisland_code) +
   theme_bw()
-endT_isl %+% subset(catches, subisland_code %in% c("DR", "EAI", "PI", "SBI", "SR", "Sutil"))
+endT_isl %+% subset(catches_rev, subisland_code %in% c("DR", "EAI", "PI", "SBI", "SR", "Sutil"))
 ```
 This graph shows the time after sunset of ASSP catches, broken out by sub-island.  The green vertical line indicates sunset, the red vertical line indicates 5.3 hours after sunset, the cutoff time indicated by Adams (2016).
 NOTE: in some years there were catches recorded before sunset.  This probably isn't accurate and is a bug in how time was calcualted in R.  Needs review. 
