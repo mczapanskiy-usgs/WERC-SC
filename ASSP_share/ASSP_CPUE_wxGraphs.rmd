@@ -5,7 +5,7 @@ date: "9/24/2020"
 output: html_document
 ---
 
-```{r }
+```{r libraries & data}
 setwd("~/WERC-SC/ASSP_share")
 
 ## LOAD LIBRARIES
@@ -34,6 +34,7 @@ wx_metadata_hrly <- readRDS(here("ASSP_share", "mistnet_w_weather_hrly.RDS"))
 wx_metadata_mdnt <- wx_metadata_hrly %>% 
   mutate(wind_sp_mdnt = sqrt(wind_u^2+wind_v^2),
          hour = hour(DateTime_h)) %>% 
+  # pull out only midnight windspeed
   filter(hour == "0") %>% 
   dplyr::select(-hour) %>% 
   left_join(metadata, by = c("session_ID", "island_code", "site_code", "session_year", "session_date", "flagged", "lat", "long"))
@@ -42,19 +43,27 @@ wx_metadata_mdnt <- wx_metadata_hrly %>%
 ### generate moon index during netting period
 wx_metadata_moon <- wx_metadata_hrly %>%
   left_join(metadata, by = c("session_ID", "island_code", "site_code", "session_year", "session_date", "flagged", "lat", "long")) %>%
-  # mutate(start_rnd = floor_date(start, unit = "hour"),
-  #        end_rnd = ceiling_date(end, unit = "hour"),
-  #        std_start = ifelse(DateTime_h >= start_rnd, "0", "1"),
-  #        std_end = ifelse(DateTime_h <= end_rnd, "0", "1")) %>%
+  # create binary field of hours when moon was up within std netting period
+  mutate(end_rnd = ceiling_date(std_ending, unit = "hour"),
+         std_end = as.numeric(ifelse(DateTime_h <= end_rnd, "1", "0")), 
+         std_moon = Moonup * std_end,
+         moonI = Moonup * Illu,
+         moonI_std = std_moon * Illu) %>%
   group_by(session_ID) %>% 
-  summarise(moonT = sum(Moonup)) %>% 
+  # for each nightly session, sum the total hours of moonlight, moonlight hours w/in std period, nightly moon index, and nightly std moon index
+  summarise(moonT = sum(Moonup),
+            moonT_std = sum(std_moon),
+            moonIndex = sum(moonI),
+            moonIndex_std = sum(moonI_std)) %>% 
   filter(TRUE)
 
 wx_metadata_full <- wx_metadata_mdnt %>% 
   right_join(wx_metadata_moon, by = "session_ID") %>% 
-  mutate(wind_sp = sqrt(wind_u^2+wind_v^2),
-         moonIndex = moonT*Illu)
+  mutate(wind_sp = sqrt(wind_u^2+wind_v^2))
 
+saveRDS(wx_metadata_full,here::here("ASSP_share", "wx_metadata_full.rds"))
+write.csv(wx_metadata_full, file = '~/WERC-SC/ASSP_share/wx_metadata_full.csv',
+          row.names = FALSE)
 ```
 
 ```{r wind speed, echo = FALSE}

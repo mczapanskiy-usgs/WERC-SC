@@ -348,7 +348,8 @@ ggplot(metadata, aes(month, app_sunset_time)) +
   scale_color_gradient(low="purple", high="orange") +
   theme_bw()
 ```
-This graph shows the time of apparent sunset for netting sessions each month. The range and timing for that time of year is as we would expect. Thus we conclude that the suncalc function was used effectively to get the sunset times associated with each mistnetting session.
+This graph shows the time of apparent sunset for netting sessions each month. The range and timing for that time of year is as we would expect. Thus we conclude that the suncalc function was used effectively to get the sunset times associated with each mistnetting session. 
+NOTE: two sessions without start dates were omitted.
 
 ### Std_ending 
 ```{r}
@@ -357,7 +358,8 @@ ggplot(metadata, aes(month, std_ending_time)) +
   scale_color_gradient(low="black", high="light blue") +
   theme_bw()
 ```
-This graph shows the time of standard ending (5.3 hours after sunset) for netting sessions each month. The range and timing of the standard ending track with sunset time as we would expect.
+This graph shows the time of standard ending (5.3 hours after sunset) for netting sessions each month. The range and timing of the standard ending track with sunset time as we would expect.  
+NOTE: two sessions without start dates were omitted.
 
 ### net_open and net_close 
 ```{r}
@@ -377,7 +379,8 @@ ggplot(metadata, aes(min)) +
 # summary of total mistnetting minutes
 summary(metadata$min)
 ```
-The graph and summary stats above show minutes calcuated for each netting session. We want to check that minutes were added correctly across multiple open/close sessions and also that minutes were added accurately across midnight. It looks like minutes were not added accurately across midnight on four occasions (the outliers to the far right)
+The graph and summary stats above show minutes calcuated for each netting session. We want to check that minutes were added correctly across multiple open/close sessions and also that minutes were added accurately across midnight - four sessions were not added correctly (the outliers to the far right). We couldn't figure out how these were miscalculated, but were able to change them manually to the correct amount of time for those four sessions for the final database version and analysis. 
+NOTE: The 24 sessions without net open/closed times were omitted. 
 
 
 ### Total mistnetting standard minutes per session 
@@ -389,7 +392,8 @@ ggplot(metadata, aes(min_std)) +
 # summary of mistnetting minutes cut to standard ending time
 summary(metadata$min_std)
 ```
-The above graph and summary stats show the total number of mintues for the standardized session (from net open to net close or standard ending whichever came first). The standard ending is 5.3 hours (318 minutes) after sunset. Nets opened sometime after sunset.
+The above graph and summary stats show the total number of mintues for the standardized session (from net open to net close or standard ending whichever came first). The standard ending is 5.3 hours (318 minutes) after sunset. Nets opened at or after sunset.  
+NOTE: The 24 sessions without net open/closed times were omitted. 
 
 ### min vs. min_std for each session
 ```{r}
@@ -400,7 +404,8 @@ ggplot(metadata, aes(min, min_std)) +
   xlim(0,1050) + ylim(0, 550) +
   theme_bw()
 ```
-This plot of minutes vs. standardized mintues (before the 5.3 hour standardized ending).  Blue line = slope of 1. Black line = standard ending.  Here we can make sure standardized net open minutes is equal or less the total number of minutes and sunset to standard ending of 5.3 hours (318 minutes).  Turquoise points = data that has been flagged due to inconsistencies in data entry. It does not appear that the reason these entries were flagged effects net minutes.
+This plot of minutes vs. standardized mintues (before the 5.3 hour standardized ending).  Blue line = slope of 1. Black line = standard ending.  Here we can make sure standardized net open minutes is equal or less the total number of minutes and sunset to standard ending of 5.3 hours (318 minutes).  Turquoise points = data that has been flagged due to inconsistencies in data entry. It does not appear that the reason these entries were flagged effects net minutes. The four outliers were sessions where the time was calculated incorrectly, these were changed manually after the fact.  
+NOTE: 27 sessions with NAs were omitted: 24 sessions did not have start and stop times, another 3 did not have any ASSP catches.
 
 ## ASSP
 ### ASSP caught per session
@@ -411,7 +416,8 @@ ggplot(metadata, aes(ASSP)) +
 # summary of ASSP catches
 summary(metadata$ASSP)
 ```
-The graph and summary stats above show the distribution of total numbers of ASSP caught per session.
+The graph and summary stats above show the distribution of total numbers of ASSP caught per session. 
+NOTE: 27 sessions with NAs were omitted: 24 sessions did not have start and stop times, another 3 did not have any ASSP catches.
 
 
 ### ASSP caught per standardized session
@@ -422,7 +428,8 @@ ggplot(metadata, aes(ASSPstd)) +
 # summary of standardized ASSP catches
 summary(metadata$ASSPstd)
 ```
-The graph and summary stats above show the distribution of total numbers of ASSP caught before standard ending or net close, whichever came first.  This distribution is more constrained than the one above, which is what we would expect with the standard ending cutoff.
+The graph and summary stats above show the distribution of total numbers of ASSP caught before standard ending or net close, whichever came first.  This distribution is more constrained than the one above, which is what we would expect with the standard ending cutoff. 
+NOTE: 27 sessions with NAs were omitted: 24 sessions did not have start and stop times, another 3 did not have any ASSP catches.
 
 ### ASSP vs ASSPstd 
 ```{r}
@@ -432,7 +439,8 @@ ggplot(metadata, aes(ASSP, ASSPstd)) +
   xlim(0,60) + ylim(0, 60) +
   theme_bw()
 ```
-The plot above shows the total number of ASSP vs. total number of ASSP before the standard ending. Blue line = slope of 1. Here we double check that the standardized number of ASSP is always equal to or less than the total number. Turquoise points = data that has been flagged due to inconsistencies in data entry.  It does not appear that the reason these entries were flagged effects the number of birds caught.
+The plot above shows the total number of ASSP vs. total number of ASSP before the standard ending. Blue line = slope of 1. Here we double check that the standardized number of ASSP is always equal to or less than the total number. Turquoise points = data that has been flagged due to inconsistencies in data entry.  It does not appear that the reason these entries were flagged effects the number of birds caught. 
+NOTE: 27 sessions with NAs were omitted: 24 sessions did not have start and stop times, another 3 did not have any ASSP catches.
 
 Next we will look into what else could effect the number of birds caught.
 
@@ -448,7 +456,9 @@ ggplot(metadata, aes(net_dim, ASSPstd)) +
             aes(net_dim, Inf, label = n), vjust = 1) +
   theme_bw()
 ```
-The graph above shows the number of ASSP caught within the standardized period in relation to net dimensions.  Number at top of each box plot = sample size. The size of the net doesn't seem to effect the number of birds caught in a specific night. Below we will explore this effect with number of catches standardized to effort.
+The graph above shows the number of ASSP caught within the standardized period in relation to net dimensions.  Number at top of each box plot = sample size. The size of the net doesn't seem to effect the number of birds caught in a specific night. 
+NOTE: 27 sessions with NAs were omitted: 24 sessions did not have start and stop times, another 3 did not have any ASSP catches.
+Below we will explore this effect with number of catches standardized to effort. 
 
 ### Timing of ASSP catches
 Next lets explore the frequency of catches in relation to the standard ending. Do catches start dropping off before 5.3 hours after sunset?  After?  NOTE - the timing of net closures will effect the number of late night captures
@@ -461,6 +471,7 @@ ggplot(catches, aes(catchPastSS)) +
   theme_bw()
 ```
 The 5.3 hour cutoff occurs when number of catches are still relatively high. How does that differ across years? In recent years (2014 - 2018) nets were usually closed at 2am. In earlier years nets were sometimes left open past 2am. 
+NOTE: 141 sessions with NAs were omitted. The time difference calculation btwn catch time and sunset didn't work for 141 of the 4158 captures for this a visualization exercise.
 
 ```{r}
 ggplot(catches, aes(catchPastSS)) +
@@ -471,7 +482,8 @@ ggplot(catches, aes(catchPastSS)) +
   theme_bw()
 # NOTE: scales on x- and y- axis differ between panes
 ```
-No clear pattern of catch timing can be seen across years.
+No clear pattern of catch timing can be seen across years.  
+NOTE: 141 sessions with NAs were omitted. The time difference calculation btwn catch time and sunset didn't work for 141 of the 4158 captures for this a visualization exercise.
 
 How does catch time post sunset differ between netting sub-islands?
 ``` {r}
@@ -482,8 +494,7 @@ ggplot(catches, aes(catchPastSS)) +
   facet_wrap(.~ subisland_code) +
   theme_bw()
 ```
-There doesn't appear to be any distinct pattern in timing of catches between locations, especially given the variation in sample sizes between locations.
-
+There doesn't appear to be any distinct pattern in timing of catches between locations, especially given the variation in sample sizes between locations.  NOTE: 141 sessions with NAs were omitted. The time difference calculation btwn catch time and sunset didn't work for 141 of the 4158 captures for this a visualization exercise.
 
 ## CPUE
 ### CPUE per session
@@ -495,6 +506,7 @@ ggplot(metadata, aes(CPUEraw)) +
 summary(metadata$CPUEraw)
 ```
 The graph and summary stats above show the distribution of catch-per-unit-effort (ASSP/min).
+NOTE: the 46 NA entires for CPUEraw were omitted.  
 
 ### CPUE per standardized session
 ```{r}
@@ -505,6 +517,7 @@ ggplot(metadata, aes(CPUEstd)) +
 summary(metadata$CPUEstd)
 ```
 The graph and summary stats above show the distribution of standardized catch-per-unit-effort (ASSPstd/min_std). This distribution is more constrained than the previous one, which is what we would expect with the standard ending cutoff.
+NOTE: the 47 NA entires for CPUEstd were omitted.  
 
 ### CPUE vs CPUEstd
 ```{r}
@@ -514,6 +527,7 @@ ggplot(metadata, aes(CPUEraw, CPUEstd)) +
   theme_bw()
 ```
 The above graph explores the correlation between CPUE and CPUE std.  Blue line = slope of 1. As expected, the correlation is often 1:1, but with variation as the number of ASSP caught and number of mistnetting minutes were both effected by the standard ending cutoff but not always in a proportional way.  Turquoise points = data that has been flagged due to inconsistencies in data entry. Sessions with high CPUE were flagged.  Nothing in the data entry suggests these entries were erroneous.
+NOTE: the 47 NA entires for CPUEstd were omitted.  
 
 ### CPUE in relation to net size
 ```{r}
@@ -524,6 +538,8 @@ ggplot(metadata, aes(net_dim, CPUEstd)) +
   theme_bw()
 ```
 Here is the frequency of standardized CPUE values broken up by the dimensions of the net. The number above each box plot = the sample size. Unknown net sizes make it hard to determine if the size of the net influenced catch rates.
+NOTE: the 47 NA entires for CPUEstd were omitted.  
+
 
 
 ## Brood Patch and Assumed Breeders
@@ -542,6 +558,7 @@ ggplot(metadata_BP, aes(month, BPfreq_Y)) +
   theme_bw()
 ```
 The above graph shows frequency of assumed breeders (brood patch 2-4) in relation to the month of netting effort. The number above each box plot = sample size. The number of assumed breeders appears to be higher later in the breeding season.
+NOTE: the 79 captures without broodpatch recorded were omitted.
 
 ```{r}
 ggplot(metadata_BP, aes(month, BPfreq_Y)) +
@@ -551,3 +568,4 @@ ggplot(metadata_BP, aes(month, BPfreq_Y)) +
   theme_bw()
 ```
 The above graph shows the frequency of assumed breeders caught in mistnetting sessions across months, broken up by years. No distinct patterns appear here.
+NOTE: the 79 captures without broodpatch recorded were omitted.

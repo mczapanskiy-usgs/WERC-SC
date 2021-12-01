@@ -1,0 +1,466 @@
+---
+title: "ASSP CPUE GLMM"
+author: "Amelia DuVall (ajduvall@uw.edu)"
+date: "July 2020"
+output: pdf_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is `r paste0("v.", (Sys.Date()))`
+
+```{r set_options, message = FALSE}
+knitr::opts_chunk$set(message = FALSE)
+
+## load packages
+library(easypackages)
+libraries("lme4", "here", "tidyverse", "ggplot2", "lubridate", 
+          "faraway", "anchors", "readxl", "naniar", "remotes",
+          "corrplot", "Hmisc")
+```
+
+see Russ Bradley et al. 2011 paper for ideas
+
+```{r data}
+## read-in data 
+wx <- readRDS(here("Working", "mistnet_w_weather_v2.rds")) # 215 sessions
+CPUE <- readRDS(here("Working", "cpue.RDS"))
+
+## join with session_ID
+dfr <- inner_join(wx, CPUE, by = c("session_ID", "island_code", "site_code", "lat", "long")) %>%
+  replace_with_na(replace = list("tot_precip" = "NaN", "wind_u" = "NaN", "wind_v" = "NaN", 
+                                 "wave_height" = "NaN", "wave_dir" = "NaN", "wave_period" = "NaN",
+                                 "tot_cloud" = "NaN", "low_cloud" = "NaN", "pressure" = "NaN", 
+                                 "surface_pressure" = "NaN", "sst" = "NaN", "temp_c" = "NaN",
+                                 "dew_point" = "NaN", "Moonup" = "NaN", "MoonAltitude" = "NaN", 
+                                 "Illu"= "NaN")) %>%
+  mutate(wind_speed = sqrt(wind_u^2+wind_v^2)) %>%
+  dplyr::select("session_ID", "session_year", "session_month", "island_code", "site_code", 
+                "start", "end", "wind_speed", "tot_precip", "wave_height":"Illu", "CPUEstd") %>%
+  filter(!is.na(CPUEstd)) %>% # 197 obs
+  mutate(logCPUE = log(CPUEstd)) %>% # use log of CPUEstd
+  ungroup()
+  
+## check CPUEstd NAs
+NAs <- CPUE %>%
+  filter(is.na(CPUEstd)) # 40 obs
+
+## scale predictors
+df <-  dfr %>% ## issues trying this with mutate_at
+  mutate(tot_precip = scale(tot_precip),
+         wind_speed = scale(wind_speed), 
+         wave_height = scale(wave_height),
+         wave_dir = scale(wave_dir), 
+         wave_period = scale(wave_period),
+         tot_cloud = scale(tot_cloud), 
+         low_cloud = scale(low_cloud),
+         pressure = scale(pressure), 
+         surface_pressure = scale(surface_pressure),
+         sst = scale(sst), 
+         temp_c = scale(temp_c), 
+         dew_point = scale(dew_point),
+         Moonup = scale(Moonup), 
+         MoonAltitude = scale(MoonAltitude), 
+         Illu = scale(Illu))
+
+## explore data
+ggplot(df) +
+  geom_histogram(mapping = aes(x = CPUEstd), bins = 20) +
+  xlab("CPUEstd") + ylab("Frequency") +
+  theme_minimal()
+# Appropriate to use normal distribution?
+
+## try logCPUE
+ggplot(df) +
+  geom_histogram(mapping = aes(x = logCPUE), bins = 20) +
+  xlab("logCPUE") + ylab("Frequency") +
+  theme_minimal()
+# Looks better!
+
+## other plots
+effort <- df %>%
+  group_by(session_year, site_code) %>%
+  summarize(effort = n())
+
+ggplot(effort) + 
+  geom_point(mapping = aes(x = as.character(session_year), y = effort, color = site_code), 
+             position = "jitter") +
+  xlab("Year") + ylab("No. sessions") +
+  theme_minimal()
+```
+
+## Modeling
+```{r nullmodel}
+## fit intercept-only model
+# site and year as random effects
+nmRE <- lmer(logCPUE ~ 1 + (1 | site_code) + (1 | session_year), data = df)
+sumary(nmRE)
+plot(nmRE)
+
+## model diagnostics
+# set plot area
+par(mai = c(0.9, 0.9, 0.6, 0.1),
+omi = c(0, 0, 0, 0),
+mfrow = c(1,2), cex.lab = 1.2)
+
+## qq resids
+qqnorm(residuals(nmRE), main = "QQ plot (residuals)", las = 1, pch = 16)
+qqline(residuals(nmRE)) # doesn't look too bad
+
+## residuals v fitted values
+plot(fitted(nmRE), residuals(nmRE), las = 1, pch = 16,
+xlab = "Fitted", ylab = "Residuals",
+main = "Residuals vs fitted")
+abline(h=0, lty = "dashed") # also does not look too bad
+
+# ## other models
+# # island as explanation for CPUE?
+# isl <- lm(CPUEstd ~ island_code, data = df)
+# sumary(isl)
+# plot(isl)
+# 
+# # try w/o random effects
+# nm <- lm(logCPUE ~ 1, data = df)
+# summary(nm)
+```
+
+## Predictors from ERA5 reanalysis data
+https://confluence.ecmwf.int/display/CKB/ERA5%3A+data+documentation#ERA5:datadocumentation-Parameterlistings
+
+* wind_u = '10m_u_component_of_wind' = 10 metre U wind component (m s**-1)
+      # This parameter is the eastward component of the 10m wind. It is the horizontal speed of air moving towards        #  the east, at a height of ten metres above the surface of the Earth, in metres per second.
+      # https://apps.ecmwf.int/codes/grib/param-db?id=165
+* wind_v = '10m_v_component_of_wind' = 10 metre V wind component (m s**-1)
+      # 	This parameter is the northward component of the 10m wind. It is the horizontal speed of air moving 
+      # towards the north, at a height of ten metres above the surface of the Earth, in metres per second.
+      # https://apps.ecmwf.int/codes/grib/param-db?id=166
+* dew_point = '2m_dewpoint_temperature' = 2 metre dewpoint temperature (K)
+* temp_C = '2m_temperature' =  2 metre temperature (K) 
+      ## confirm this with Abram, diff code online "2t", "t2m" in era5 code from Abram
+      # https://apps.ecmwf.int/codes/grib/param-db?id=167
+* low_cloud = 'low_cloud_cover' = Low cloud cover (0 - 1)
+* pressure = 'mean_sea_level_pressure'=  Mean sea level pressure (Pa)
+* wave_dir = 'mean_wave_direction' = Mean wave direction (degrees)
+* wave_period = 'mean_wave_period' = Mean wave period (s)
+* sst = 'sea_surface_temperature', = Sea surface temperature (K)
+* wave_height = 'significant_height_of_combined_wind_waves_and_swell'= Significant height of combined wind waves and swell (m)
+* surface_pressure = 'surface_pressure' = Surface pressure (Pa)
+* tot_cloud = 'total_cloud_cover' = Total cloud cover (0 - 1)
+* tot_precip = 'total_precipitation' = Total precipitation (m)
+
+## Moon data from oce package
+* moonup = 1 if moon is above horizon, otherwise 0
+      ## should these values be averaged then?
+* moonaltitude = altitude = moon altitude, in degrees from -90 to 90.
+* illu = 'illuminatedFraction' = fraction of moon’s visible disk that is illuminated
+
+### Correlation between predictors 
+```{r corr}
+## check for correlation between predictors (cutoff >0.65)
+(cp <- as.data.frame((round(cor(df[,10:25], use="complete.obs"), 2))))
+
+# covs df
+covs <- dfr %>%
+  dplyr::select(wind_speed:Illu)
+
+# this function flattens your data in a particular way, used below
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  =(cormat)[ut],
+    p = pmat[ut]
+  )
+}
+
+cor <- rcorr(as.matrix(covs))
+
+# creates a new formatted df
+cor_vals <- flattenCorrMatrix(cor$r, cor$P) %>% arrange(cor)
+
+#makes a plot
+corrplot(cor$r, type = "lower", order = "original", p.mat = cor$P,
+         insig = "blank", sig.level = 0.01, tl.col = "black", tl.cex = .9, number.cex = .2)
+```
+Positive correlations are displayed in blue and negative correlations in red color. Color intensity and the size of the circle are proportional to the correlation coefficients.
+
+Correlated predictors:
+* wind_u and wind_v 
+* wind_v and wave_height
+* wave_period and wave_dir
+* low_cloud and tot_cloud
+* surface_pressure and pressure
+* temp_c and sst
+* dew_point and sst
+* dew_point and temp_c
+* moonup and moonaltitude
+* moonup and illu
+* moonaltitude and illu
+* moonup and moonaltitude
+
+*wing_speed = sqrt(wind_u^2+wind_v^2)*
+*moon time above horizon x illu*
+
+```{r mod}
+preds <- c("tot_precip", "wind_u", "wind_v", "wave_height", "wave_dir", 
+               "wave_period","tot_cloud", "low_cloud", "pressure", "surface_pressure", 
+               "sst", "temp_c", "dew_point", "Moonup", "MoonAltitude", "Illu")
+# Combine moon variables? Wind? Wave?
+# How to deal with wind? Extract wind speed at midnight? east and north variables
+
+top_preds <- c("tot_precip", "wind_u", "wave_height", "tot_cloud", "pressure", 
+               "sst", "temp_c", "dew_point", "MoonAltitude", "Illu")
+
+## model selection
+## create data frame specifying predictors to include
+predictors <- as.data.frame(matrix(c(FALSE, TRUE), 2, 10)) # 10 potential predictors
+
+## add column names 
+cov_names <- colnames(predictors) <- c("tot_precip", "wind_u", "wave_height", "tot_cloud", " pressure", 
+               "sst", "temp_c", "dew_point", "MoonAltitude", "Illu")
+
+## create set of all possible combinations
+full_set <- expand.grid(predictors) # 1024 combinations
+
+## select models with correlated predictors
+ii <- which(full_set$temp_c + full_set$sst == 2 |
+              full_set$dew_point + full_set$sst == 2 |
+              full_set$dew_point + full_set$temp_c == 2 |
+              full_set$MoonAltitude + full_set$Illu == 2)
+
+# ii <- which(full_set$wind_u + full_set$wind_v == 2 |
+#               full_set$wind_v + full_set$wave_height == 2 |
+#               full_set$wave_period + full_set$wave_dir == 2 |
+#               full_set$low_cloud + full_set$tot_cloud == 2 |
+#               full_set$surface_pressure + full_set$pressure == 2 |
+#               full_set$temp_c + full_set$sst == 2 |
+#               full_set$dew_point + full_set$sst == 2 |
+#               full_set$dew_point + full_set$temp_c == 2 |
+#               full_set$Moonup + full_set$MoonAltitude == 2 |
+#               full_set$Moonup + full_set$Illu == 2 |
+#               full_set$MoonAltitude + full_set$Illu == 2 |
+#               full_set$Moonup + full_set$MoonAltitude == 2)
+
+## create reduced set of models and convert to a matrix for easier indexing
+use_set <- as.matrix(full_set[-ii,]) # 384 models to fit
+
+## number of models in set
+(n_mods <- nrow(use_set)) # 384 models to fit
+
+## create empty matrix for storing results
+mod_res <- matrix(NA, n_mods, 2)
+colnames(mod_res) <- c("AIC", "BIC")
+
+## fit models and store AIC & BIC
+for(i in 1:n_mods) {
+  if(i == 1) {
+    fmla <- "logCPUE ~ 1 + (1 | site_code) + (1 | session_year)"
+  } else {
+    fmla <- paste("logCPUE ~ (1 | site_code) + (1 | session_year) +", paste(cov_names[use_set[i,]], collapse = " + "))
+  }
+  mod_fit <- lmer(as.formula(fmla), data = df)
+  mod_res[i,"AIC"] <- AIC(mod_fit)
+  mod_res[i,"BIC"] <- BIC(mod_fit) 
+}
+
+## create empty matrix for storing results
+delta_res <- matrix(NA, n_mods, 2)
+colnames(delta_res) <- c("deltaAIC", "deltaBIC")
+
+## convert IC to deltaIC
+delta_res[,"deltaAIC"] <- mod_res[,"AIC"] - min(mod_res[,"AIC"])
+delta_res[,"deltaBIC"] <- mod_res[,"BIC"] - min(mod_res[,"BIC"])
+(delta_res <- round(delta_res, 2)) # round results
+
+## create df with mod results
+mp <- as.data.frame(use_set) 
+
+allm <- as.data.frame(delta_res) %>%
+  mutate(modelno = 1:384)%>%
+  arrange(deltaAIC) 
+
+## create df with top models
+bestm <- allm %>%
+  filter(deltaAIC <= 2) # 5 competitive models 
+
+top <- mp %>%
+  slice(97, 33, 353, 65, 321)
+
+## final predictors
+## fit full model
+fm <- lm(logCPUE ~ Type + PDO + Fish + PDSI + CUTI + (1 | Plot) + (1 | Year), 
+            data = SCMU, family = binomial)
+summary(fm)
+```
+
+```{r bestmod, echo = FALSE, message = FALSE, warning = FALSE, include = FALSE}
+bm <- lmer(logCPUE ~ (1 | site_code) + (1 | session_year) + dew_point, data = df)
+summary(bm)
+sumary(bm)
+mm <- model.matrix(bm)
+
+## extract predicted values and plot
+preds <- predict(bm)
+ggplot() + geom_histogram(mapping = aes(preds)) + theme_minimal()
+
+## extract residuals and plot
+resids <- residuals(bm)
+ggplot() + geom_histogram(mapping = aes(resids)) + theme_minimal()
+
+## extract coeffs and random effects
+coef(bm)
+artificial <- 1 / (1 + exp(-(0.15064))) # intercept
+crevice <- 1 / (1 + exp(-(0.15064 + 0.04569))) 
+shrub <- 1 / (1 + exp(-(0.15064 + 1.02356))) 
+ranefyr <- ranef(bm)$Year
+ranefpl <- ranef(bm)$Plot
+
+## estimated mean success
+eta <- predict(bm)
+
+## mean response
+mean(est <- 1 / (1 + exp(-eta)))
+```
+
+
+```{r diagnostics, echo = FALSE, message = FALSE, warning = FALSE, include = FALSE}
+## Q-Q Plots
+## set plot area
+par(mai = c(0.9, 0.9, 0.6, 0.1),
+    omi = c(0, 0, 0, 0),
+    mfrow = c(1,2), cex.lab = 1.2)
+
+# qq resids
+qqnorm(resids, main = "QQ plot (residuals)", las = 1, pch = 16)
+qqline(resids)
+
+# qq Plot RE
+qqnorm(unlist(ranefpl), main = "QQ plot (Plot RE)", las = 1, pch = 16)
+qqline(unlist(ranefpl))
+
+# qq Year RE
+qqnorm(unlist(ranefyr), main = "QQ plot (Year RE)", las = 1, pch = 16)
+qqline(unlist(ranefyr))
+
+## plot residuals versus fitted values
+yh <- fitted(bm, type = "response")
+plot(yh, resids, las = 1, pch = 16,
+     xlab = "Fitted", ylab = "Residuals",
+     main = "Residuals vs fitted")
+abline(h=0, lty = "dashed")
+
+## Levene's test
+## split residuals into 2 groups
+g1 <- resids[yh <= median(yh)]
+g2 <- resids[yh > median(yh)]
+
+## Levene's test
+var.test(g1, g2)
+# We would reject the null hypothesis that the variances are equal. 
+
+## Goodness of fit
+## Pearson's X^2 statistic
+X2 <- sum((success - yh)^2/yh)
+df <- nn-5 # 3 fixed effects, 2 random effects
+
+## likelihood ratio test
+pchisq(X2, df = 1323, lower.tail = FALSE)
+# large p-value, cannot reject H_0
+
+## check for overdispersion 
+c_hat <- deviance(bm)/df
+# close to 1
+
+## Likelihood ratio tests  
+## run model with plot RE only
+bm_plot <- glmer(Success ~ Type + (1 | Plot), data = SCMU, family = binomial)
+## run model with year RE only
+bm_yr <- glmer(Success ~ Type + (1 | Year), data = SCMU, family = binomial)
+## run model with both REs (same as top model)
+
+## conduct an LRT to see if the variance of the Plot RE is contributing useful info
+test_1 <- 2 * (logLik(bm) - logLik(bm_yr))
+pchisq(as.numeric(test_1), df = 1, lower.tail = FALSE)
+# There is support for inclusion of Plot as an RE
+
+## check for contribution of Year RE
+test_2 <- 2 * (logLik(bm) - logLik(bm_plot))
+pchisq(as.numeric(test_2), df = 1, lower.tail = FALSE)
+# There is support for inclusion of Year as an RE
+
+## Bootstrapping  to test for evidence against including multiple random effects in the same model
+## set random seed 
+set.seed(514)
+
+## fit null model with no RE's 
+nbm <- lm(Success ~ Type, data = SCMU)
+
+## calculate likelihood ratio (difference in log-likelihood)
+lambda <- 2 * (logLik(bm) - logLik(nbm))
+
+## number of bootstrapped samples
+nb <- 1000
+
+## empty vector for storing LRT statistics
+LRT_boot <- rep(NA, nb)
+
+## bootstrapping
+for(i in 1:nb) { # repeat nb times
+  sim_data <- unlist(simulate(nbm)) # simulate data from null model
+  m_null <- lm(sim_data ~ Type, data = SCMU) # fit null model to sim data 
+  m_alt <- lmer(sim_data ~ Type + (1 | Year) + (1 | Plot), data = SCMU, REML = FALSE) # fit RE model
+  LRT_boot[i] <- as.numeric(2*(logLik(m_alt) - logLik(m_null))) # calculate likelihood ratio 
+}
+
+## calculate approximate p-value
+mean(LRT_boot > lambda)
+# none of the bootstrapped samples had a test statistic larger than the original value of lambda
+```
+
+# Results
+
+
+## Tables
+
+\vspace{0.25in}
+
+\setlength{\leftskip}{0.5in}
+\setlength{\rightskip}{0.5in}
+
+\small
+
+`r tbl_cap(1, caption = "Model selection results.", display = "full")` 
+
+\normalsize
+
+\setlength{\leftskip}{0in}
+\setlength{\rightskip}{0in}
+
+```{r tbl, echo = FALSE}
+tbl <- allm
+
+# print table
+knitr::kable(tbl,
+             format = "latex",
+             booktabs = TRUE,
+             col.names = c("Model ID",
+                           "Fixed Effects",
+                           "$k$",
+                           "$\\Delta$AIC",
+                           "$\\Delta$BIC"),
+             escape = FALSE,
+             row.names = FALSE,
+             align = "ccr") %>%
+  kable_styling(position = "center", font_size = 10)
+```
+
+
+
+
+
+
+
+

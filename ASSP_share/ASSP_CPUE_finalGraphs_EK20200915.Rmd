@@ -127,7 +127,7 @@ ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/
 series_std <- ggplot(metadata_series, aes(as.character(series_ID), CPUEstd)) +
   geom_boxplot() +
   stat_n_text(y.pos = 0.4) +
-  xlab("Sequential Night") + ylab("Standardized CPUE") +
+  xlab("Sequential Night") + ylab("Standardized Catch-Per-Unit-Effort") +
   theme_cowplot(12) # theme_bw()
 series_std
 ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUEseries_std.pdf")
@@ -144,10 +144,10 @@ metadata_month <- gather(metadata_month, "CPUEtype", "CPUE", CPUEraw:CPUEstd)
 month <- ggplot(metadata, aes(as.character(session_month), CPUEstd)) +
   geom_boxplot() +
   stat_n_text(y.pos = 0.5) +
-  xlab("Month") + ylab("Standardized CPUE") +
+  xlab("Month") + ylab("Standardized Catch-Per-Unit-Effort") +
   theme_cowplot(12) # theme_bw()
 month
-ggsave(width = 5, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/month.pdf")
+ggsave(width = 5, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_month.pdf")
 
 month2 <- ggplot(metadata_month, aes(as.character(session_month), CPUE)) +
   geom_boxplot() +
@@ -156,7 +156,7 @@ month2 <- ggplot(metadata_month, aes(as.character(session_month), CPUE)) +
   xlab("Month") + ylab("Catch-Per-Unit-Effort") +
   theme_cowplot(12) # theme_bw()
 month2
-ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/month2.pdf")
+ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_month2.pdf")
 ```
 This graph show how catch rates varied across months 
 
@@ -210,10 +210,11 @@ metadata_yr <- gather(metadata_yr, "CPUEtype", "CPUE", CPUEraw:CPUEstd)
 
 year <- ggplot(metadata, aes(as.character(session_year), CPUEstd)) +
   geom_boxplot() +
-  xlab("Year") + ylab("Standardized CPUE") +
-  stat_n_text(size = 4, y.pos = 0.41) +
+  xlab("Year") + ylab("Standardized Catch-Per-Unit-Effort") +
+  stat_n_text(size = 3.5, y.pos = 0.41) +
   theme_cowplot(12) # theme_bw()
-year
+year %+% subset(metadata, session_year %in% c("1994", "1995", "1996", "2004", "2005", "2006", "2007", "2009", 
+                                            "2010", "2011", "2014", "2015", "2016", "2017", "2018"))
 ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_yr.pdf")
 
 year2 <- ggplot(metadata_yr, aes(as.character(session_year), CPUE)) +
@@ -289,7 +290,7 @@ metadata_isl <- gather(metadata_isl, "CPUEtype", "CPUE", CPUEraw:CPUEstd)
 
 island <- ggplot(metadata, aes(island_code, CPUEstd)) +
   geom_boxplot() +
-  xlab("Island") + ylab("Standardized CPUE") +
+  xlab("Island") + ylab("Standardized Catch-Per-Unit-Effort") +
   stat_n_text(size = 4, y.pos = 0.41) +
   theme_cowplot(12) # theme_bw()
 island 
@@ -359,12 +360,12 @@ NOTE: the samples sizes at the top are the sum of CPUEbrd_std and CPUEstd
 
 #### CATCH TIMES
 ```{r catch times 1}
-metadata_effort <- metadata_test %>% 
-  dplyr::select(site_code, session_ID, app_sunset_new, std_ending, lat, long)
+# metadata_effort <- metadata_test %>% 
+#   dplyr::select(site_code, session_ID, app_sunset_new, std_ending, lat, long)
 
-catches <-  ASSP %>% 
-  left_join(metadata_effort, by = c("site_code", "session_ID", "lat", "long")) %>% 
-  filter(TRUE)
+# catches <-  ASSP %>% 
+#   left_join(metadata_effort, by = c("site_code", "session_ID", "lat", "long")) %>% 
+#   filter(TRUE)
   # mutate(app_sunset = as.numeric(app_sunset_new), capture_date = as.numeric(capture_date),
   #        catchPastSS = minutes(app_sunset_new) - minutes(capture_date)) %>%
          # catchPastSS = duration(capture_date, app_sunset_new, "minutes")) %>%
@@ -375,8 +376,8 @@ catches <-  ASSP %>%
          # catchPastSS = minutes(app_sunset_new) - minutes(capture_date)) %>%  # %>% 
   # dplyr::select(catch_ID:site_code, app_sunset_new, capture_date, catchPastSS)
 
-write.csv(catches, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_7_catchesPastSS.csv',
-          row.names = FALSE)
+# write.csv(catches, file = '~/WERC-SC/ASSP_share/ASSP_CPUE_7_catchesPastSS.csv',
+#           row.names = FALSE)
 catches_rev <- read.csv('~/WERC-SC/ASSP_share/ASSP_CPUE_7_catchesPastSS_rev.csv') %>%  
   mutate_at(c("app_sunset", "std_ending", "capture_date", "release_date"),
             .funs = ~as.POSIXct(., format="%m/%d/%Y %H:%M")) %>% # SECONDS dropped from app_sunset and std_ending during transition to and from excel
@@ -443,7 +444,7 @@ CPUE_min <- ggplot(metadata, aes(min, CPUEraw)) +
   geom_point() +
   geom_smooth(method = 'lm') +
   geom_text(x = 450, y = 0.25, label = lm_eqn(metadata, y = metadata$CPUEraw, x = metadata$min), parse = TRUE) + 
-  xlab("Total Netting Minutes") + ylab("CPUE") +
+  xlab("Total Netting Minutes") + ylab("Catch-Per-Unit-Effort") +
   theme_cowplot(12) # 
 CPUE_min
 ggsave(width = 7, height = 5, dpi=300, filename = "~/WERC-SC/ASSP_share/figures/CPUE_v_min.pdf")
@@ -453,7 +454,7 @@ This graphs show the CPUE in relation to the number of minutes the net was open.
 CPUE_minstd <- ggplot(metadata, aes(min_std, CPUEstd)) +
   geom_point() +
   geom_smooth(method = 'lm') +
-  xlab("Total Netting Minutes") + ylab("Standardized CPUE") +
+  xlab("Total Netting Minutes") + ylab("Standardized Catch-Per-Unit-Effort") +
   geom_text(x = 250, y = 0.35, label = lm_eqn(metadata, y = metadata$CPUEstd, x = metadata$min_std), parse = TRUE) + 
   theme_cowplot(12) 
 CPUE_minstd
